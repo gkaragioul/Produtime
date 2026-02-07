@@ -1,0 +1,25 @@
+{
+    "configurations": [
+        u
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Produtime}",
+            "name": "Debug ProduTime",
+            "target": "ProduTime",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug ProduTime"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:Produtime}",
+            "name": "Release ProduTime",
+            "target": "ProduTime",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release ProduTime"
+        }
+    ]
+}

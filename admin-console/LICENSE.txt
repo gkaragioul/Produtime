@@ -1,0 +1,143 @@
+END-USER LICENSE AGREEMENT (EULA) FOR PRODUTIME ADMIN CONSOLE
+
+Last Updated: January 15, 2026
+
+COPYRIGHT (C) 2025-2026 GEORGE KARAGIOULES. ALL RIGHTS RESERVED.
+
+IMPORTANT: PLEASE READ THIS END-USER LICENSE AGREEMENT ("AGREEMENT") CAREFULLY BEFORE INSTALLING OR USING PRODUTIME ADMIN CONSOLE SOFTWARE.
+
+BY INSTALLING, COPYING, OR OTHERWISE USING THIS SOFTWARE, YOU AGREE TO BE BOUND BY THE TERMS OF THIS AGREEMENT. IF YOU DO NOT AGREE TO THE TERMS OF THIS AGREEMENT, DO NOT INSTALL OR USE THE SOFTWARE.
+
+1. DEFINITIONS
+
+"Software" means ProduTime Admin Console, including all updates, upgrades, and associated documentation.
+"Licensor" means George Karagioules, the sole owner and copyright holder of ProduTime.
+"Licensee" or "You" means the individual or entity that has purchased a valid license to use the Software.
+"License Key" means the unique alphanumeric code provided to activate the Software.
+
+2. LICENSE GRANT
+
+Subject to the terms of this Agreement and upon purchase of a valid license, the Licensor grants you a limited, non-exclusive, non-transferable license to:
+   a) Install and use the Software on computers within your organization
+   b) Use the Software in accordance with your purchased license tier
+   c) Make backup copies for archival purposes only
+
+This Software requires a valid license key for operation. Unauthorized use, distribution, or circumvention of the licensing system is strictly prohibited and may result in legal action.
+
+3. LICENSE RESTRICTIONS
+
+You may NOT:
+   a) Copy, modify, or distribute the Software except as expressly permitted
+   b) Reverse engineer, decompile, disassemble, or attempt to derive the source code
+   c) Remove, alter, or obscure any copyright, trademark, or proprietary notices
+   d) Rent, lease, lend, sell, sublicense, or transfer the Software to third parties
+   e) Use the Software to provide services to third parties (SaaS) without written permission
+   f) Circumvent, disable, or interfere with the licensing or copy protection mechanisms
+   g) Share, publish, or distribute your License Key to any third party
+   h) Use the Software for any illegal, unauthorized, or unethical purpose
+
+4. INTELLECTUAL PROPERTY
+
+The Software is protected by copyright laws and international treaties. All title, ownership rights, and intellectual property rights in and to the Software (including but not limited to any code, images, text, and "applets" incorporated into the Software) are owned by George Karagioules.
+
+This Agreement does not grant you any rights to patents, copyrights, trade secrets, trademarks, or any other rights in respect to the Software.
+
+5. DATA COLLECTION AND PRIVACY
+
+The Software may collect:
+   - Device management and connectivity data
+   - Usage statistics for connected ProduTime clients
+   - License validation information
+   - System diagnostic information
+
+Data collected by the Admin Console from connected devices is stored locally. License validation requires periodic communication with our licensing servers.
+
+6. SUBSCRIPTION AND PAYMENT
+
+The Software operates on a subscription license model. Your license grants usage rights for the duration of your subscription period. Upon expiration or non-renewal:
+   - The Software will enter a restricted mode
+   - Access to features will be limited until license renewal
+   - Your data remains accessible for export
+
+7. UPDATES AND SUPPORT
+
+Licensed users are entitled to:
+   - Software updates during the active subscription period
+   - Technical support as specified in your license tier
+   - Access to new features released during your subscription
+
+8. WARRANTY DISCLAIMER
+
+THE SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. GEORGE KARAGIOULES DISCLAIMS ALL WARRANTIES, INCLUDING BUT NOT LIMITED TO:
+   - MERCHANTABILITY
+   - FITNESS FOR A PARTICULAR PURPOSE
+   - NON-INFRINGEMENT
+   - ACCURACY OR RELIABILITY OF RESULTS
+
+THE LICENSOR DOES NOT WARRANT THAT THE SOFTWARE WILL MEET YOUR REQUIREMENTS, OPERATE WITHOUT INTERRUPTION, OR BE ERROR-FREE.
+
+9. LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL GEORGE KARAGIOULES BE LIABLE FOR ANY:
+   - INDIRECT, INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES
+   - LOSS OF PROFITS, REVENUE, DATA, OR BUSINESS OPPORTUNITIES
+   - DAMAGES ARISING FROM USE OR INABILITY TO USE THE SOFTWARE
+
+THE TOTAL LIABILITY OF THE LICENSOR SHALL NOT EXCEED THE AMOUNT PAID BY YOU FOR THE SOFTWARE LICENSE IN THE TWELVE (12) MONTHS PRECEDING THE CLAIM.
+
+10. TERMINATION
+
+This Agreement is effective until terminated. Your license will terminate automatically if you:
+   a) Fail to comply with any term of this Agreement
+   b) Attempt to circumvent the licensing system
+   c) Share or distribute your License Key
+   d) Fail to renew your subscription (subject to grace periods)
+
+Upon termination:
+   - You must cease all use of the Software
+   - You must destroy all copies of the Software
+   - You must delete or return any License Keys
+
+Sections 4, 8, 9, and 11 shall survive termination.
+
+11. GOVERNING LAW AND JURISDICTION
+
+This Agreement shall be governed by and construed in accordance with the laws of Greece. Any disputes arising from this Agreement shall be subject to the exclusive jurisdiction of the courts of Athens, Greece.
+
+12. EXPORT COMPLIANCE
+
+You agree to comply with all applicable export laws and regulations. You may not export or re-export the Software to any country subject to trade sanctions or embargoes.
+
+13. ENTIRE AGREEMENT
+
+This Agreement constitutes the entire agreement between you and George Karagioules regarding the Software. It supersedes all prior agreements, proposals, and communications.
+
+14. SEVERABILITY
+
+If any provision of this Agreement is held invalid or unenforceable, the remaining provisions shall continue in full force and effect.
+
+15. NO WAIVER
+
+Failure to enforce any provision of this Agreement shall not constitute a waiver of future enforcement.
+
+16. CONTACT INFORMATION
+
+For licensing inquiries, support, or legal matters:
+
+George Karagioules
+ProduTime Software
+Email: support@produtime.com
+
+17. ACKNOWLEDGMENT
+
+BY INSTALLING OR USING THE SOFTWARE, YOU ACKNOWLEDGE THAT:
+   - You have read and understood this Agreement
+   - You agree to be bound by its terms and conditions
+   - You have the authority to enter into this Agreement
+   - You have obtained a valid license for your use of the Software
+
+---
+
+Copyright (C) 2025-2026 George Karagioules. All Rights Reserved.
+ProduTime and ProduTime Admin Console are trademarks of George Karagioules.
+Unauthorized reproduction or distribution is prohibited and may result in civil and criminal penalties.
