@@ -91,6 +91,7 @@ export class EnhancedLicenseService {
 
   private serverUrl: string;
   private revocationCheckTimer: NodeJS.Timeout | null = null;
+  private heartbeatScheduleTimer: NodeJS.Timeout | null = null;
 
   private constructor(db: DatabaseManager, publicKey: string, serverUrl: string) {
     this.db = db;
@@ -331,10 +332,14 @@ export class EnhancedLicenseService {
         // Prevents users from extending grace period by setting clock back
         if (state.lastServerTime && state.lastServerLocalTime) {
           const serverTime = new Date(state.lastServerTime).getTime();
-          const drift = now - state.lastServerLocalTime - (Date.now() - state.lastServerLocalTime);
+          // Calculate drift: compare elapsed time since last server contact
+          // against what the server thought the time was
+          const localElapsed = now - state.lastServerLocalTime;
+          const expectedNow = serverTime + localElapsed;
+          const drift = now - expectedNow;
           if (Math.abs(drift) > 30 * 60 * 1000) { // > 30 minutes
             logger.warn('ENHANCED_LICENSE', 'Time drift detected in grace period check', { drift });
-            now = serverTime + (Date.now() - state.lastServerLocalTime);
+            now = expectedNow;
           }
         }
 
@@ -836,8 +841,12 @@ export class EnhancedLicenseService {
    * Schedule next heartbeat
    */
   private scheduleHeartbeat(): void {
+    // Clear any existing scheduled heartbeat to prevent duplicates
+    if (this.heartbeatScheduleTimer) {
+      clearTimeout(this.heartbeatScheduleTimer);
+    }
     const intervalMs = this.HEARTBEAT_INTERVAL_HOURS * 60 * 60 * 1000;
-    setTimeout(() => {
+    this.heartbeatScheduleTimer = setTimeout(() => {
       this.heartbeatIfDue();
     }, intervalMs);
   }
@@ -885,6 +894,10 @@ export class EnhancedLicenseService {
       clearInterval(this.revocationCheckTimer);
       this.revocationCheckTimer = null;
       logger.info('ENHANCED_LICENSE', 'Revocation checks stopped');
+    }
+    if (this.heartbeatScheduleTimer) {
+      clearTimeout(this.heartbeatScheduleTimer);
+      this.heartbeatScheduleTimer = null;
     }
   }
 

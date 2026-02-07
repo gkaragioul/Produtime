@@ -154,8 +154,14 @@ export const AdminLoginDialog: React.FC<AdminLoginDialogProps> = ({
           if (nowLocked) {
             setIsLocked(true);
             setError('Account is locked. Please try again later.');
+            try {
+              const seconds = await adminAuthService.getLockoutTimeRemaining();
+              setLockoutRemaining(seconds);
+            } catch {}
           }
-        } catch {}
+        } catch (err) {
+          console.warn('Error checking lockout after failed attempt:', err);
+        }
       }
     } catch (error) {
       console.log('🔧 [DEBUG] AdminLoginDialog: Login error:', error);

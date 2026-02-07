@@ -16,6 +16,7 @@ export class AutoExportScheduler {
   private db: DatabaseManager;
   private pdf: PDFGenerator;
   private timer: NodeJS.Timeout | null = null;
+  private isExporting = false;
   private opts: Required<SchedulerOptions>;
 
   constructor(
@@ -198,6 +199,10 @@ export class AutoExportScheduler {
   // Force an export regardless of time/date conditions (for testing)
   public async forceExport() {
     this.opts.logger('🔧 [AutoExport] forceExport called');
+    if (this.isExporting) {
+      throw new Error('Export already in progress');
+    }
+    this.isExporting = true;
     try {
       const enabled = this.db.getSetting('auto_export_enabled');
       this.opts.logger('🔧 [AutoExport] auto_export_enabled:', enabled);
@@ -270,6 +275,8 @@ export class AutoExportScheduler {
       } catch {}
       this.opts.logger('❌ [AutoExport] Manual export error:', err);
       throw err;
+    } finally {
+      this.isExporting = false;
     }
   }
 
@@ -407,10 +414,19 @@ export class AutoExportScheduler {
   }
 
   private ensureDir(dir: string) {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    try {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    } catch (err) {
+      this.opts.logger(`[AutoExport] Failed to create directory: ${dir}`, err);
+      throw new Error(`Failed to create export directory: ${dir}`);
+    }
   }
 
   private async tick() {
+    if (this.isExporting) {
+      this.opts.logger('[AutoExport] Export already in progress, skipping tick');
+      return;
+    }
     try {
       const enabled = this.db.getSetting('auto_export_enabled');
       if (enabled !== 'true') {
@@ -547,7 +563,13 @@ export class AutoExportScheduler {
       this.opts.logger(
         '[AutoExport] Generating comprehensive report with enhanced analytics...'
       );
-      const result = await this.pdf.generateReport(options as any);
+      this.isExporting = true;
+      let result;
+      try {
+        result = await this.pdf.generateReport(options as any);
+      } finally {
+        this.isExporting = false;
+      }
 
       this.db.setSetting('last_auto_export_date', today);
       try {

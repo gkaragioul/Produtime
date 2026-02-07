@@ -59,11 +59,13 @@ export class StartupHelper {
 
     // Create shortcut using PowerShell (for backward compatibility)
     // Write script to temp file to avoid command injection
+    // Escape backticks and double quotes for PowerShell string safety
+    const psEscape = (s: string) => s.replace(/\\/g, '\\\\').replace(/`/g, '``').replace(/"/g, '`"');
     const psScript = `
       $WshShell = New-Object -ComObject WScript.Shell
-      $Shortcut = $WshShell.CreateShortcut("${shortcutPath.replace(/\\/g, '\\\\')}")
-      $Shortcut.TargetPath = "${exePath.replace(/\\/g, '\\\\')}"
-      $Shortcut.WorkingDirectory = "${path.dirname(exePath).replace(/\\/g, '\\\\')}"
+      $Shortcut = $WshShell.CreateShortcut("${psEscape(shortcutPath)}")
+      $Shortcut.TargetPath = "${psEscape(exePath)}"
+      $Shortcut.WorkingDirectory = "${psEscape(path.dirname(exePath))}"
       $Shortcut.Description = "ProduTime - Activity Tracking"
       $Shortcut.Save()
     `;

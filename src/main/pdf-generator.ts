@@ -14,6 +14,7 @@ export class PDFGenerator {
   private reportsDir: string;
   private dataService: ReportDataService;
   private renderer: ReportRenderer;
+  private renderingInProgress = false;
 
   constructor(private database: DatabaseManager) {
     // Primary reports directory under ProduTime, with fallback to legacy TimePort if primary is empty or missing
@@ -221,9 +222,12 @@ export class PDFGenerator {
         );
       }
 
-      // Find the report file by ID
+      // Find the report file by ID - use precise match to avoid partial ID collisions
       const files = fs.readdirSync(this.reportsDir);
-      const reportFile = files.find((file) => file.includes(reportId));
+      const reportFile = files.find((file) => {
+        const baseName = path.basename(file, path.extname(file));
+        return baseName.endsWith(reportId);
+      });
 
       if (!reportFile) {
         throw new Error(`Report with ID ${reportId} not found`);
@@ -269,6 +273,12 @@ export class PDFGenerator {
     htmlContent: string,
     outPath: string
   ): Promise<void> {
+    // Prevent concurrent PDF rendering to avoid resource leaks
+    if (this.renderingInProgress) {
+      throw new Error('PDF rendering already in progress');
+    }
+    this.renderingInProgress = true;
+
     // Renders the provided HTML string into a real PDF using an offscreen BrowserWindow
     const win = new BrowserWindow({
       show: false,
@@ -281,6 +291,12 @@ export class PDFGenerator {
     });
     console.log('[PDF] BrowserWindow created for PDF rendering');
 
+    // Add a timeout to prevent hanging forever
+    const RENDER_TIMEOUT_MS = 30000;
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('PDF rendering timed out after 30s')), RENDER_TIMEOUT_MS)
+    );
+
     try {
       const url =
         'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
@@ -292,7 +308,7 @@ export class PDFGenerator {
       });
       await win.loadURL(url);
       // Always await did-finish-load to avoid timing races that can yield blank PDFs
-      await loadPromise;
+      await Promise.race([loadPromise, timeoutPromise]);
 
       // Ensure fonts/layout are fully ready and give Chromium a couple of frames
       try {
@@ -352,6 +368,7 @@ export class PDFGenerator {
 
       fs.writeFileSync(outPath, pdfBuffer);
     } finally {
+      this.renderingInProgress = false;
       if (!win.isDestroyed()) {
         win.destroy();
       }

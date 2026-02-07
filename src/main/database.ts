@@ -330,16 +330,19 @@ export class DatabaseManager {
     // Get current migration version
     const currentVersion = this.getCurrentMigrationVersion();
 
-    // Apply pending migrations
+    // Apply pending migrations, each in its own transaction for atomicity
     for (const migration of migrations) {
       if (migration.version > currentVersion) {
-        try {
+        const runMigration = this.db.transaction(() => {
           this.db.exec(migration.up);
           this.db
             .prepare(
               'INSERT INTO migrations (version, description) VALUES (?, ?)'
             )
             .run(migration.version, migration.description);
+        });
+        try {
+          runMigration();
           console.log(
             `Applied migration ${migration.version}: ${migration.description}`
           );
