@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ProduTime</title>
+    <script>
+      // Fix global variable issues for Electron renderer
+      if (typeof global === "undefined") {
+        window.global = window;
+      }
+      if (typeof process === "undefined") {
+        window.process = { env: {} };
+      }
+      if (typeof Buffer === "undefined") {
+        window.Buffer = {};
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root">Loading ProduTime...</div>
+    <script src="bundle.js" defer></script>
+  </body>
+</html>

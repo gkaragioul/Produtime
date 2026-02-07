@@ -1,0 +1,87 @@
+{
+  "name": "produtime-admin-console",
+  "version": "1.2.2",
+  "description": "ProduTime Admin Console - Centralized management for ProduTime devices",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "build:main": "tsc -p src/main/tsconfig.json",
+    "build:renderer": "webpack --mode production --config webpack.config.js",
+    "build": "npm run build:main && npm run build:renderer",
+    "start": "electron .",
+    "dev": "npm run build && npm start",
+    "dist": "npm run build && electron-builder --win"
+  },
+  "keywords": [
+    "produtime",
+    "admin-console",
+    "time-tracking",
+    "management"
+  ],
+  "author": "George Karagioules",
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "electron-updater": "^6.6.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tweetnacl": "^1.0.3",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@types/ws": "^8.5.13",
+    "copy-webpack-plugin": "^13.0.1",
+    "css-loader": "^7.1.2",
+    "electron": "^37.10.0",
+    "electron-builder": "^26.0.12",
+    "html-webpack-plugin": "^5.6.4",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.2",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1"
+  },
+  "build": {
+    "appId": "com.produtime.admin-console",
+    "productName": "ProduTime Admin Console",
+    "directories": {
+      "output": "build-output"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../assets/PTAdminIcon.png",
+        "to": "assets/PTAdminIcon.png"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "../assets/PTAdminIcon.png",
+      "artifactName": "ProduTime-AdminConsole-${version}-x64.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "include": "build/installer.nsh",
+      "installerIcon": "../assets/PTAdminIcon.ico",
+      "uninstallerIcon": "../assets/PTAdminIcon.ico",
+      "runAfterFinish": true,
+      "license": "LICENSE.txt"
+    }
+  }
+}

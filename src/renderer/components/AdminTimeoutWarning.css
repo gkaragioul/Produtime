@@ -1,0 +1,263 @@
+/* AdminTimeoutWarning.css */
+
+.admin-timeout-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.admin-timeout-warning {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  max-width: 500px;
+  width: 90%;
+  padding: 24px;
+  animation: slideIn 0.3s ease-out;
+  border: 3px solid;
+}
+
+.admin-timeout-warning.warning {
+  border-color: #f59e0b; /* Amber */
+}
+
+.admin-timeout-warning.critical {
+  border-color: #ef4444; /* Red */
+  animation: pulse 1s infinite;
+}
+
+.timeout-warning-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.timeout-warning-icon {
+  margin-right: 12px;
+  font-size: 24px;
+}
+
+.icon-warning {
+  color: #f59e0b;
+}
+
+.icon-critical {
+  color: #ef4444;
+  animation: shake 0.5s infinite;
+}
+
+.timeout-warning-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.timeout-warning-content {
+  margin-bottom: 24px;
+}
+
+.timeout-warning-description {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+.countdown {
+  font-weight: 700;
+  font-size: 18px;
+  color: #f59e0b;
+  transition: color 0.3s ease;
+}
+
+.countdown.critical {
+  color: #ef4444;
+  animation: blink 1s infinite;
+}
+
+.timeout-warning-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.btn:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: #2563eb;
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background-color: #6b7280;
+  color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: #4b5563;
+  transform: translateY(-1px);
+}
+
+.btn-secondary:active {
+  transform: translateY(0);
+}
+
+/* Responsive design */
+.admin-timeout-warning.responsive {
+  max-width: 500px;
+}
+
+@media (max-width: 640px) {
+  .admin-timeout-warning.responsive {
+    max-width: 95%;
+    padding: 20px;
+  }
+  
+  .timeout-warning-actions {
+    flex-direction: column;
+  }
+  
+  .btn {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  .timeout-warning-title {
+    font-size: 18px;
+  }
+  
+  .timeout-warning-description {
+    font-size: 14px;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-2px);
+  }
+  75% {
+    transform: translateX(2px);
+  }
+}
+
+@keyframes blink {
+  0%, 50% {
+    opacity: 1;
+  }
+  51%, 100% {
+    opacity: 0.5;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .admin-timeout-warning {
+    border-width: 4px;
+  }
+  
+  .btn:focus {
+    outline-width: 3px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .admin-timeout-overlay,
+  .admin-timeout-warning,
+  .countdown,
+  .icon-critical,
+  .btn {
+    animation: none;
+    transition: none;
+  }
+  
+  .btn:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .admin-timeout-warning {
+    background: #1f2937;
+    color: #f9fafb;
+  }
+  
+  .timeout-warning-title {
+    color: #f9fafb;
+  }
+  
+  .timeout-warning-description {
+    color: #d1d5db;
+  }
+}

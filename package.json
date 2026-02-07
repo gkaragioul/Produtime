@@ -1,0 +1,235 @@
+{
+  "name": "produtime",
+  "version": "1.9.0",
+  "description": "ProduTime - Time tracking application with production licensing",
+  "main": "dist/main/main.js",
+  "homepage": "https://github.com/georgekgr12/timeport",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/georgekgr12/timeport.git"
+  },
+  "scripts": {
+    "prepare": "husky install",
+    "postinstall": "electron-builder install-app-deps",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "lint:fix": "eslint . --ext .js,.jsx,.ts,.tsx --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test:tdd": "jest --watch --verbose",
+    "test:coverage": "jest --coverage",
+    "tdd": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tdd-workflow.ps1",
+    "__AI_ASSISTANT_README__": "echo \"AI ASSISTANTS: Use 'npm run build' (alias of build:safe) for ALL builds and 'npm run panic:restore' for recovery. Do NOT call electron-builder directly or modify scripts in ./scripts without explicit user permission.\"",
+    "build": "npm run build:safe",
+    "build:simple": "npm run build:main && npm run build:renderer && npm run package:x64",
+    "build:main": "tsc -p src/main/tsconfig.json",
+    "build:renderer": "webpack --mode production --config webpack.config.js",
+    "package": "electron-builder --win --dir",
+    "package:x64": "electron-builder --win portable --x64 --dir",
+    "dist": "npm run build && electron-builder --win",
+    "dist:x64": "npm run build && electron-builder --win portable --x64",
+    "export:desktop": "echo LEGACY: Do not use 'npm run export:desktop'. Use 'npm run package:produtime' instead.",
+    "start": "cross-env NODE_ENV=production electron .",
+    "start:silent": "wscript.exe //nologo .\\scripts\\start-produtime-dev-silent.vbs",
+    "start:old": "echo LEGACY: Do not use 'npm run start:old'. Use 'npm start' instead.",
+    "app": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/start-app.ps1",
+    "rebuild": "npm run build",
+    "clean": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/pre-build-cleanup.ps1",
+    "cleanup:workspace": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/auto-cleanup-workspace.ps1",
+    "build:safe": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/safe-build.ps1",
+    "verify:current": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-validator.ps1",
+    "panic:restore": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/panic-restore.ps1",
+    "panic:restore:license-manager": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/panic-restore-license-manager.ps1",
+    "status": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path CURRENT_VERSION.lock) { Get-Content CURRENT_VERSION.lock | ConvertFrom-Json | Format-List } else { Write-Host 'No version lock found' }\"",
+    "workspace:startup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/workspace-startup.ps1",
+    "test:launch": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$p = Start-Process -FilePath 'build-output\\win-unpacked\\ProduTime.exe' -PassThru; Start-Sleep 5; if ($p.HasExited) { Write-Host 'FAILED: App crashed'; exit 1 } else { Write-Host 'PASSED: App running'; Stop-Process $p; exit 0 }\"",
+    "license:keypair": "ts-node --project tools/tsconfig.json tools/license-generator.ts keypair",
+    "license:generate": "ts-node --project tools/tsconfig.json tools/license-generator.ts generate",
+    "license:activate": "ts-node --project tools/tsconfig.json tools/license-generator.ts activate",
+    "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/deploy-to-local.ps1",
+    "test:produtime": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/launch-local-produtime.ps1",
+    "test:produtime:silent": "wscript.exe //nologo .\\scripts\\start-produtime-silent.vbs",
+    "test:license-manager": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/launch-local-license-manager.ps1",
+    "test:license-manager:silent": "wscript.exe //nologo .\\scripts\\start-license-manager-silent.vbs",
+    "package:produtime": "npm run dist:x64 && powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-for-distribution.ps1",
+    "package:license-manager": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/safe-build-license-manager.ps1",
+    "package:all": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-for-distribution.ps1",
+    "package:existing": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-existing-installs.ps1",
+    "save:working": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tag-working-version.ps1",
+    "maintenance:weekly": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/weekly-maintenance.ps1",
+    "workspace:init": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/workspace-init.ps1",
+    "deps:check": "npm outdated",
+    "deps:update": "npm update",
+    "deps:audit": "npm audit fix",
+    "typecheck": "tsc -p src/main/tsconfig.json --noEmit && tsc -p admin-console/tsconfig.json --noEmit && tsc -p licensing-server/api/tsconfig.json --noEmit",
+    "test:all": "npm test && node scripts/simulate-license-scenarios.js"
+  },
+  "keywords": [
+    "produtime",
+    "time-tracking",
+    "electron",
+    "react",
+    "typescript"
+  ],
+  "author": "George Karagioules",
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@swc/core": "^1.13.5",
+    "@swc/jest": "^0.2.39",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/react": "^16.3.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/jest": "^30.0.0",
+    "@types/jspdf": "^1.3.3",
+    "@types/node": "^24.3.0",
+    "@types/nodemailer": "^7.0.1",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^8.41.0",
+    "@typescript-eslint/parser": "^8.41.0",
+    "asar": "^3.2.0",
+    "bs-logger": "^0.2.6",
+    "buffer": "^6.0.3",
+    "concurrently": "^9.2.1",
+    "copy-webpack-plugin": "^13.0.1",
+    "cross-env": "^10.0.0",
+    "css-loader": "^7.1.2",
+    "electron": "^37.10.0",
+    "electron-builder": "^26.0.12",
+    "electron-rebuild": "^3.2.9",
+    "eslint": "^9.34.0",
+    "fast-check": "^4.5.3",
+    "html-webpack-plugin": "^5.6.4",
+    "husky": "^8.0.3",
+    "identity-obj-proxy": "^3.0.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jimp": "^1.6.0",
+    "lint-staged": "^13.2.3",
+    "png-to-ico": "^3.0.1",
+    "prettier": "^3.6.2",
+    "process": "^0.11.10",
+    "rcedit": "^5.0.0",
+    "sharp": "^0.34.5",
+    "style-loader": "^4.0.0",
+    "ts-jest": "^29.4.1",
+    "ts-loader": "^9.5.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "wait-on": "^8.0.4",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1",
+    "webpack-dev-server": "^5.2.2"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ]
+  },
+  "build": {
+    "appId": "com.produtime.app",
+    "productName": "ProduTime",
+    "icon": "../assets/icon.ico",
+    "asar": false,
+    "directories": {
+      "output": "build-output"
+    },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "ProduTime-Setup-${version}-x64.${ext}",
+      "icon": "../assets/icon.ico",
+      "forceCodeSigning": false,
+      "verifyUpdateCodeSignature": false,
+      "signAndEditExecutable": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "../assets/icon.icns"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "../assets/icon.png"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "georgekgr12",
+      "repo": "timeport"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "license": "LICENSE.txt",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "../assets/icon.ico",
+      "uninstallerIcon": "../assets/icon.ico",
+      "runAfterFinish": false,
+      "perMachine": true,
+      "displayLanguageSelector": false,
+      "allowElevation": true,
+      "warningsAsErrors": false,
+      "include": "build/installer.nsh"
+    }
+  },
+  "dependencies": {
+    "@journeyapps/sqlcipher": "^5.3.1",
+    "active-win": "^8.2.1",
+    "better-sqlite3": "^12.2.0",
+    "electron-updater": "^6.6.2",
+    "events": "^3.3.0",
+    "html2canvas": "^1.4.1",
+    "javascript-obfuscator": "^4.1.1",
+    "jspdf": "^3.0.2",
+    "node-machine-id": "^1.1.12",
+    "nodemailer": "^7.0.5",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tweetnacl": "^1.0.3",
+    "tweetnacl-util": "^0.15.1",
+    "webpack-obfuscator": "^3.5.1",
+    "ws": "^8.19.0"
+  }
+}

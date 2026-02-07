@@ -1,0 +1,177 @@
+// SQLite schema for local development
+// Copy this to schema.prisma for local dev
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id         String   @id @default(uuid())
+  name       String
+  wsEndpoint String   @unique
+  apiKey     String   @unique
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  settings   String?
+
+  admins       AdminUser[]
+  devices      Device[]
+  pairCodes    PairCode[]
+  pairRequests PairRequest[]
+  dailyMetrics DailyMetrics[]
+  auditLogs    AuditLog[]
+
+  @@map("tenants")
+}
+
+model AdminUser {
+  id             String    @id @default(uuid())
+  tenantId       String    @map("tenant_id")
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  email          String
+  passwordHash   String    @map("password_hash")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  lastLoginAt    DateTime? @map("last_login_at")
+  lockedUntil    DateTime? @map("locked_until")
+  failedAttempts Int       @default(0) @map("failed_attempts")
+
+  @@unique([tenantId, email])
+  @@index([email])
+  @@index([tenantId])
+  @@map("admin_users")
+}
+
+model Device {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deviceId     String    @map("device_id")
+  deviceName   String    @map("device_name")
+  devicePubKey String    @map("device_pub_key")
+  pairedAt     DateTime  @default(now()) @map("paired_at")
+  lastSeenAt   DateTime? @map("last_seen_at")
+  status       String    @default("offline")
+  appVersion   String?   @map("app_version")
+  ip           String?
+  policyId     String?   @map("policy_id")
+  revoked      Boolean   @default(false)
+
+  dailyMetrics DailyMetrics[]
+
+  @@unique([tenantId, deviceId])
+  @@index([tenantId, status])
+  @@index([tenantId])
+  @@index([lastSeenAt])
+  @@map("devices")
+}
+
+model PairCode {
+  id        String    @id @default(uuid())
+  tenantId  String    @map("tenant_id")
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code      String
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([tenantId, code])
+  @@index([tenantId])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("pair_codes")
+}
+
+model PairRequest {
+  id           String    @id @default(uuid())
+  tenantId     String    @map("tenant_id")
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deviceId     String    @map("device_id")
+  deviceName   String    @map("device_name")
+  devicePubKey String    @map("device_pub_key")
+  appVersion   String    @map("app_version")
+  osInfo       String    @map("os_info")
+  ip           String
+  status       String    @default("pending")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  expiresAt    DateTime  @map("expires_at")
+  resolvedAt   DateTime? @map("resolved_at")
+  resolvedBy   String?   @map("resolved_by")
+
+  @@index([tenantId, status])
+  @@index([tenantId])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("pair_requests")
+}
+
+model DailyMetrics {
+  id               String   @id @default(uuid())
+  tenantId         String   @map("tenant_id")
+  deviceId         String   @map("device_id")
+  device           Device   @relation(fields: [tenantId, deviceId], references: [tenantId, deviceId], onDelete: Cascade)
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dateYmd          String   @map("date_ymd")
+  activeSeconds    Int      @default(0) @map("active_seconds")
+  idleSeconds      Int      @default(0) @map("idle_seconds")
+  untrackedSeconds Int      @default(0) @map("untracked_seconds")
+  firstActivityTs  BigInt?  @map("first_activity_ts")
+  lastActivityTs   BigInt?  @map("last_activity_ts")
+  topAppsJson      String?  @map("top_apps_json")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@unique([tenantId, deviceId, dateYmd])
+  @@index([tenantId, dateYmd])
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("daily_metrics")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  tenantId     String   @map("tenant_id")
+  refreshToken String   @unique @map("refresh_token")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([expiresAt])
+  @@index([createdAt])
+  @@map("sessions")
+}
+
+model FailedLogin {
+  id        String   @id @default(uuid())
+  email     String
+  ip        String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+  @@index([createdAt])
+  @@map("failed_logins")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  tenantId  String   @map("tenant_id")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  action    String
+  deviceId  String?  @map("device_id")
+  userId    String?  @map("user_id")
+  details   String
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

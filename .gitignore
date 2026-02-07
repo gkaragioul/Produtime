@@ -1,0 +1,82 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build output
+dist/
+build/
+build-output/
+*.tsbuildinfo
+
+# Electron builder output
+*.exe
+*.msi
+*.nupkg
+*.blockmap
+*.dmg
+*.AppImage
+*.snap
+*.deb
+*.rpm
+win-unpacked/
+linux-unpacked/
+mac-unpacked/
+
+# Admin console build
+admin-console/dist/
+admin-console/build/
+admin-console/build-output/
+admin-console/build-output-new/
+
+# Cloud admin build
+cloud-admin-web/dist/
+cloud-admin-api/dist/
+
+# Licensing server build
+licensing-server/api/dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+logs/
+*.log
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# IDE & tools
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# Backups & archives
+PROTECTED_BACKUPS/
+archive/
+
+# Test output & data
+Test User/
+test-analytics-data/
+coverage/
+
+# Database files (dev/test)
+*.db
+!src/main/services/test-data/timeport.db
+cloud-admin-api/prisma/dev.db
+
+# Installer output
+installer/
+
+# macOS
+xcuserdata/
+DerivedData/
+.swiftpm/
+.netrc
+Packages/
+.build/

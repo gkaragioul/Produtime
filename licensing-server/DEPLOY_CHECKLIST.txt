@@ -1,0 +1,93 @@
+╔═══════════════════════════════════════════════════════════╗
+║     ProduTime Licensing Server - Deployment Checklist    ║
+╚═══════════════════════════════════════════════════════════╝
+
+PROJECT URL: https://railway.com/project/925b1b9c-6fc0-4a19-8f80-aefca92f4ca7
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+QUICK DEPLOYMENT (Web Dashboard Method)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+☐ 1. Open Railway project URL above
+
+☐ 2. Click "+ New" → "Empty Service"
+
+☐ 3. Connect GitHub repository:
+     - Settings → Source → Connect Repo
+     - (Create GitHub repo first if needed - see guide)
+
+☐ 4. Configure build settings:
+     Build Command: npm install && npx prisma generate
+     Start Command: npm start
+
+☐ 5. Set environment variables:
+     - Click Variables tab → RAW Editor
+     - Paste the env vars from guide
+     - Add DATABASE_URL reference to PostgreSQL
+
+☐ 6. Wait for deployment (2-5 minutes)
+     - Watch Deployments tab for progress
+
+☐ 7. Generate domain:
+     - Settings → Networking → Generate Domain
+     - COPY THE URL!
+
+☐ 8. Test API:
+     curl https://YOUR-URL/v1/public-key
+
+☐ 9. Access admin portal:
+     https://YOUR-URL/admin
+     Login: admin@produtime.local / ProduTime2026!Admin
+
+☐ 10. Update app config with URL and rebuild
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ALTERNATIVE: CLI Method (PowerShell)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+cd "c:\Users\georg\Documents\Produtime\Produtime\licensing-server\api"
+railway login
+railway up
+railway domain
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ENVIRONMENT VARIABLES TO SET:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ED25519_PRIVATE_KEY=29nD/vXDPy/eVmQBWSWeRrYUzxiZt5gftlap2WGHpIfIGkzqZVMFsb2PxKZCVAW9FaUvxN87Ae7NYQ7vOEfODA==
+ED25519_PUBLIC_KEY=yBpM6mVTBbG9j8SmQlQFvRWlL8TfOwHuzWEO7zhHzgw=
+JWT_SECRET=produtime-v18-jwt-secret-secure-random-string-2026
+DEFAULT_ADMIN_EMAIL=admin@produtime.local
+DEFAULT_ADMIN_PASSWORD=ProduTime2026!Admin
+NODE_ENV=production
+PORT=3000
+DATABASE_URL=<Reference from PostgreSQL service>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+FILES READY FOR DEPLOYMENT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✓ licensing-server/api/package.json
+✓ licensing-server/api/src/index.ts (Express server)
+✓ licensing-server/api/prisma/schema.prisma (Database schema)
+✓ licensing-server/api/.env (Local env vars)
+✓ licensing-server/api/railway.toml (Railway config)
+✓ licensing-server/api/.railway-project.json (Project link)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+WHAT TO SEND ME AFTER DEPLOYMENT:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Your Railway-generated URL
+2. Result of: curl https://YOUR-URL/v1/public-key
+3. Can you access /admin portal? (yes/no)
+4. Any errors encountered
+
+Then I'll update your app and we'll test the full licensing flow!
+
+╚═══════════════════════════════════════════════════════════╝
