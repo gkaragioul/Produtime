@@ -284,23 +284,18 @@ const App: React.FC = () => {
     } catch {}
   }, [activeTab]);
 
-  // Bridge DOM activity to activityDetector.onActivity with throttle (for tests)
+  // Bridge DOM activity to activityDetector with throttle (for tests)
   useEffect(() => {
     try {
-      const activityDetector = activityDetectorRef.current;
       const adminAuthService = adminAuthServiceRef.current;
-      if (!activityDetector || !adminAuthService) return;
+      if (!adminAuthService) return;
       let last = 0;
       const evtHandler = () => {
         const now = Date.now();
         if (now - last < 50) return;
         last = now;
         try {
-          activityDetector.onActivity(() => {
-            try {
-              adminAuthService.startTimeoutAndActivityDetection();
-            } catch {}
-          });
+          adminAuthService.startTimeoutAndActivityDetection();
         } catch {}
       };
       document.addEventListener("mousemove", evtHandler);

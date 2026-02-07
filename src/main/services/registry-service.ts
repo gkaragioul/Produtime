@@ -128,8 +128,8 @@ export class RegistryService {
         this.TRIAL_KEY,
       ]);
 
-      // Parse registry output
-      const match = stdout.match(/TrialData\s+REG_SZ\s+(.+)/);
+      // Parse registry output - use flexible whitespace matching and handle \r\n
+      const match = stdout.match(/TrialData\s+REG_SZ\s+(.+?)[\r\n]/);
       if (!match || !match[1]) {
         return null;
       }

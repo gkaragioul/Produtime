@@ -55,6 +55,7 @@ export class ActivityTracker {
   }> = [];
   // Cooldown to prevent rapid idle/active switching
   private lastIdleEndTime: number = 0;
+  private resumeCheckTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private database: DatabaseManager,
@@ -113,8 +114,10 @@ export class ActivityTracker {
 
     if (this.trackingInterval) clearInterval(this.trackingInterval);
     if (this.idleCheckInterval) clearInterval(this.idleCheckInterval);
+    if (this.resumeCheckTimer) clearTimeout(this.resumeCheckTimer);
     this.trackingInterval = null;
     this.idleCheckInterval = null;
+    this.resumeCheckTimer = null;
 
     if (this.currentActivity) {
       await this.logCurrentActivity();
@@ -520,7 +523,9 @@ export class ActivityTracker {
 
     // If no activity detected (shouldn't happen), wait briefly and try again
     if (!this.currentActivity) {
-      setTimeout(async () => {
+      if (this.resumeCheckTimer) clearTimeout(this.resumeCheckTimer);
+      this.resumeCheckTimer = setTimeout(async () => {
+        this.resumeCheckTimer = null;
         try {
           const idleSeconds = powerMonitor.getSystemIdleTime();
           if (idleSeconds < 3) { // More lenient than === 0

@@ -506,8 +506,12 @@ export const ActivityDashboard: React.FC = () => {
           setDbHealthy(!!res.data);
           setShowDbWarning(!res.data);
         }
+      }).catch((err: any) => {
+        console.warn('Failed to check db health:', err);
       });
-    } catch {}
+    } catch (err) {
+      console.warn('Error initiating db health check:', err);
+    }
 
     const tick = setInterval(() => setNow(new Date()), 1000);
     return () => {
@@ -595,10 +599,12 @@ export const ActivityDashboard: React.FC = () => {
             prevIsTrackingRef.current = serverTracking;
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn('Error polling tracking stats:', err);
+      }
     };
     const t = setInterval(poll, POLL_MS);
-    poll();
+    poll().catch((err: any) => console.warn('Initial poll failed:', err));
     return () => {
       mounted = false;
       clearInterval(t);
@@ -744,6 +750,8 @@ export const ActivityDashboard: React.FC = () => {
         console.log("📊 METRICS: Applying resume active carry =", resumeActiveCarryRef.current, "s");
       }
       active += resumeActiveCarryRef.current;
+      // Reset carry after applying so it's not double-counted on subsequent computations
+      resumeActiveCarryRef.current = 0;
     }
 
     // BUG FIX #9: Prevent negative productivity by clamping active to 0-100 range
@@ -979,15 +987,19 @@ export const ActivityDashboard: React.FC = () => {
 
       // Wait for main process to send updated activity, then refresh logs
       setTimeout(async () => {
-        if (typeof api.getActivityLogs !== "function") return;
-        const res = await api.getActivityLogs({ limit: 200, offset: 0 });
+        try {
+          if (typeof api.getActivityLogs !== "function") return;
+          const res = await api.getActivityLogs({ limit: 200, offset: 0 });
 
-        if (res.success && res.data) {
-          setRecent(sortLogsDesc(res.data));
+          if (res.success && res.data) {
+            setRecent(sortLogsDesc(res.data));
+          }
+
+          // Force metrics recalculation after logs are updated
+          setNow(new Date());
+        } catch (err) {
+          console.warn("Error refreshing logs after resume:", err);
         }
-
-        // Force metrics recalculation after logs are updated
-        setNow(new Date());
       }, 100);
 
       showNotification("Tracking resumed", "success");

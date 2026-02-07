@@ -332,8 +332,7 @@ export const SettingsTab: React.FC = () => {
 
     // Cleanup on unmount
     return () => {
-      // Note: In a real implementation, we'd need a way to remove the callback
-      // For now, this is handled by the service lifecycle
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
     };
   }, []);
 
@@ -1144,12 +1143,12 @@ export const SettingsTab: React.FC = () => {
                       // BUG FIX #13: Track timeout state to prevent showing success after timeout
                       watchdog = setTimeout(() => {
                         timedOut = true;
-                        setIsLoading(false);
                         setErrors((prev) => ({
                           ...prev,
                           general:
                             'Report generation timed out after 30 seconds. Try a smaller date range or contact support.',
                         }));
+                        setSuccessMessage('');
                       }, REPORT_GENERATION_TIMEOUT_MS);
 
                       const today = new Date().toISOString().split('T')[0];

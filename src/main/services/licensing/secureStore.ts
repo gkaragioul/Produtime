@@ -78,7 +78,7 @@ export class SecureStore {
       } else {
         // Fallback: Try to decrypt as AES-256-GCM
         // Format: iv(16) + authTag(16) + encrypted(variable)
-        if (encryptedData.length < 32) {
+        if (encryptedData.length <= 32) {
           throw new Error('Invalid encrypted data format');
         }
 

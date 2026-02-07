@@ -22,26 +22,28 @@ export const LicenseActivationModal: React.FC<LicenseActivationModalProps> = ({
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load device ID on mount
+  // Load device ID when modal opens
   useEffect(() => {
-    if (isOpen) {
-      loadDeviceId();
-    }
-  }, [isOpen]);
-
-  const loadDeviceId = async () => {
-    try {
-      const response = await window.electronAPI.getDeviceId();
-      if (response.success && response.data) {
-        setDeviceId(response.data);
-      } else {
-        setError('Failed to get device ID');
+    if (!isOpen) return;
+    let cancelled = false;
+    const loadDeviceId = async () => {
+      try {
+        const response = await window.electronAPI.getDeviceId();
+        if (cancelled) return;
+        if (response.success && response.data) {
+          setDeviceId(response.data);
+        } else {
+          setError('Failed to get device ID');
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Error loading device ID:', err);
+        setError('Failed to load device information');
       }
-    } catch (err) {
-      console.error('Error loading device ID:', err);
-      setError('Failed to load device information');
-    }
-  };
+    };
+    loadDeviceId();
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   const handleOnlineActivation = async () => {
     setError('');
