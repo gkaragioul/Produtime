@@ -1,13 +1,12 @@
 # ProduTime
 
-A desktop time-tracking and productivity monitoring suite built with Electron, React, and TypeScript. Includes a main tracking app, an admin console for device management, a licensing server, and a cloud admin dashboard.
+A desktop time-tracking and productivity monitoring suite built with Electron, React, and TypeScript. Includes a main tracking app, a licensing server, and a cloud admin dashboard.
 
 ## Components
 
 | Component | Path | Stack | Description |
 |-----------|------|-------|-------------|
 | **ProduTime App** | `/src` | Electron + React + TypeScript | Desktop app that tracks active windows, idle time, and generates productivity reports |
-| **Admin Console** | `/admin-console` | Electron + React + TypeScript | Standalone desktop app for managing and monitoring ProduTime devices |
 | **Licensing Server** | `/licensing-server` | Fastify + Prisma + PostgreSQL | Handles license activation, seat enforcement, heartbeat verification, and revocation |
 | **Cloud Admin API** | `/cloud-admin-api` | Node.js + Fastify | Multi-tenant cloud backend for remote device management |
 | **Cloud Admin Web** | `/cloud-admin-web` | Vite + React | Web dashboard frontend for the cloud admin API |
@@ -27,12 +26,6 @@ ProduTime App (Electron)
   Renderer Process
     React UI (Dashboard, Settings, Reports, License Activation)
 
-Admin Console (Electron)
-  WebSocket server for agent pairing
-  Real-time device monitoring
-  Policy deployment
-  Audit logging
-
 Licensing Server (Fastify)
   PostgreSQL (Prisma ORM)
   Ed25519 key signing
@@ -48,7 +41,7 @@ Licensing Server (Fastify)
 - **Privacy Mode** - Sanitizes window titles for sensitive applications (configurable)
 - **Auto Export** - Scheduled automatic report generation and export
 - **Licensing** - 7-day trial with offline support, Ed25519 cryptographic license validation, seat enforcement, revocation detection with 72-hour grace period
-- **Admin Console** - Centralized management with device pairing, policy deployment, and real-time monitoring
+- **Cloud Admin** - Web-based centralized management with device pairing, policy deployment, and real-time monitoring (see `/cloud-admin-web`)
 - **Auto Updates** - In-app updates with SHA256 checksum verification
 - **Startup Integration** - Windows auto-start via registry and startup folder shortcuts
 
@@ -86,9 +79,6 @@ npm run dev
 # Main app (production mode)
 npm start
 
-# Admin console
-cd admin-console && npm run dev
-
 # Licensing server
 cd licensing-server/api && npm run dev
 ```
@@ -98,9 +88,6 @@ cd licensing-server/api && npm run dev
 ```bash
 # Build main app
 npm run build
-
-# Build admin console
-cd admin-console && npm run build
 
 # Package for distribution
 npm run package

@@ -1,33 +1,11 @@
 /**
- * Admin Console Preload Script
- * Exposes IPC APIs to the renderer process
+ * Admin Console Preload Script (Freeware Edition)
+ * No licensing API — all features available.
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('adminAPI', {
-  // ============================================================
-  // CRITICAL FIX: Licensing API
-  // ============================================================
-  
-  getLicenseStatus: () => ipcRenderer.invoke('licensing:getStatus'),
-  activateLicense: (licenseKey: string) => ipcRenderer.invoke('licensing:activate', licenseKey),
-  deactivateLicense: () => ipcRenderer.invoke('licensing:deactivate'),
-  getMachineHash: () => ipcRenderer.invoke('licensing:getMachineHash'),
-  startTrial: () => ipcRenderer.invoke('licensing:startTrial'),
-  
-  onLicenseRevoked: (callback: (data: { reason: string }) => void) => {
-    const listener = (_: any, data: any) => callback(data);
-    ipcRenderer.on('license:revoked', listener);
-    return () => ipcRenderer.removeListener('license:revoked', listener);
-  },
-
-  onOpenActivation: (callback: () => void) => {
-    const listener = () => callback();
-    ipcRenderer.on('open-activation', listener);
-    return () => ipcRenderer.removeListener('open-activation', listener);
-  },
-
   // Device operations
   getAllDevices: () => ipcRenderer.invoke('devices:getAll'),
   getDevice: (deviceId: string) => ipcRenderer.invoke('devices:get', deviceId),
@@ -38,12 +16,12 @@ contextBridge.exposeInMainWorld('adminAPI', {
   getAllPolicies: () => ipcRenderer.invoke('policies:getAll'),
   getPolicy: (policyId: string) => ipcRenderer.invoke('policies:get', policyId),
   createPolicy: (policy: any) => ipcRenderer.invoke('policies:create', policy),
-  updatePolicy: (policyId: string, name: string, data: any) => 
+  updatePolicy: (policyId: string, name: string, data: any) =>
     ipcRenderer.invoke('policies:update', policyId, name, data),
   deletePolicy: (policyId: string) => ipcRenderer.invoke('policies:delete', policyId),
-  assignPolicy: (deviceId: string, policyId: string) => 
+  assignPolicy: (deviceId: string, policyId: string) =>
     ipcRenderer.invoke('policies:assign', deviceId, policyId),
-  pushPolicy: (deviceId: string, policy: any) => 
+  pushPolicy: (deviceId: string, policy: any) =>
     ipcRenderer.invoke('policies:push', deviceId, policy),
 
   // Pairing operations
@@ -54,10 +32,10 @@ contextBridge.exposeInMainWorld('adminAPI', {
   denyPairing: (requestId: string) => ipcRenderer.invoke('pairing:deny', requestId),
 
   // Device control
-  lockDevice: (deviceId: string, reason: string, message: string) => 
+  lockDevice: (deviceId: string, reason: string, message: string) =>
     ipcRenderer.invoke('device:lock', deviceId, reason, message),
   unlockDevice: (deviceId: string) => ipcRenderer.invoke('device:unlock', deviceId),
-  requestExport: (deviceId: string, options: any) => 
+  requestExport: (deviceId: string, options: any) =>
     ipcRenderer.invoke('device:requestExport', deviceId, options),
 
   // Audit logs
@@ -109,13 +87,10 @@ contextBridge.exposeInMainWorld('adminAPI', {
   // Server logs
   getServerLogs: (count?: number) => ipcRenderer.invoke('server:getLogs', count),
 
-  // ============================================================
   // Dashboard API
-  // ============================================================
-  
   getDashboardSummary: (range: 'today' | '7d') => ipcRenderer.invoke('dashboard:getSummary', range),
   getDashboardDevices: () => ipcRenderer.invoke('dashboard:getDevices'),
-  getDeviceDetail: (deviceId: string, range: 'today' | '7d') => 
+  getDeviceDetail: (deviceId: string, range: 'today' | '7d') =>
     ipcRenderer.invoke('dashboard:getDeviceDetail', deviceId, range),
   getExceptions: (resolved?: boolean) => ipcRenderer.invoke('dashboard:getExceptions', resolved),
   resolveException: (id: number) => ipcRenderer.invoke('dashboard:resolveException', id),
@@ -129,40 +104,30 @@ contextBridge.exposeInMainWorld('adminAPI', {
   getAttention: () => ipcRenderer.invoke('dashboard:getAttention'),
   getDashboardStory: () => ipcRenderer.invoke('dashboard:getStory'),
   getRankings: () => ipcRenderer.invoke('dashboard:getRankings'),
-  getTrends: (scope: 'team' | 'device', deviceId?: string, days?: number) => 
+  getTrends: (scope: 'team' | 'device', deviceId?: string, days?: number) =>
     ipcRenderer.invoke('dashboard:getTrends', scope, deviceId, days),
 
-  // Enhanced Device Detail (for DeviceDetailPage)
+  // Enhanced Device Detail
   getDeviceDetailEnhanced: (deviceId: string, range: 'today' | '7d' | '30d') =>
     ipcRenderer.invoke('dashboard:getDeviceDetailEnhanced', deviceId, range),
 
-  // ============================================================
   // App Categorization API
-  // ============================================================
-  
   getAppUsageAggregates: () => ipcRenderer.invoke('apps:getUsageAggregates'),
   getAppCategory: (appName: string) => ipcRenderer.invoke('apps:getCategory', appName),
-  setAppCategory: (appName: string, category: string) => 
+  setAppCategory: (appName: string, category: string) =>
     ipcRenderer.invoke('apps:setCategory', appName, category),
-  setAppCategoriesBulk: (apps: Array<{ appName: string; category: string }>) => 
+  setAppCategoriesBulk: (apps: Array<{ appName: string; category: string }>) =>
     ipcRenderer.invoke('apps:setCategoriesBulk', apps),
   getAllAppCategories: () => ipcRenderer.invoke('apps:getAllCategories'),
 
-  // ============================================================
   // Weekly Insights API
-  // ============================================================
-
   getWeeklyInsights: (weekEnd?: string) => ipcRenderer.invoke('insights:getWeekly', weekEnd),
   getWeeklyReports: () => ipcRenderer.invoke('reports:getAll'),
   getWeeklyReport: (weekEnd: string) => ipcRenderer.invoke('reports:get', weekEnd),
   generateWeeklyReport: () => ipcRenderer.invoke('reports:generate'),
 
-  // ============================================================
-  // Updater API
-  // ============================================================
-
-  checkForUpdates: () => ipcRenderer.invoke('updater:checkForUpdates'),
+  // Version
   getAppVersion: () => ipcRenderer.invoke('updater:getVersion'),
 });
 
-console.log('Admin Console preload script loaded');
+console.log('Admin Console preload script loaded (freeware)');

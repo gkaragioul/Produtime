@@ -45,15 +45,6 @@ npm run build:main
 npm start
 ```
 
-### Admin Console
-
-```bash
-cd admin-console
-npm install
-npm run build
-npm start
-```
-
 ### Licensing Server
 
 ```bash
@@ -71,7 +62,6 @@ ProduTime/
 │   ├── main/                 # Electron main process
 │   ├── renderer/             # React UI
 │   └── shared/               # Shared utilities
-├── admin-console/            # Admin panel (Electron)
 ├── cloud-admin-api/          # Cloud API (Node.js/Fastify)
 ├── cloud-admin-web/          # Cloud web UI (React)
 ├── licensing-server/         # License manager (Fastify)
@@ -117,9 +107,6 @@ npm run build:renderer
 
 # Build for distribution
 npm run dist:x64
-
-# Build admin console
-cd admin-console && npm run build
 ```
 
 ## 📋 Features

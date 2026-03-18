@@ -9,7 +9,7 @@ import { app, BrowserWindow, dialog, Menu, shell, nativeImage } from "electron";
 import * as path from "path";
 import * as fs from "fs";
 
-startupLogger.info(`App path: ${app.getAppPath()}`);
+try { startupLogger.info(`App path: ${app?.getAppPath?.() || 'unknown'}`); } catch { /* app not ready yet */ }
 
 // Override global error handlers to show user-friendly dialog with log location
 process.on("uncaughtException", (err) => {

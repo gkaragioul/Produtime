@@ -9,7 +9,9 @@
     "build": "npm run build:main && npm run build:renderer",
     "start": "electron .",
     "dev": "npm run build && npm start",
-    "dist": "npm run build && electron-builder --win"
+    "dist": "npm run build && electron-builder --win",
+    "dist:portable": "npm run build && electron-builder --win portable --x64",
+    "package:x64": "electron-builder --win portable --x64 --dir"
   },
   "keywords": [
     "produtime",
@@ -18,10 +20,9 @@
     "management"
   ],
   "author": "George Karagioules",
-  "license": "SEE LICENSE IN LICENSE.txt",
+  "license": "Freeware",
   "dependencies": {
     "better-sqlite3": "^12.2.0",
-    "electron-updater": "^6.6.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "tweetnacl": "^1.0.3",

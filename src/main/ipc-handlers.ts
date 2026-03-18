@@ -114,39 +114,10 @@ export class IPCHandlers {
   }
 
   /**
-   * Initialize periodic license validation with enhanced detection
-   * - Local validation every 10 seconds (catches trial expiry)
-   * - Server validation every 2 minutes (detects revocation faster)
-   * - Includes retry logic and better error handling
+   * Freeware: license validation disabled — always activated
    */
   private initializeLicenseValidation(): void {
-    try {
-      const electron = require('electron');
-
-      this.logger.info('LICENSE', 'Initializing real-time license validation', {
-        localCheckIntervalSec:
-          this.LICENSE_VALIDATION_CONFIG.LOCAL_CHECK_INTERVAL_MS / 1000,
-        serverCheckIntervalSec:
-          this.LICENSE_VALIDATION_CONFIG.SERVER_CHECK_INTERVAL_MS / 1000,
-        retryMaxAttempts: this.LICENSE_VALIDATION_CONFIG.RETRY_MAX_ATTEMPTS,
-      });
-
-      // Local validation every 10 seconds
-      const localTimer = setInterval(() => {
-        this.performLocalLicenseValidation(electron);
-      }, this.LICENSE_VALIDATION_CONFIG.LOCAL_CHECK_INTERVAL_MS);
-      this.licenseValidationTimers.push(localTimer);
-
-      // Server validation every 2 minutes (configurable via env var)
-      const serverTimer = setInterval(() => {
-        this.performServerLicenseValidation(electron);
-      }, this.LICENSE_VALIDATION_CONFIG.SERVER_CHECK_INTERVAL_MS);
-      this.licenseValidationTimers.push(serverTimer);
-    } catch (e) {
-      this.logger.error('LICENSE', 'Failed to initialize license validation', {
-        error: e instanceof Error ? e.message : String(e),
-      });
-    }
+    this.logger.info('LICENSE', 'Freeware mode — license validation disabled');
   }
 
   /**
@@ -1274,13 +1245,11 @@ export class IPCHandlers {
         // Store hash as salt:hash format so we can verify later
         adminPasswordHash = salt.toString('hex') + ':' + derivedKey.toString('hex');
         this.database.setSetting('admin_password_hash', adminPasswordHash);
-        this.logger.info('Generated and hashed new admin password on first run');
+        this.logger.info('ADMIN', 'Generated and hashed new admin password on first run');
 
         // Also store plaintext password in memory for displaying to user only on first run
         // (in production, this would be shown to user via secure channel, then immediately cleared)
-        this.logger.info('Generated new admin password (CHANGE IT IMMEDIATELY)', {
-          password: generatedPassword,
-        });
+        this.logger.info('ADMIN', 'Generated new admin password (CHANGE IT IMMEDIATELY)');
       }
 
       // Hash the incoming password for comparison
@@ -1288,7 +1257,7 @@ export class IPCHandlers {
       try {
         const parts = adminPasswordHash.split(':');
         if (parts.length !== 2) {
-          this.logger.warn('Invalid password hash format in database');
+          this.logger.warn('ADMIN', 'Invalid password hash format in database');
           isValidPassword = false;
         } else {
           const salt = Buffer.from(parts[0], 'hex');
@@ -1300,7 +1269,7 @@ export class IPCHandlers {
         }
       } catch (err) {
         // Hashing or comparison failed
-        this.logger.error('Password verification error:', err);
+        this.logger.error('ADMIN', 'Password verification error', err);
         isValidPassword = false;
       }
 
@@ -1956,34 +1925,27 @@ export class IPCHandlers {
   // ============================================================
 
   /**
-   * Get current license status from EnhancedLicenseService
+   * Freeware: always returns activated with all features
    */
   private async handleGetLicenseStatus(
-    event: IpcMainInvokeEvent
+    _event: IpcMainInvokeEvent
   ): Promise<IPCResponse<any>> {
-    try {
-      if (!this.enhancedLicenseService) {
-        // Fallback for development or if service not initialized
-        return {
-          success: true,
-          data: {
-            mode: 'activated',
-            isEntitled: true,
-            trialDaysRemaining: null,
-            error: null,
-          },
-        };
-      }
-
-      const status = this.enhancedLicenseService.getStatus();
-      return { success: true, data: status };
-    } catch (error: any) {
-      this.logger.error('IPC', 'Error getting license status', { error });
-      return {
-        success: false,
-        error: error.message || 'Failed to get license status',
-      };
-    }
+    return {
+      success: true,
+      data: {
+        mode: 'activated',
+        isEntitled: true,
+        trialDaysRemaining: null,
+        features: {
+          adminPanel: true,
+          managedMode: true,
+          exports: true,
+          advancedReports: true,
+          customBranding: true,
+          apiAccess: true,
+        },
+      },
+    };
   }
 
   /**
@@ -2159,7 +2121,6 @@ export class IPCHandlers {
       this.agentService = AgentService.getInstance(this.database);
       await this.agentService.initialize(appVersion);
 
-      // Set up event listeners for agent state changes
       this.agentService.on('stateChanged', (state: AgentState) => {
         this.broadcastAgentStateChange(state);
       });
@@ -2186,65 +2147,36 @@ export class IPCHandlers {
     }
   }
 
-  /**
-   * Get current agent state
-   */
-  private async handleAgentGetState(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<AgentState | null>> {
+  private async handleAgentGetState(event: IpcMainInvokeEvent): Promise<IPCResponse<AgentState | null>> {
     try {
-      if (!this.agentService) {
-        return { success: true, data: null };
-      }
+      if (!this.agentService) return { success: true, data: null };
       return { success: true, data: this.agentService.getState() };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Get pairing state
-   */
-  private async handleAgentGetPairingState(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<AgentPairingState | null>> {
+  private async handleAgentGetPairingState(event: IpcMainInvokeEvent): Promise<IPCResponse<AgentPairingState | null>> {
     try {
-      if (!this.agentService) {
-        return { success: true, data: null };
-      }
+      if (!this.agentService) return { success: true, data: null };
       return { success: true, data: this.agentService.getPairingState() };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Get discovered admin consoles on LAN
-   */
-  private async handleAgentGetDiscoveredAdmins(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<DiscoveredAdmin[]>> {
+  private async handleAgentGetDiscoveredAdmins(event: IpcMainInvokeEvent): Promise<IPCResponse<DiscoveredAdmin[]>> {
     try {
-      if (!this.agentService) {
-        return { success: true, data: [] };
-      }
+      if (!this.agentService) return { success: true, data: [] };
       return { success: true, data: this.agentService.getDiscoveredAdmins() };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Start pairing with admin console
-   */
-  private async handleAgentStartPairing(
-    event: IpcMainInvokeEvent,
-    request: { adminHost: string; pairCode: string }
-  ): Promise<IPCResponse<{ success: boolean; error?: string }>> {
+  private async handleAgentStartPairing(event: IpcMainInvokeEvent, request: { adminHost: string; pairCode: string }): Promise<IPCResponse<{ success: boolean; error?: string }>> {
     try {
-      if (!this.agentService) {
-        return { success: false, error: 'Agent service not initialized' };
-      }
+      if (!this.agentService) return { success: false, error: 'Agent service not initialized' };
       const result = await this.agentService.startPairing(request.adminHost, request.pairCode);
       return { success: true, data: result };
     } catch (error: any) {
@@ -2252,35 +2184,14 @@ export class IPCHandlers {
     }
   }
 
-  /**
-   * Start cloud-based pairing with admin console
-   * Requirement 3.3, 3.7: Support cloud-based pair code submission
-   */
-  private async handleAgentStartCloudPairing(
-    event: IpcMainInvokeEvent,
-    request: { cloudApiUrl: string; pairCode: string }
-  ): Promise<IPCResponse<{ success: boolean; error?: string }>> {
-    try {
-      if (!this.agentService) {
-        return { success: false, error: 'Agent service not initialized' };
-      }
-      const result = await this.agentService.startCloudPairing(request.cloudApiUrl, request.pairCode);
-      return { success: true, data: result };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
+  // Freeware: cloud pairing disabled — local LAN only
+  private async handleAgentStartCloudPairing(_event: IpcMainInvokeEvent, _request: { cloudApiUrl: string; pairCode: string }): Promise<IPCResponse<{ success: boolean; error?: string }>> {
+    return { success: false, error: 'Cloud pairing is not available in the free local-only edition' };
   }
 
-  /**
-   * Unpair from admin console
-   */
-  private async handleAgentUnpair(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<void>> {
+  private async handleAgentUnpair(event: IpcMainInvokeEvent): Promise<IPCResponse<void>> {
     try {
-      if (!this.agentService) {
-        return { success: false, error: 'Agent service not initialized' };
-      }
+      if (!this.agentService) return { success: false, error: 'Agent service not initialized' };
       await this.agentService.unpair();
       return { success: true };
     } catch (error: any) {
@@ -2288,17 +2199,9 @@ export class IPCHandlers {
     }
   }
 
-  /**
-   * Manually add admin console by IP
-   */
-  private async handleAgentAddManualAdmin(
-    event: IpcMainInvokeEvent,
-    request: { host: string; port?: number }
-  ): Promise<IPCResponse<DiscoveredAdmin>> {
+  private async handleAgentAddManualAdmin(event: IpcMainInvokeEvent, request: { host: string; port?: number }): Promise<IPCResponse<DiscoveredAdmin>> {
     try {
-      if (!this.agentService) {
-        return { success: false, error: 'Agent service not initialized' };
-      }
+      if (!this.agentService) return { success: false, error: 'Agent service not initialized' };
       const admin = this.agentService.addManualAdmin(request.host, request.port);
       return { success: true, data: admin };
     } catch (error: any) {
@@ -2306,142 +2209,75 @@ export class IPCHandlers {
     }
   }
 
-  /**
-   * Get effective policy from admin
-   */
-  private async handleAgentGetEffectivePolicy(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<any>> {
+  private async handleAgentGetEffectivePolicy(event: IpcMainInvokeEvent): Promise<IPCResponse<any>> {
     try {
-      if (!this.agentService) {
-        return { success: true, data: null };
-      }
+      if (!this.agentService) return { success: true, data: null };
       return { success: true, data: this.agentService.getEffectivePolicy() };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Check if device is managed by admin console
-   */
-  private async handleAgentIsManaged(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<boolean>> {
+  private async handleAgentIsManaged(event: IpcMainInvokeEvent): Promise<IPCResponse<boolean>> {
     try {
-      if (!this.agentService) {
-        return { success: true, data: false };
-      }
+      if (!this.agentService) return { success: true, data: false };
       return { success: true, data: this.agentService.isManaged() };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Handle export request from admin console
-   */
   private async handleAgentExportRequest(request: any): Promise<void> {
     try {
       if (!this.pdfGenerator) {
-        this.agentService?.sendExportResult({
-          success: false,
-          error: 'PDF generator not available',
-        });
+        this.agentService?.sendExportResult({ success: false, error: 'PDF generator not available' });
         return;
       }
-
       const reportOptions: ReportOptions = {
         type: request.reportType as any,
         format: ReportFormat.PDF,
-        dateRange: {
-          startDate: request.startDate,
-          endDate: request.endDate,
-        },
-        includeCharts: true,
-        includeSummary: true,
-        includeDetails: true,
+        dateRange: { startDate: request.startDate, endDate: request.endDate },
+        includeCharts: true, includeSummary: true, includeDetails: true,
       };
-
       const result = await this.pdfGenerator.generateReport(reportOptions);
-      
-      this.agentService?.sendExportResult({
-        success: true,
-        reportId: result.reportId,
-        filePath: result.filePath,
-        fileSize: result.fileSize,
-      });
+      this.agentService?.sendExportResult({ success: true, reportId: result.reportId, filePath: result.filePath, fileSize: result.fileSize });
     } catch (error: any) {
-      this.agentService?.sendExportResult({
-        success: false,
-        error: error.message,
-      });
+      this.agentService?.sendExportResult({ success: false, error: error.message });
     }
   }
 
-  /**
-   * Broadcast agent state change to renderer
-   */
   private broadcastAgentStateChange(state: AgentState): void {
     try {
       const electron = require('electron');
       const windows = electron.BrowserWindow.getAllWindows();
-      windows.forEach((w: any) => {
-        try {
-          w.webContents.send('agent:stateChanged', state);
-        } catch {}
-      });
+      windows.forEach((w: any) => { try { w.webContents.send('agent:stateChanged', state); } catch {} });
     } catch {}
   }
 
-  /**
-   * Broadcast agent locked event
-   */
   private broadcastAgentLocked(data: { reason: string; message: string }): void {
     try {
       const electron = require('electron');
       const windows = electron.BrowserWindow.getAllWindows();
-      windows.forEach((w: any) => {
-        try {
-          w.webContents.send('agent:locked', data);
-        } catch {}
-      });
+      windows.forEach((w: any) => { try { w.webContents.send('agent:locked', data); } catch {} });
     } catch {}
   }
 
-  /**
-   * Broadcast agent unlocked event
-   */
   private broadcastAgentUnlocked(): void {
     try {
       const electron = require('electron');
       const windows = electron.BrowserWindow.getAllWindows();
-      windows.forEach((w: any) => {
-        try {
-          w.webContents.send('agent:unlocked');
-        } catch {}
-      });
+      windows.forEach((w: any) => { try { w.webContents.send('agent:unlocked'); } catch {} });
     } catch {}
   }
 
-  /**
-   * Broadcast policy updated event
-   */
   private broadcastPolicyUpdated(policy: any): void {
     try {
       const electron = require('electron');
       const windows = electron.BrowserWindow.getAllWindows();
-      windows.forEach((w: any) => {
-        try {
-          w.webContents.send('agent:policyUpdated', policy);
-        } catch {}
-      });
+      windows.forEach((w: any) => { try { w.webContents.send('agent:policyUpdated', policy); } catch {} });
     } catch {}
   }
 
-  /**
-   * Shutdown agent service
-   */
   public shutdownAgentService(): void {
     if (this.agentService) {
       this.agentService.shutdown();

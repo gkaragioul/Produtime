@@ -1,33 +1,22 @@
 /**
- * ProduTime Admin Console - Main Process
- * Electron main process for the Admin Console application
- * 
- * CRITICAL FIX: Added licensing gate - blocks access until license is validated
+ * ProduTime Admin Console - Main Process (Freeware Edition)
+ * No licensing, no update checks, all features available.
  */
 
 import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
 import * as path from 'path';
 import { AdminDatabase } from './db';
 import { AdminServer } from './server';
-import { AdminLicensingService } from './licensing-service';
-import { AdminAssistedUpdater } from './assisted-updater';
 
 let mainWindow: BrowserWindow | null = null;
 let db: AdminDatabase | null = null;
 let server: AdminServer | null = null;
-let licensingService: AdminLicensingService | null = null;
-let assistedUpdater: AdminAssistedUpdater | null = null;
-
-// Ed25519 public key for license verification (same as main app and server)
-const LICENSING_PUBLIC_KEY = 'yBpM6mVTBbG9j8SmQlQFvRWlL8TfOwHuzWEO7zhHzgw=';
 
 // Get the correct icon path for both dev and production
 function getIconPath(): string {
   if (app.isPackaged) {
-    // In production, icon is in resources folder
     return path.join(process.resourcesPath, 'assets', 'PTAdminIcon.png');
   }
-  // In development, use the main assets folder
   return path.join(__dirname, '../../../assets/PTAdminIcon.png');
 }
 
@@ -48,15 +37,12 @@ function createWindow(): void {
     icon: iconPath,
   });
 
-  // Show window maximized when ready
   mainWindow.once('ready-to-show', () => {
     mainWindow?.maximize();
     mainWindow?.show();
     mainWindow?.focus();
-    console.log('Admin Console window shown, maximized, and focused');
   });
 
-  // Load the renderer
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:3001');
     mainWindow.webContents.openDevTools();
@@ -68,13 +54,11 @@ function createWindow(): void {
     mainWindow = null;
   });
 
-  // Create menu
+  // Freeware menu — no licensing or update items
   const menu = Menu.buildFromTemplate([
     {
       label: 'File',
-      submenu: [
-        { role: 'quit' },
-      ],
+      submenu: [{ role: 'quit' }],
     },
     {
       label: 'View',
@@ -92,28 +76,13 @@ function createWindow(): void {
       label: 'Help',
       submenu: [
         {
-          label: 'Check for Updates',
-          click: () => {
-            assistedUpdater?.checkForUpdates(true);
-          },
-        },
-        { type: 'separator' },
-        {
-          label: 'Activate License',
-          click: () => {
-            // Send event to renderer to open activation modal
-            mainWindow?.webContents.send('open-activation');
-          },
-        },
-        { type: 'separator' },
-        {
           label: 'About',
           click: () => {
             dialog.showMessageBox(mainWindow!, {
               type: 'info',
               title: 'About ProduTime Admin Console',
-              message: `ProduTime Admin Console`,
-              detail: `Version: ${app.getVersion()}\n\nCentralized management for ProduTime devices.`,
+              message: 'ProduTime Admin Console',
+              detail: `Version: ${app.getVersion()}\n\nFree local network management for ProduTime devices.`,
               buttons: ['OK'],
             });
           },
@@ -125,29 +94,18 @@ function createWindow(): void {
 }
 
 function initializeServices(): void {
-  // Initialize database
   db = new AdminDatabase();
-
-  // CRITICAL FIX: Initialize licensing service
-  licensingService = new AdminLicensingService(db, LICENSING_PUBLIC_KEY);
-
-  // Initialize server
   server = new AdminServer(db);
 
-  // Set up server event handlers
   server.onDeviceConnected = (deviceId) => {
-    console.log('[MAIN] onDeviceConnected callback fired for:', deviceId);
     mainWindow?.webContents.send('device:connected', deviceId);
-    console.log('[MAIN] Sent device:connected event to renderer');
   };
 
   server.onDeviceDisconnected = (deviceId) => {
-    console.log('[MAIN] onDeviceDisconnected callback fired for:', deviceId);
     mainWindow?.webContents.send('device:disconnected', deviceId);
   };
 
   server.onPairRequest = (request) => {
-    console.log('[MAIN] onPairRequest callback fired:', request);
     mainWindow?.webContents.send('pair:request', request);
   };
 
@@ -156,13 +114,11 @@ function initializeServices(): void {
   };
 
   server.onLog = (message) => {
-    // Send to renderer if window exists
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('server:log', message);
     }
   };
 
-  // Start server
   server.start().then(() => {
     console.log('Admin Console server started');
     mainWindow?.webContents.send('server:started', {
@@ -175,37 +131,6 @@ function initializeServices(): void {
 }
 
 function registerIpcHandlers(): void {
-  // ============================================================
-  // CRITICAL FIX: Licensing IPC Handlers
-  // ============================================================
-
-  ipcMain.handle('licensing:getStatus', async () => {
-    return licensingService?.getStatus() || { licensed: false, reason: 'Service not initialized' };
-  });
-
-  ipcMain.handle('licensing:activate', async (_, licenseKey: string) => {
-    if (!licensingService) {
-      return { success: false, error: 'Service not initialized' };
-    }
-    return licensingService.activateWithKey(licenseKey);
-  });
-
-  ipcMain.handle('licensing:deactivate', async () => {
-    licensingService?.deactivate();
-    return { success: true };
-  });
-
-  ipcMain.handle('licensing:getMachineHash', async () => {
-    return licensingService?.getMachineHash() || '';
-  });
-
-  ipcMain.handle('licensing:startTrial', async () => {
-    if (!licensingService) {
-      return { success: false, error: 'Service not initialized' };
-    }
-    return await licensingService.startTrial();
-  });
-
   // Device handlers
   ipcMain.handle('devices:getAll', () => {
     return db?.getAllDevices() || [];
@@ -221,9 +146,7 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('devices:getConnected', () => {
-    const connected = server?.getConnectedDevices() || [];
-    console.log('[MAIN] devices:getConnected called, returning:', connected);
-    return connected;
+    return server?.getConnectedDevices() || [];
   });
 
   // Policy handlers
@@ -281,14 +204,7 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('pairing:approve', (_, requestId: string) => {
-    console.log('[MAIN] pairing:approve called for requestId:', requestId);
     const success = server?.approvePairing(requestId) || false;
-    console.log('[MAIN] approvePairing returned:', success);
-
-    // After approval, log the connected devices
-    const connected = server?.getConnectedDevices() || [];
-    console.log('[MAIN] Connected devices after approval:', connected);
-
     return { success };
   });
 
@@ -337,10 +253,7 @@ function registerIpcHandlers(): void {
     return server?.getLogs(count) || [];
   });
 
-  // ============================================================
   // Dashboard API Handlers
-  // ============================================================
-
   ipcMain.handle('dashboard:getSummary', (_, range: 'today' | '7d') => {
     const dashboardService = server?.getDashboardService();
     return dashboardService?.getDashboardSummary(range) || null;
@@ -413,20 +326,16 @@ function registerIpcHandlers(): void {
     return dashboardService?.getTrends(scope, deviceId, days || 7) || null;
   });
 
-  // Enhanced Device Detail (for DeviceDetailPage)
+  // Enhanced Device Detail
   ipcMain.handle('dashboard:getDeviceDetailEnhanced', (_, deviceId: string, range: 'today' | '7d' | '30d') => {
     const { DeviceDetailService } = require('./device-detail-service');
     const detailService = new DeviceDetailService(db);
     return detailService.getDeviceDetail(deviceId, range);
   });
 
-  // ============================================================
   // App Categorization IPC Handlers
-  // ============================================================
-
   ipcMain.handle('apps:getUsageAggregates', () => {
     const todayYmd = new Date().toISOString().split('T')[0];
-    // First aggregate from heartbeats
     db?.aggregateAppUsageFromHeartbeats(todayYmd);
     return db?.getAppUsageAggregates(todayYmd) || [];
   });
@@ -449,10 +358,7 @@ function registerIpcHandlers(): void {
     return db?.getAllAppCategories() || [];
   });
 
-  // ============================================================
   // Weekly Insights IPC Handlers
-  // ============================================================
-
   ipcMain.handle('insights:getWeekly', (_, weekEnd?: string) => {
     const endDate = weekEnd || new Date().toISOString().split('T')[0];
     return db?.getWeeklyInsights(endDate) || [];
@@ -467,18 +373,10 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('reports:generate', async () => {
-    // TODO: Implement weekly report generation
     return { success: false, message: 'Not implemented yet' };
   });
 
-  // ============================================================
-  // Assisted Updater IPC Handlers
-  // ============================================================
-
-  ipcMain.handle('updater:checkForUpdates', async () => {
-    return assistedUpdater?.checkForUpdates(true) || { updateAvailable: false };
-  });
-
+  // Version
   ipcMain.handle('updater:getVersion', () => {
     return app.getVersion();
   });
@@ -488,23 +386,7 @@ function registerIpcHandlers(): void {
 app.whenReady().then(async () => {
   initializeServices();
   registerIpcHandlers();
-
-  // CRITICAL FIX: Initialize licensing service before showing window
-  if (licensingService) {
-    await licensingService.init();
-    console.log('[MAIN] Licensing service initialized');
-    const status = licensingService.getStatus();
-    console.log('[MAIN] License status:', status.licensed ? 'LICENSED' : 'NOT LICENSED', status.reason || '');
-  }
-
   createWindow();
-
-  // Initialize assisted updater after window is created
-  if (mainWindow) {
-    assistedUpdater = new AdminAssistedUpdater(mainWindow);
-    assistedUpdater.startBackgroundChecks();
-    console.log('[MAIN] Assisted updater initialized');
-  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -520,9 +402,6 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-  // CRITICAL FIX: Stop heartbeat on quit
-  licensingService?.stopHeartbeat();
-  assistedUpdater?.cleanup();
   server?.stop();
   db?.close();
 });

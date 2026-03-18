@@ -1,25 +1,21 @@
 /**
- * Licensing Configuration (v1.8)
+ * Licensing Configuration — Freeware Edition
  *
- * IMPORTANT: Before deploying to production:
- * 1. Generate Ed25519 keypair using the server's keygen.ts script
- * 2. Replace ED25519_PUBLIC_KEY with your actual public key
- * 3. Deploy the server with the private key in environment variables
- * 4. Update LICENSE_SERVER_URL with your Railway deployment URL
+ * No server calls, no trials, no heartbeats.
+ * All features permanently unlocked.
  */
 
-// Ed25519 Public Key for verifying license signatures
-// Generated: 2026-01-09
-export const ED25519_PUBLIC_KEY = process.env.ED25519_PUBLIC_KEY || "yBpM6mVTBbG9j8SmQlQFvRWlL8TfOwHuzWEO7zhHzgw=";
+// Ed25519 Public Key — not used in freeware mode
+export const ED25519_PUBLIC_KEY = "";
 
-// License Server URL
-export const LICENSE_SERVER_URL = process.env.LICENSE_SERVER_URL || "https://produtime-licensing-server-production.up.railway.app";
+// License Server URL — not used in freeware mode
+export const LICENSE_SERVER_URL = "";
 
-// Heartbeat interval (milliseconds)
-export const HEARTBEAT_INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 hours
+// Heartbeat interval — not used in freeware mode
+export const HEARTBEAT_INTERVAL_MS = 0;
 
-// Grace period for offline operation (milliseconds)
-export const GRACE_PERIOD_MS = 72 * 60 * 60 * 1000; // 72 hours
+// Grace period — not used in freeware mode
+export const GRACE_PERIOD_MS = 0;
 
-// Trial period (days)
-export const TRIAL_PERIOD_DAYS = 7;
+// Trial period — not used in freeware mode
+export const TRIAL_PERIOD_DAYS = 0;
