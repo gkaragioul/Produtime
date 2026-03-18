@@ -37,41 +37,23 @@ export interface TimeDriftInfo {
 }
 
 /**
- * Feature requirements by plan
+ * Feature requirements by plan — Freeware: all features enabled for all plans
  */
+const ALL_FEATURES: LicenseFeatures = {
+  adminPanel: true,
+  managedMode: true,
+  exports: true,
+  advancedReports: true,
+  customBranding: true,
+  apiAccess: true,
+};
+
 export const PLAN_FEATURES: Record<string, LicenseFeatures> = {
-  trial: {
-    adminPanel: false,
-    managedMode: false,
-    exports: true,
-    advancedReports: false,
-    customBranding: false,
-    apiAccess: false,
-  },
-  basic: {
-    adminPanel: false,
-    managedMode: false,
-    exports: true,
-    advancedReports: false,
-    customBranding: false,
-    apiAccess: false,
-  },
-  pro: {
-    adminPanel: true,
-    managedMode: true,
-    exports: true,
-    advancedReports: true,
-    customBranding: false,
-    apiAccess: false,
-  },
-  enterprise: {
-    adminPanel: true,
-    managedMode: true,
-    exports: true,
-    advancedReports: true,
-    customBranding: true,
-    apiAccess: true,
-  },
+  trial: { ...ALL_FEATURES },
+  basic: { ...ALL_FEATURES },
+  pro: { ...ALL_FEATURES },
+  enterprise: { ...ALL_FEATURES },
+  freeware: { ...ALL_FEATURES },
 };
 
 /**
@@ -98,11 +80,10 @@ export interface TamperFlag {
 }
 
 /**
- * Check if a feature is allowed
+ * Check if a feature is allowed — Freeware: always true
  */
-export function isFeatureAllowed(features: LicenseFeatures | undefined, featureName: string): boolean {
-  if (!features) return false;
-  return features[featureName] === true;
+export function isFeatureAllowed(_features: LicenseFeatures | undefined, _featureName: string): boolean {
+  return true;
 }
 
 /**

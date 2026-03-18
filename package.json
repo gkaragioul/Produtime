@@ -1,7 +1,7 @@
 {
   "name": "produtime",
-  "version": "1.9.0",
-  "description": "ProduTime - Time tracking application with production licensing",
+  "version": "0.5.1",
+  "description": "ProduTime - Free local-only time tracking application",
   "main": "dist/main/main.js",
   "homepage": "https://github.com/georgekgr12/timeport",
   "repository": {
@@ -62,7 +62,7 @@
     "deps:check": "npm outdated",
     "deps:update": "npm update",
     "deps:audit": "npm audit fix",
-    "typecheck": "tsc -p src/main/tsconfig.json --noEmit && tsc -p admin-console/tsconfig.json --noEmit && tsc -p licensing-server/api/tsconfig.json --noEmit",
+    "typecheck": "tsc -p src/main/tsconfig.json --noEmit && tsc -p licensing-server/api/tsconfig.json --noEmit",
     "test:all": "npm test && node scripts/simulate-license-scenarios.js"
   },
   "keywords": [
@@ -73,7 +73,7 @@
     "typescript"
   ],
   "author": "George Karagioules",
-  "license": "MIT",
+  "license": "Freeware",
   "devDependencies": {
     "@eslint/js": "^9.34.0",
     "@swc/core": "^1.13.5",
@@ -144,6 +144,8 @@
     "files": [
       "dist/**/*",
       "node_modules/**/*",
+      "!node_modules/electron",
+      "!node_modules/electron/**/*",
       "package.json"
     ],
     "extraResources": [
@@ -168,7 +170,7 @@
       "icon": "../assets/icon.ico",
       "forceCodeSigning": false,
       "verifyUpdateCodeSignature": false,
-      "signAndEditExecutable": true
+      "signAndEditExecutable": false
     },
     "mac": {
       "target": [

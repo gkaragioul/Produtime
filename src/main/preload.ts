@@ -451,16 +451,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 });
 
-// Expose separate enhanced licensing API (v1.8) as window.api
+// Freeware: window.api always returns activated
 contextBridge.exposeInMainWorld('api', {
   getLicenseStatus: (): Promise<IPCResponse<any>> =>
-    ipcRenderer.invoke('license:getStatus'),
-
+    Promise.resolve({
+      success: true,
+      data: { mode: 'activated', isEntitled: true, trialDaysRemaining: null,
+        features: { adminPanel: true, managedMode: true, exports: true, advancedReports: true, customBranding: true, apiAccess: true } },
+    }),
   startTrial: (): Promise<IPCResponse<{ success: boolean; error?: string }>> =>
-    ipcRenderer.invoke('license:startTrial'),
-
-  activateLicense: (licenseKey: string): Promise<IPCResponse<{ success: boolean; error?: string }>> =>
-    ipcRenderer.invoke('license:activate', licenseKey),
+    Promise.resolve({ success: true, data: { success: true } }),
+  activateLicense: (_licenseKey: string): Promise<IPCResponse<{ success: boolean; error?: string }>> =>
+    Promise.resolve({ success: true, data: { success: true } }),
 });
 
 // Debug: Log that electronAPI has been exposed
