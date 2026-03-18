@@ -51,6 +51,29 @@ export class EmailService {
    * - EMAIL_USER: Email account username
    * - EMAIL_PASS: Email account password or app password
    */
+  /**
+   * Configure from database settings (preferred over env vars)
+   */
+  public configureFromDatabase(getSetting: (key: string) => string | null): void {
+    const host = getSetting('email_smtp_host');
+    const port = getSetting('email_smtp_port');
+    const user = getSetting('email_smtp_user');
+    const pass = getSetting('email_smtp_pass');
+    const secure = getSetting('email_smtp_secure');
+
+    if (host && user && pass) {
+      this.configure({
+        host,
+        port: parseInt(port || '587', 10),
+        secure: secure === 'true',
+        auth: { user, pass },
+      });
+    } else {
+      // Fall back to env vars
+      this.configure();
+    }
+  }
+
   public configure(config?: EmailConfig): void {
     try {
       // Load configuration from environment variables or use provided config

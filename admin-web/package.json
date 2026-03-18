@@ -1,0 +1,46 @@
+{
+  "name": "produtime-admin-web",
+  "version": "1.0.0",
+  "description": "ProduTime Admin Console - Web Edition (deployable to Railway)",
+  "main": "dist/server/server/index.js",
+  "scripts": {
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:client": "webpack --mode production --config webpack.config.js",
+    "build": "npm run build:server && npm run build:client",
+    "start": "node dist/server/server/index.js",
+    "dev:server": "tsc -p tsconfig.server.json --watch",
+    "dev:client": "webpack --mode development --watch --config webpack.config.js",
+    "dev": "npm run build && npm start"
+  },
+  "keywords": ["produtime", "admin-console", "web", "time-tracking"],
+  "author": "George Karagioules",
+  "license": "Freeware",
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "jsonwebtoken": "^9.0.2",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tweetnacl": "^1.0.3",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^24.3.0",
+    "@types/react": "^19.1.12",
+    "@types/react-dom": "^19.1.9",
+    "@types/ws": "^8.5.13",
+    "css-loader": "^7.1.2",
+    "html-webpack-plugin": "^5.6.4",
+    "copy-webpack-plugin": "^13.0.1",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.2",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1"
+  }
+}

@@ -61,6 +61,8 @@ export class IPCHandlers {
   private readonly FAILED_ALERT_RATE_LIMIT_MIN = 10; // minutes
 
   private readonly FAILED_ALERT_THRESHOLD = 3; // Minimum failed attempts before sending alert
+  private readonly LOCKOUT_THRESHOLD = 5; // Lock account after this many failed attempts
+  private readonly LOCKOUT_DURATION_MINUTES = 15; // Lockout duration in minutes
 
   // License public key for verification (in production, this would be embedded)
   private readonly LICENSE_PUBLIC_KEY =
@@ -100,7 +102,7 @@ export class IPCHandlers {
     this.enhancedLicenseService = enhancedLicenseService || null;
     this.onMenuRebuildNeeded = onMenuRebuildNeeded || null;
     this.emailService = EmailService.getInstance();
-    this.emailService.configure(); // Initialize with default configuration
+    this.emailService.configureFromDatabase((key) => this.database.getSetting(key));
     // Freeware: legacy license service not initialized (no network calls)
     this.licenseService = null;
     this.deviceIdService = DeviceIdService.getInstance();
@@ -455,6 +457,71 @@ export class IPCHandlers {
       IPCChannels.ADMIN_RESET_LOCKOUT,
       this.handleResetAdminLockout.bind(this)
     );
+
+    // Email configuration handlers
+    try { ipcMain.removeHandler('email:getConfig'); } catch {}
+    try { ipcMain.removeHandler('email:saveConfig'); } catch {}
+    try { ipcMain.removeHandler('email:test'); } catch {}
+    ipcMain.handle('email:getConfig', async () => {
+      try {
+        return {
+          success: true,
+          data: {
+            host: this.database.getSetting('email_smtp_host') || '',
+            port: this.database.getSetting('email_smtp_port') || '587',
+            user: this.database.getSetting('email_smtp_user') || '',
+            pass: this.database.getSetting('email_smtp_pass') ? '********' : '', // Mask password
+            secure: this.database.getSetting('email_smtp_secure') || 'false',
+            recipient: this.database.getSetting('admin_alert_email') || '',
+            isConfigured: this.emailService.isConfigured,
+          },
+        };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('email:saveConfig', async (_event: IpcMainInvokeEvent, config: {
+      host: string; port: string; user: string; pass: string; secure: string; recipient: string;
+    }) => {
+      try {
+        this.database.setSetting('email_smtp_host', config.host);
+        this.database.setSetting('email_smtp_port', config.port);
+        this.database.setSetting('email_smtp_user', config.user);
+        if (config.pass && config.pass !== '********') {
+          this.database.setSetting('email_smtp_pass', config.pass);
+        }
+        this.database.setSetting('email_smtp_secure', config.secure);
+        this.database.setSetting('admin_alert_email', config.recipient);
+
+        // Reconfigure email service with new settings
+        this.emailService.configureFromDatabase((key) => this.database.getSetting(key));
+
+        return { success: true, data: { isConfigured: this.emailService.isConfigured } };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    });
+
+    ipcMain.handle('email:test', async () => {
+      try {
+        const alertEmail = this.database.getSetting('admin_alert_email');
+        if (!alertEmail) {
+          return { success: false, error: 'No recipient email configured' };
+        }
+        if (!this.emailService.isConfigured) {
+          return { success: false, error: 'Email service not configured' };
+        }
+        await this.emailService.sendSecurityAlert(alertEmail, {
+          type: 'failed_attempts',
+          timestamp: new Date().toISOString(),
+          details: { failedAttempts: 0, maxAttempts: 0 },
+        });
+        return { success: true };
+      } catch (error: any) {
+        return { success: false, error: error.message };
+      }
+    });
 
     // Enhanced settings management handlers
     ipcMain.handle(
@@ -1226,8 +1293,20 @@ export class IPCHandlers {
     request: AdminLoginRequest
   ): Promise<IPCResponse<AdminLoginResponse>> {
     try {
-      // Lockout disabled: never block login attempts
-      // We still return current failed attempts for UI messaging if needed
+      // Check if account is locked out
+      if (this.database.isAdminLockedOut()) {
+        const lockoutState = this.database.getLockoutState();
+        return {
+          success: true,
+          data: {
+            success: false,
+            isLockedOut: true,
+            failedAttempts: lockoutState.failed_attempts_count,
+            maxAttempts: this.LOCKOUT_THRESHOLD,
+            lockoutExpiresAt: lockoutState.locked_until || undefined,
+          },
+        };
+      }
       const lockoutState = this.database.getLockoutState();
 
       // Get the admin password hash from settings, or generate and store a secure one on first run
@@ -1235,19 +1314,13 @@ export class IPCHandlers {
       let adminPasswordHash = await this.database.getSetting('admin_password_hash');
 
       if (!adminPasswordHash) {
-        // Generate a secure random password on first run
-        const generatedPassword = crypto.randomBytes(12).toString('hex');
-        // Hash the generated password using scrypt
+        // Default password on first run: admin123
+        const defaultPassword = 'admin123';
         const salt = crypto.randomBytes(16);
-        const derivedKey = crypto.scryptSync(generatedPassword, salt, 32);
-        // Store hash as salt:hash format so we can verify later
+        const derivedKey = crypto.scryptSync(defaultPassword, salt, 32);
         adminPasswordHash = salt.toString('hex') + ':' + derivedKey.toString('hex');
         this.database.setSetting('admin_password_hash', adminPasswordHash);
-        this.logger.info('ADMIN', 'Generated and hashed new admin password on first run');
-
-        // Also store plaintext password in memory for displaying to user only on first run
-        // (in production, this would be shown to user via secure channel, then immediately cleared)
-        this.logger.info('ADMIN', 'Generated new admin password (CHANGE IT IMMEDIATELY)');
+        this.logger.info('ADMIN', 'Set default admin password on first run');
       }
 
       // Hash the incoming password for comparison
@@ -1291,7 +1364,7 @@ export class IPCHandlers {
             success: true,
             isLockedOut: false,
             failedAttempts: 0,
-            maxAttempts: 0,
+            maxAttempts: this.LOCKOUT_THRESHOLD,
           },
         };
       } else {
@@ -1299,13 +1372,22 @@ export class IPCHandlers {
         const lockoutState = this.database.getLockoutState();
         const newFailedCount = lockoutState.failed_attempts_count + 1;
 
-        // Update failed attempts count, but never lock out
+        // Lock out if threshold reached
+        const shouldLock = newFailedCount >= this.LOCKOUT_THRESHOLD;
+        const lockedUntil = shouldLock
+          ? new Date(Date.now() + this.LOCKOUT_DURATION_MINUTES * 60 * 1000).toISOString()
+          : null;
+
         this.database.updateLockoutState({
           failed_attempts_count: newFailedCount,
           last_attempt_at: new Date().toISOString(),
-          is_locked: false,
-          locked_until: null,
+          is_locked: shouldLock,
+          locked_until: lockedUntil,
         });
+
+        if (shouldLock) {
+          this.logger.warn('ADMIN', `Account locked after ${newFailedCount} failed attempts. Locked for ${this.LOCKOUT_DURATION_MINUTES} minutes.`);
+        }
 
         // Send an admin alert only after threshold failures (rate-limited)
         // Fire-and-forget to avoid blocking the authentication response
@@ -1334,9 +1416,10 @@ export class IPCHandlers {
           success: true,
           data: {
             success: false,
-            isLockedOut: false,
+            isLockedOut: shouldLock,
             failedAttempts: newFailedCount,
-            maxAttempts: 0,
+            maxAttempts: this.LOCKOUT_THRESHOLD,
+            lockoutExpiresAt: lockedUntil || undefined,
           },
         };
       }

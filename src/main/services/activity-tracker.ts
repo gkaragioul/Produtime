@@ -572,7 +572,14 @@ export class ActivityTracker {
       return { appName: 'System', windowTitle: 'Paused' };
     }
     if (!activeWin) {
-      return null;
+      // Fallback to platform-specific methods when active-win native module is unavailable
+      if (process.platform === 'win32') {
+        return this.getActiveWindowWindows();
+      } else if (process.platform === 'darwin') {
+        return this.getActiveWindowMacOS();
+      } else {
+        return this.getActiveWindowLinux();
+      }
     }
     try {
       // Take 3 samples to balance accuracy vs speed (reduced from 5)

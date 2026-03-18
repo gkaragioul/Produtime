@@ -92,6 +92,11 @@ export interface ElectronAPI {
   getAdminLockoutState: () => Promise<IPCResponse<AdminLockoutState>>;
   resetAdminLockout: () => Promise<IPCResponse<void>>;
 
+  // Email Configuration API
+  getEmailConfig: () => Promise<IPCResponse<any>>;
+  saveEmailConfig: (config: any) => Promise<IPCResponse<any>>;
+  testEmail: () => Promise<IPCResponse<any>>;
+
   // Enhanced Settings Management API
   bulkUpdateSettings: (
     settings: Record<string, string>
