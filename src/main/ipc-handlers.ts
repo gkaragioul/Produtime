@@ -1,12 +1,12 @@
 import { app, ipcMain, IpcMainInvokeEvent } from 'electron';
 import { DatabaseManager } from './database';
-import { AutoUpdaterManager } from './auto-updater';
+import type { AutoUpdaterManager } from './auto-updater';
 import { PDFGenerator } from './pdf-generator';
 import { SystemTrayManager } from './system-tray';
 import { EmailService } from './services/email-service';
 import { ActivityTracker } from './services/activity-tracker';
 import { StartupHelper } from './startup-helper';
-import { LicenseService } from './services/license-service';
+// Freeware: LicenseService not used (EnhancedLicenseService stub handles everything)
 import { DeviceIdService } from './services/device-id-service';
 import { Logger } from './logger';
 import { EnhancedLicenseService } from './services/licensing/EnhancedLicenseService';
@@ -52,7 +52,7 @@ export class IPCHandlers {
   private activityTracker: ActivityTracker | null = null;
   private agentService: AgentService | null = null;
   private emailService: EmailService;
-  private licenseService: LicenseService;
+  private licenseService: any;
   private deviceIdService: DeviceIdService;
   private logger: Logger;
   private enhancedLicenseService: EnhancedLicenseService | null = null;
@@ -101,10 +101,8 @@ export class IPCHandlers {
     this.onMenuRebuildNeeded = onMenuRebuildNeeded || null;
     this.emailService = EmailService.getInstance();
     this.emailService.configure(); // Initialize with default configuration
-    this.licenseService = LicenseService.getInstance(
-      database,
-      this.LICENSE_PUBLIC_KEY
-    );
+    // Freeware: legacy license service not initialized (no network calls)
+    this.licenseService = null;
     this.deviceIdService = DeviceIdService.getInstance();
     this.logger = Logger.getInstance();
     this.registerHandlers();

@@ -665,49 +665,13 @@ class TimePortApp {
         console.warn("[LICENSE] Skipping license service - no database");
         return;
       }
-
-      console.log("[LICENSE] Initializing enhanced license service");
-
-      // Import licensing configuration
-      const { ED25519_PUBLIC_KEY, LICENSE_SERVER_URL } = await import("../shared/licensing-config");
-
-      const publicKey = process.env.ED25519_PUBLIC_KEY || ED25519_PUBLIC_KEY;
-      const serverUrl = process.env.LICENSE_SERVER_URL || LICENSE_SERVER_URL;
-
+      console.log("[LICENSE] Initializing freeware license service (all features unlocked)");
       const { EnhancedLicenseService } = await import("./services/licensing/EnhancedLicenseService");
-      this.enhancedLicenseService = EnhancedLicenseService.getInstance(
-        this.database,
-        publicKey,
-        serverUrl
-      );
-
-      // Initialize license system (check trial, activation, grace period, etc.)
+      this.enhancedLicenseService = EnhancedLicenseService.getInstance(this.database, "", "");
       await this.enhancedLicenseService.init();
-
-      console.log("[LICENSE] Enhanced license service initialized successfully");
-
-      // Log current license status
-      const status = this.enhancedLicenseService.getStatus();
-      console.log("[LICENSE] Current status:", status);
-
-      // Start periodic revocation checks (every 5 minutes for faster detection)
-      this.enhancedLicenseService.startRevocationChecks();
-
-      // Schedule periodic heartbeat (hourly check if due)
-      // Store timer so it can be cleaned up on app shutdown (prevents memory leak)
-      this.heartbeatTimer = setInterval(async () => {
-        if (this.enhancedLicenseService) {
-          try {
-            await this.enhancedLicenseService.heartbeatIfDue();
-          } catch (err) {
-            console.error('[LICENSE] Heartbeat check failed:', err);
-          }
-        }
-      }, 60 * 60 * 1000); // Check every hour
-
+      console.log("[LICENSE] Freeware license service ready");
     } catch (error) {
       console.error("[LICENSE] Failed to initialize license service:", error);
-      // Don't crash the app - license service failure should be handled gracefully
     }
   }
 
@@ -717,42 +681,13 @@ class TimePortApp {
   }
 
   private async initializeAutoUpdater(): Promise<void> {
-    if (process.env.DIAGNOSTIC_SKIP_AUTOUPDATE === "1") {
-      console.warn("[DIAGNOSTIC] Skipping auto-updater initialization");
-      return;
-    }
-    if (this.mainWindow) {
-      const { AutoUpdaterManager } = await import("./auto-updater");
-      this.autoUpdater = new AutoUpdaterManager(
-        this.mainWindow,
-        this.database || undefined
-      );
-      // DISABLED: All builds now use License Manager for updates
-      // this.autoUpdater.setFeedURL(""); // GitHub releases
-      console.log("Auto-updater initialized successfully (using License Manager for all updates)");
-    } else {
-      throw new Error("Main window must be created before auto-updater");
-    }
+    // Freeware: auto-updater disabled — no network update checks
+    console.log("[FREEWARE] Auto-updater disabled");
   }
 
   private async initializeAssistedUpdater(): Promise<void> {
-    if (process.env.DIAGNOSTIC_SKIP_ASSISTED_UPDATER === "1") {
-      console.warn("[DIAGNOSTIC] Skipping assisted updater initialization");
-      return;
-    }
-    if (this.mainWindow) {
-      const { AssistedUpdater } = await import("./assisted-updater");
-      this.assistedUpdater = new AssistedUpdater(this.mainWindow, {
-        manifestUrl: "https://raw.githubusercontent.com/georgekgr12/produtime-releases/main/latest.json",
-      });
-
-      // Start background checks (24h interval)
-      this.assistedUpdater.startBackgroundChecks();
-
-      console.log("Assisted updater initialized successfully");
-    } else {
-      throw new Error("Main window must be created before assisted updater");
-    }
+    // Freeware: assisted updater disabled — no network update checks
+    console.log("[FREEWARE] Assisted updater disabled");
   }
 
   private async initializePDFGenerator(): Promise<void> {
