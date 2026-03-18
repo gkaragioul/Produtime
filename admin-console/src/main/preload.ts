@@ -5,6 +5,12 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
+contextBridge.exposeInMainWorld('adminAuth', {
+  login: (password: string) => ipcRenderer.invoke('auth:login', password),
+  isAuthenticated: () => ipcRenderer.invoke('auth:isAuthenticated'),
+  logout: () => ipcRenderer.invoke('auth:logout'),
+});
+
 contextBridge.exposeInMainWorld('adminAPI', {
   // Device operations
   getAllDevices: () => ipcRenderer.invoke('devices:getAll'),
@@ -84,6 +90,12 @@ contextBridge.exposeInMainWorld('adminAPI', {
     return () => ipcRenderer.removeListener('server:log', listener);
   },
 
+  onExportResult: (callback: (data: { deviceId: string; result: any }) => void) => {
+    const listener = (_: any, data: any) => callback(data);
+    ipcRenderer.on('export:result', listener);
+    return () => ipcRenderer.removeListener('export:result', listener);
+  },
+
   // Server logs
   getServerLogs: (count?: number) => ipcRenderer.invoke('server:getLogs', count),
 
@@ -125,6 +137,10 @@ contextBridge.exposeInMainWorld('adminAPI', {
   getWeeklyReports: () => ipcRenderer.invoke('reports:getAll'),
   getWeeklyReport: (weekEnd: string) => ipcRenderer.invoke('reports:get', weekEnd),
   generateWeeklyReport: () => ipcRenderer.invoke('reports:generate'),
+
+  // Analytics API
+  getAnalyticsMetrics: (params: { deviceId?: string; startDate: string; endDate: string }) =>
+    ipcRenderer.invoke('analytics:getMetrics', params),
 
   // Version
   getAppVersion: () => ipcRenderer.invoke('updater:getVersion'),

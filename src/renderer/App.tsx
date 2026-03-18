@@ -399,24 +399,12 @@ const App: React.FC = () => {
                     >
                       Dashboard
                     </button>
-                    {/* Show Settings tab only when NOT managed */}
-                    {!isManaged && (
-                      <button
-                        className={`tab-button ${activeTab === "settings" ? "active" : ""}`}
-                        onClick={() => setActiveTab("settings")}
-                      >
-                        Settings
-                      </button>
-                    )}
-                    {/* Show Policy tab when managed */}
-                    {isManaged && (
-                      <button
-                        className={`tab-button ${activeTab === "policy" ? "active" : ""}`}
-                        onClick={() => setActiveTab("policy")}
-                      >
-                        Policy
-                      </button>
-                    )}
+                    <button
+                      className={`tab-button ${activeTab === "settings" ? "active" : ""}`}
+                      onClick={() => setActiveTab("settings")}
+                    >
+                      Settings
+                    </button>
                   </div>
                 </div>
               </div>
@@ -439,21 +427,8 @@ const App: React.FC = () => {
                   <>
                     {activeTab === "dashboard" && <DailyPerformanceConsole />}
 
-                    {activeTab === "settings" && !isManaged && (
-                      <div>
-                        {wasLoggedOut ? (
-                          <div className="settings-locked-placeholder">
-                            <h2>Settings Locked</h2>
-                            <p>Please log in as admin to access settings.</p>
-                          </div>
-                        ) : (
-                          <SettingsTab />
-                        )}
-                      </div>
-                    )}
-
-                    {activeTab === "policy" && isManaged && (
-                      <PolicyView />
+                    {activeTab === "settings" && (
+                      <PolicyView isManaged={isManaged} adminName={adminName} />
                     )}
                   </>
                 )}

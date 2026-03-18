@@ -5,12 +5,17 @@
 
 import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { AdminDatabase } from './db';
 import { AdminServer } from './server';
 
 let mainWindow: BrowserWindow | null = null;
 let db: AdminDatabase | null = null;
 let server: AdminServer | null = null;
+
+// Authentication state (in-memory, resets on app restart)
+let isAdminAuthenticated = false;
+let authExpiry: number | null = null;
 
 // Get the correct icon path for both dev and production
 function getIconPath(): string {
@@ -113,6 +118,10 @@ function initializeServices(): void {
     mainWindow?.webContents.send('stats:received', { deviceId, stats });
   };
 
+  server.onExportResult = (deviceId, result) => {
+    mainWindow?.webContents.send('export:result', { deviceId, result });
+  };
+
   server.onLog = (message) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('server:log', message);
@@ -130,7 +139,91 @@ function initializeServices(): void {
   });
 }
 
+function hashPassword(password: string, salt: Buffer): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(password, salt, 64, (err, derivedKey) => {
+      if (err) reject(err);
+      else resolve(derivedKey);
+    });
+  });
+}
+
+/**
+ * Re-push policy (with updated app categories) to all connected devices that have an assigned policy.
+ */
+function pushCategoriesToAllDevices(): void {
+  if (!db || !server) return;
+
+  const allDevices = db.getAllDevices();
+  const connectedIds = server.getConnectedDevices();
+
+  for (const device of allDevices) {
+    if (!device.policy_id || !connectedIds.includes(device.device_id)) continue;
+
+    const policyRecord = db.getPolicy(device.policy_id);
+    if (!policyRecord) continue;
+
+    try {
+      const policyData = JSON.parse(policyRecord.policy_json);
+      policyData.version = policyData.version || policyRecord.policy_id;
+      policyData.updatedAt = policyData.updatedAt || policyRecord.updated_at;
+      server.pushPolicy(device.device_id, policyData);
+    } catch (err) {
+      console.error(`Failed to push categories to device ${device.device_id}:`, err);
+    }
+  }
+}
+
 function registerIpcHandlers(): void {
+  // Authentication handlers
+  ipcMain.handle('auth:login', async (_, password: string) => {
+    try {
+      let storedHash = db?.getSetting('admin_password_hash') ?? null;
+
+      // First run: hash default password and store it
+      if (!storedHash) {
+        const salt = crypto.randomBytes(16);
+        const hash = await hashPassword('admin123', salt);
+        storedHash = salt.toString('hex') + ':' + hash.toString('hex');
+        db?.setSetting('admin_password_hash', storedHash);
+      }
+
+      // Verify the incoming password
+      const [saltHex, hashHex] = storedHash.split(':');
+      const salt = Buffer.from(saltHex, 'hex');
+      const expectedHash = Buffer.from(hashHex, 'hex');
+      const incomingHash = await hashPassword(password, salt);
+
+      // Constant-time comparison
+      if (crypto.timingSafeEqual(expectedHash, incomingHash)) {
+        isAdminAuthenticated = true;
+        authExpiry = Date.now() + 8 * 60 * 60 * 1000; // 8 hours
+        return { success: true };
+      } else {
+        return { success: false, error: 'Invalid password' };
+      }
+    } catch (error) {
+      console.error('Auth login error:', error);
+      return { success: false, error: 'Authentication error' };
+    }
+  });
+
+  ipcMain.handle('auth:isAuthenticated', () => {
+    if (isAdminAuthenticated && authExpiry && Date.now() < authExpiry) {
+      return { authenticated: true };
+    }
+    // Expired or not authenticated
+    isAdminAuthenticated = false;
+    authExpiry = null;
+    return { authenticated: false };
+  });
+
+  ipcMain.handle('auth:logout', () => {
+    isAdminAuthenticated = false;
+    authExpiry = null;
+    return { success: true };
+  });
+
   // Device handlers
   ipcMain.handle('devices:getAll', () => {
     return db?.getAllDevices() || [];
@@ -346,11 +439,13 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle('apps:setCategory', (_, appName: string, category: string) => {
     db?.setAppCategory(appName, category as any);
+    pushCategoriesToAllDevices();
     return { success: true };
   });
 
   ipcMain.handle('apps:setCategoriesBulk', (_, apps: Array<{ appName: string; category: string }>) => {
     db?.setAppCategoriesBulk(apps as any);
+    pushCategoriesToAllDevices();
     return { success: true };
   });
 
@@ -373,7 +468,163 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle('reports:generate', async () => {
-    return { success: false, message: 'Not implemented yet' };
+    try {
+      if (!db) {
+        return { success: false, message: 'Database not initialized' };
+      }
+
+      // 1. Calculate week range: Monday of this week to Sunday (or today if mid-week)
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ...
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(today);
+      monday.setDate(today.getDate() + mondayOffset);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+
+      const endDate = sunday <= today ? sunday : today;
+
+      const startDateStr = monday.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+
+      // 2. Get team daily metrics for the range
+      const teamDaily = db.getTeamDailyMetricsRange(startDateStr, endDateStr);
+
+      // 3. Get all devices and per-device metrics
+      const devices = db.getAllDevices();
+      const perDeviceData: Array<{
+        device_id: string;
+        device_name: string;
+        active_seconds: number;
+        idle_seconds: number;
+        untracked_seconds: number;
+        productive_seconds: number;
+        unproductive_seconds: number;
+        top_apps: Array<{ app: string; seconds: number }>;
+      }> = [];
+
+      for (const device of devices) {
+        const deviceMetrics = db.getDeviceDailyMetricsRange(device.device_id, startDateStr, endDateStr);
+        let active = 0, idle = 0, untracked = 0, productive = 0, unproductive = 0;
+        const appTotals = new Map<string, number>();
+
+        for (const m of deviceMetrics) {
+          active += m.active_seconds || 0;
+          idle += m.idle_seconds || 0;
+          untracked += m.untracked_seconds || 0;
+          productive += m.productive_seconds || 0;
+          unproductive += m.unproductive_seconds || 0;
+
+          try {
+            const apps = JSON.parse(m.top_apps_json || '[]') as Array<{ app: string; seconds: number }>;
+            for (const a of apps) {
+              appTotals.set(a.app, (appTotals.get(a.app) || 0) + a.seconds);
+            }
+          } catch {
+            // Ignore parse errors
+          }
+        }
+
+        const topApps = Array.from(appTotals.entries())
+          .map(([app, seconds]) => ({ app, seconds }))
+          .sort((a, b) => b.seconds - a.seconds)
+          .slice(0, 10);
+
+        perDeviceData.push({
+          device_id: device.device_id,
+          device_name: device.device_name,
+          active_seconds: active,
+          idle_seconds: idle,
+          untracked_seconds: untracked,
+          productive_seconds: productive,
+          unproductive_seconds: unproductive,
+          top_apps: topApps,
+        });
+      }
+
+      // 4. Build report JSON
+      const teamTotals = {
+        active_seconds: teamDaily.reduce((s, d) => s + (d.active_seconds || 0), 0),
+        idle_seconds: teamDaily.reduce((s, d) => s + (d.idle_seconds || 0), 0),
+        untracked_seconds: teamDaily.reduce((s, d) => s + (d.untracked_seconds || 0), 0),
+        productive_seconds: teamDaily.reduce((s, d) => s + (d.productive_seconds || 0), 0),
+        unproductive_seconds: teamDaily.reduce((s, d) => s + (d.unproductive_seconds || 0), 0),
+      };
+
+      const reportJson = {
+        week_start: startDateStr,
+        week_end: endDateStr,
+        team_totals: teamTotals,
+        daily_breakdown: teamDaily,
+        per_device: perDeviceData,
+      };
+
+      // 5. Generate narrative
+      const activeHours = (teamTotals.active_seconds / 3600).toFixed(1);
+      const deviceCount = perDeviceData.filter(d => d.active_seconds > 0).length;
+      const topPerformer = perDeviceData.length > 0
+        ? perDeviceData.reduce((best, d) => d.active_seconds > best.active_seconds ? d : best, perDeviceData[0])
+        : null;
+
+      let narrative = `Team logged ${activeHours} hours of active time across ${deviceCount} device${deviceCount !== 1 ? 's' : ''} from ${startDateStr} to ${endDateStr}.`;
+      if (topPerformer && topPerformer.active_seconds > 0) {
+        const topHours = (topPerformer.active_seconds / 3600).toFixed(1);
+        narrative += ` Top performer: ${topPerformer.device_name} with ${topHours} hours.`;
+      }
+
+      // 6. Save to DB
+      db.insertWeeklyReport({
+        week_start: startDateStr,
+        week_end: endDateStr,
+        report_json: JSON.stringify(reportJson),
+        narrative,
+        generated_at: Date.now(),
+        file_path: null,
+      });
+
+      // 7. Return success
+      return { success: true, weekEnd: endDateStr };
+    } catch (err: any) {
+      console.error('Failed to generate weekly report:', err);
+      return { success: false, message: err.message || 'Report generation failed' };
+    }
+  });
+
+  // Analytics API
+  ipcMain.handle('analytics:getMetrics', (_, params: { deviceId?: string; startDate: string; endDate: string }) => {
+    if (!db) return [];
+    if (params.deviceId) {
+      return db.getDeviceDailyMetricsRange(params.deviceId, params.startDate, params.endDate);
+    }
+    // For team view: return aggregated totals + merge top_apps from all devices
+    const teamTotals = db.getTeamDailyMetricsRange(params.startDate, params.endDate);
+    const devices = db.getAllDevices();
+    // Collect all top_apps_json across devices for each date
+    const dateAppsMap = new Map<string, Map<string, number>>();
+    for (const device of devices) {
+      const deviceMetrics = db.getDeviceDailyMetricsRange(device.device_id, params.startDate, params.endDate);
+      for (const m of deviceMetrics) {
+        if (m.top_apps_json) {
+          try {
+            const apps = JSON.parse(m.top_apps_json);
+            if (!dateAppsMap.has(m.date_ymd)) dateAppsMap.set(m.date_ymd, new Map());
+            const dayMap = dateAppsMap.get(m.date_ymd)!;
+            for (const a of apps) {
+              dayMap.set(a.app, (dayMap.get(a.app) || 0) + (a.seconds || 0));
+            }
+          } catch {}
+        }
+      }
+    }
+    // Attach aggregated top_apps_json to team totals
+    return teamTotals.map((row: any) => ({
+      ...row,
+      top_apps_json: dateAppsMap.has(row.date_ymd)
+        ? JSON.stringify(Array.from(dateAppsMap.get(row.date_ymd)!.entries()).map(([app, seconds]) => ({ app, seconds })).sort((a, b) => b.seconds - a.seconds).slice(0, 20))
+        : undefined,
+    }));
   });
 
   // Version

@@ -681,9 +681,15 @@ export class AgentService extends EventEmitter {
    * Connect to admin console via WebSocket
    */
   private connect(adminHost: string): void {
+    // Clean up old socket without triggering reconnect via handleDisconnect
     if (this.ws) {
-      this.ws.close();
+      try {
+        this.ws.removeAllListeners();
+        this.ws.close();
+      } catch {}
+      this.ws = null;
     }
+    this.stopHeartbeat();
 
     const [host, portStr] = adminHost.split(':');
     const port = parseInt(portStr) || ADMIN_CONSOLE_DEFAULT_PORT;
@@ -695,10 +701,12 @@ export class AgentService extends EventEmitter {
 
     try {
       const ws = new WebSocket(wsUrl);
-      this.ws = ws;
 
       ws.on('open', () => {
+        // Store reference only once connection is actually open
+        this.ws = ws;
         console.log('[AGENT] Connected to Admin Console');
+        console.log('[AGENT] WebSocket readyState after open:', this.ws?.readyState);
         this.reconnectAttempts = 0;
         this.state.status = this.pairingState?.paired ? 'paired' : 'pairing';
         this.state.lastConnected = Date.now();
@@ -715,12 +723,18 @@ export class AgentService extends EventEmitter {
 
       ws.on('close', (code, reason) => {
         console.log(`[AGENT] Disconnected from Admin Console: code=${code}, reason=${reason}`);
-        this.handleDisconnect();
+        // Only handle disconnect if this is still the active socket
+        if (this.ws === ws) {
+          this.handleDisconnect();
+        }
       });
 
       ws.on('error', (err) => {
         console.error('[AGENT] WebSocket error:', err);
-        this.handleDisconnect();
+        // Only handle disconnect if this is still the active socket
+        if (this.ws === ws || this.ws === null) {
+          this.handleDisconnect();
+        }
       });
     } catch (err) {
       console.error('[AGENT] Failed to connect:', err);
@@ -1033,6 +1047,7 @@ export class AgentService extends EventEmitter {
       'idleThreshold', 'privacyModeEnabled', 'privacyApps',
       'titleSharingEnabled', 'autoExportEnabled', 'autoExportTime',
       'exportFolder', 'reportRetentionDays', 'employeeName',
+      'appCategories',
     ];
 
     for (const key of policyKeys) {
@@ -1040,12 +1055,15 @@ export class AgentService extends EventEmitter {
       if (value !== undefined) {
         const dbKey = this.policyKeyToSettingKey(key);
         const dbValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
-        
+
         // Store in effective_policy table
         this.database.execute(
           `INSERT OR REPLACE INTO effective_policy (key, value, updated_at, source) VALUES (?, ?, ?, ?)`,
           [dbKey, dbValue, Date.now(), 'admin']
         );
+
+        // Also apply to settings table so the entire app respects admin policy
+        this.database.setSetting(dbKey, dbValue);
       }
     }
 
@@ -1069,6 +1087,7 @@ export class AgentService extends EventEmitter {
       exportFolder: 'export_folder',
       reportRetentionDays: 'report_retention_days',
       employeeName: 'employee_name',
+      appCategories: 'app_categories',
     };
     return mapping[key] || key;
   }

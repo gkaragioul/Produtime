@@ -25,8 +25,8 @@ import {
   TrendsResponse,
 } from '../shared/dashboard-types';
 
-// Logo import
-import adminLogo from '../../../assets/PTAdminIcon.png';
+// Logo — use the copied asset path
+const adminLogo = 'assets/PTAdminIcon.png';
 
 type PageType = 'dashboard' | 'devices' | 'policies' | 'pairing' | 'logs' | 'device-detail' | 'app-categories' | 'analytics';
 

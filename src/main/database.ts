@@ -187,7 +187,6 @@ export class DatabaseManager {
         up: `
           -- Add created_at and updated_at columns to settings if they don't exist
           PRAGMA foreign_keys=off;
-          BEGIN TRANSACTION;
           CREATE TABLE IF NOT EXISTS settings_new (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL,
@@ -198,7 +197,6 @@ export class DatabaseManager {
             SELECT key, value FROM settings;
           DROP TABLE settings;
           ALTER TABLE settings_new RENAME TO settings;
-          COMMIT;
           PRAGMA foreign_keys=on;
         `,
       },

@@ -144,15 +144,20 @@ export class AdminServer {
   }
 
   /**
-   * Derive a machine-specific encryption key from multiple OS identifiers.
-   * Combines hostname, username, CPU model, and home directory to make the
-   * key material far less predictable than hostname alone.
+   * Derive encryption key. In web/cloud mode, uses ENCRYPTION_KEY env var.
+   * Falls back to machine-specific derivation for local deployments.
    */
   private deriveEncryptionKey(): Buffer {
+    if (process.env.ENCRYPTION_KEY) {
+      // Cloud mode: use explicit env var
+      const salt = 'produtime-admin-web:ed25519-key-encryption:v1';
+      return crypto.pbkdf2Sync(process.env.ENCRYPTION_KEY, salt, 100000, 32, 'sha256');
+    }
+    // Local mode: derive from machine identifiers
     const machineId = [
       os.hostname(),
       os.userInfo().username,
-      os.cpus()[0].model,
+      os.cpus()[0]?.model || 'unknown',
       os.homedir(),
     ].join('|');
     const salt = 'produtime-admin-console:ed25519-key-encryption:v2';
@@ -957,11 +962,17 @@ export class AdminServer {
       this.log(`[SERVER] Found pending WebSocket connection!`);
       this.log(`[SERVER] WebSocket readyState: ${pendingConn.ws.readyState} (1=OPEN)`);
       
+      // Include wsEndpoint so devices can reconnect via the cloud/public URL
+      const publicUrl = process.env.PUBLIC_URL || process.env.RAILWAY_PUBLIC_DOMAIN
+        ? `wss://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+        : null;
+
       const approvalMessage = this.signMessage('PAIR_APPROVED', pending.device_id, {
         adminName: 'ProduTime Admin Console',
         adminPubKey: this.adminKeyPair?.publicKey,
         sessionToken: crypto.randomUUID(),
-        initialPolicy: null, // Can add default policy here
+        initialPolicy: null,
+        wsEndpoint: publicUrl,
       });
       
       try {

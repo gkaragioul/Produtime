@@ -18,11 +18,179 @@ import {
 // Gap threshold for untracked time detection (60 seconds)
 const UNTRACKED_GAP_THRESHOLD_MS = 60000;
 
+// App categorization type
+type AppCategory = 'productive' | 'distracting' | 'neutral';
+
+/**
+ * Default app categorization patterns.
+ * Each entry is a lowercase substring matched against the app_name.
+ * Apps not matching any pattern are treated as neutral.
+ */
+const DEFAULT_PRODUCTIVE_PATTERNS: string[] = [
+  // IDEs and editors
+  'code', 'visual studio', 'vscode', 'intellij', 'webstorm', 'pycharm',
+  'rider', 'phpstorm', 'rubymine', 'goland', 'clion', 'datagrip',
+  'android studio', 'xcode', 'eclipse', 'netbeans', 'sublime', 'atom',
+  'notepad++', 'vim', 'neovim', 'emacs', 'cursor',
+  // Terminals and shells
+  'terminal', 'powershell', 'cmd.exe', 'command prompt', 'iterm',
+  'windows terminal', 'wt.exe', 'mintty', 'conemu', 'hyper',
+  'git bash', 'wsl',
+  // Microsoft Office
+  'word', 'excel', 'powerpoint', 'outlook', 'onenote', 'access',
+  'publisher', 'visio', 'project', 'teams',
+  // Google Workspace (as app names)
+  'google docs', 'google sheets', 'google slides',
+  // Design and creative tools
+  'figma', 'sketch', 'adobe', 'photoshop', 'illustrator', 'indesign',
+  'premiere', 'after effects', 'blender',
+  // Dev tools
+  'postman', 'insomnia', 'docker', 'pgadmin', 'dbeaver',
+  'sourcetree', 'gitkraken', 'fork',
+  // Communication (work)
+  'slack', 'zoom', 'microsoft teams',
+  // Productivity
+  'notion', 'obsidian', 'trello', 'jira', 'asana', 'linear',
+  'confluence', 'clickup',
+  // File management
+  'explorer', 'finder',
+];
+
+const DEFAULT_DISTRACTING_PATTERNS: string[] = [
+  // Gaming
+  'steam', 'epic games', 'origin', 'battle.net', 'riot client',
+  'xbox', 'gog galaxy',
+  // Social media (standalone apps)
+  'discord', 'telegram', 'whatsapp', 'facebook', 'instagram',
+  'tiktok', 'twitter', 'reddit',
+  // Entertainment
+  'spotify', 'netflix', 'vlc', 'itunes', 'amazon music',
+  'youtube music', 'plex', 'twitch',
+];
+
 export class MetricsComputer {
   private database: DatabaseManager;
+  private categoryCache: Map<string, AppCategory> | null = null;
+  private categoryCacheTs: number = 0;
+  private static readonly CACHE_TTL_MS = 60000; // Refresh categories every 60s
 
   constructor(database: DatabaseManager) {
     this.database = database;
+  }
+
+  /**
+   * Categorize an app as productive, distracting, or neutral.
+   * First checks for admin-pushed categories (via effective_policy or settings),
+   * then falls back to built-in default pattern matching.
+   */
+  private categorizeApp(appName: string): AppCategory {
+    // Skip idle/system entries -- they are not categorized
+    if (appName === 'System') {
+      return 'neutral';
+    }
+
+    // Check admin-pushed categories first (cached)
+    const overrides = this.getAdminCategories();
+    if (overrides.has(appName)) {
+      return overrides.get(appName)!;
+    }
+
+    // Fall back to default pattern matching
+    const lowerName = appName.toLowerCase();
+
+    for (const pattern of DEFAULT_PRODUCTIVE_PATTERNS) {
+      if (lowerName.includes(pattern)) {
+        return 'productive';
+      }
+    }
+
+    for (const pattern of DEFAULT_DISTRACTING_PATTERNS) {
+      if (lowerName.includes(pattern)) {
+        return 'distracting';
+      }
+    }
+
+    return 'neutral';
+  }
+
+  /**
+   * Load admin-pushed app categories from the effective_policy or settings table.
+   * Categories are stored as JSON under the key 'app_categories'.
+   * Expected format: { "AppName": "productive"|"distracting"|"neutral", ... }
+   * Results are cached for CACHE_TTL_MS to avoid repeated DB reads.
+   */
+  private getAdminCategories(): Map<string, AppCategory> {
+    const now = Date.now();
+    if (this.categoryCache && (now - this.categoryCacheTs) < MetricsComputer.CACHE_TTL_MS) {
+      return this.categoryCache;
+    }
+
+    this.categoryCache = new Map();
+    this.categoryCacheTs = now;
+
+    try {
+      // Check effective_policy table first (admin-pushed takes priority)
+      const policyRow = this.database.get<{ value: string }>(
+        'SELECT value FROM effective_policy WHERE key = ?',
+        ['app_categories']
+      );
+
+      const raw = policyRow?.value || this.database.getSetting('app_categories');
+
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed === 'object' && parsed !== null) {
+          for (const [app, cat] of Object.entries(parsed)) {
+            if (cat === 'productive' || cat === 'distracting' || cat === 'neutral') {
+              this.categoryCache.set(app, cat as AppCategory);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[MetricsComputer] Error loading admin app categories:', err);
+    }
+
+    return this.categoryCache;
+  }
+
+  /**
+   * Compute productive and unproductive seconds from a list of activity logs.
+   * Logs are clipped to the given time range.
+   */
+  private computeCategorizedSeconds(
+    logs: any[],
+    rangeStart: number,
+    rangeEnd: number
+  ): { productiveSeconds: number; unproductiveSeconds: number } {
+    let productiveSeconds = 0;
+    let unproductiveSeconds = 0;
+
+    for (const log of logs) {
+      if (this.isIdleLog(log)) {
+        continue;
+      }
+
+      const logTs = new Date(log.timestamp).getTime();
+      const logEnd = logTs + (log.duration * 1000);
+
+      // Clip to range
+      const effectiveStart = Math.max(logTs, rangeStart);
+      const effectiveEnd = Math.min(logEnd, rangeEnd);
+      const effectiveDuration = Math.max(0, (effectiveEnd - effectiveStart) / 1000);
+
+      const category = this.categorizeApp(log.app_name);
+      if (category === 'productive') {
+        productiveSeconds += effectiveDuration;
+      } else if (category === 'distracting') {
+        unproductiveSeconds += effectiveDuration;
+      }
+    }
+
+    return {
+      productiveSeconds: Math.round(productiveSeconds),
+      unproductiveSeconds: Math.round(unproductiveSeconds),
+    };
   }
 
   /**
@@ -71,10 +239,14 @@ export class MetricsComputer {
     
     // Compute untracked time (gaps in coverage)
     const untrackedSeconds = this.computeUntrackedTime(logs, fifteenMinutesAgo, now);
-    
+
+    // Compute productive/unproductive from app categorization
+    const { productiveSeconds, unproductiveSeconds } =
+      this.computeCategorizedSeconds(logs, fifteenMinutesAgo, now);
+
     return {
-      productiveSeconds: 0,      // TODO: App categorization
-      unproductiveSeconds: 0,    // TODO: App categorization
+      productiveSeconds,
+      unproductiveSeconds,
       idleSeconds: Math.round(idleSeconds),
       untrackedSeconds: Math.round(untrackedSeconds),
       activeSeconds: Math.round(activeSeconds),
@@ -103,9 +275,14 @@ export class MetricsComputer {
         appTotals.set(entry.app_name, current + entry.total_duration);
       }
       
-      // Sort and take top 10
+      // Sort and take top 10, including category
       return Array.from(appTotals.entries())
-        .map(([app, seconds]) => ({ app, seconds }))
+        .map(([app, seconds]) => {
+          const cat = this.categorizeApp(app);
+          const category: 'productive' | 'unproductive' | 'neutral' =
+            cat === 'distracting' ? 'unproductive' : cat;
+          return { app, seconds, category };
+        })
         .sort((a, b) => b.seconds - a.seconds)
         .slice(0, 10);
     } catch (err) {
@@ -149,10 +326,15 @@ export class MetricsComputer {
         rangeEnd,
         firstActivityTs
       );
-      
+
+      // Compute productive/unproductive from app categorization
+      // Use the full logs we already fetched for timestamp computation
+      const { productiveSeconds, unproductiveSeconds } =
+        this.computeCategorizedSeconds(logs, rangeStartTs, rangeEnd);
+
       return {
-        productiveSeconds: 0,      // TODO: App categorization
-        unproductiveSeconds: 0,    // TODO: App categorization
+        productiveSeconds,
+        unproductiveSeconds,
         idleSeconds: summary.total_idle_seconds || 0,
         untrackedSeconds,
         activeSeconds: summary.total_active_seconds || 0,

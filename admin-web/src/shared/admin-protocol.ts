@@ -128,9 +128,6 @@ export interface PolicyData {
   
   // Employee info (can be set by admin)
   employeeName?: string;
-
-  // App categorization (synced from admin console)
-  appCategories?: Record<string, 'productive' | 'neutral' | 'distracting'>;
 }
 
 export interface DaySchedule {
