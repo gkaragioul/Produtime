@@ -88,49 +88,191 @@ function pct(n: number, total: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// CSV Export
+// PDF Export (opens printable report in new window)
 // ---------------------------------------------------------------------------
 
-function exportCSV(metrics: DailyMetric[], devices: DeviceInfo[], deviceFilter: string, period: PeriodType): void {
+interface TopApp {
+  app: string;
+  seconds: number;
+}
+
+function exportPDF(
+  metrics: DailyMetric[],
+  devices: DeviceInfo[],
+  deviceFilter: string,
+  period: PeriodType,
+  topApps: TopApp[],
+): void {
   if (metrics.length === 0) return;
 
   const filterLabel = deviceFilter === 'all'
     ? 'All Team'
     : devices.find(d => d.device_id === deviceFilter)?.device_name || deviceFilter;
 
-  const rows: string[][] = [
-    ['Date', 'Device', 'Active Time', 'Idle Time', 'Untracked', 'Productivity %'],
-  ];
+  const periodLabel = period === 'daily' ? 'Daily' : period === 'weekly' ? 'Weekly (7 Days)' : 'Monthly (30 Days)';
+  const { startDate, endDate } = dateRange(period);
 
-  for (const m of [...metrics].reverse()) {
-    const dayTracked = (m.active_seconds || 0) + (m.idle_seconds || 0);
-    const prod = dayTracked > 0 ? Math.round(((m.active_seconds || 0) / dayTracked) * 100) : 0;
-    rows.push([
-      m.date_ymd,
-      m.device_id ? (devices.find(d => d.device_id === m.device_id)?.device_name || m.device_id) : filterLabel,
-      formatSeconds(m.active_seconds || 0),
-      formatSeconds(m.idle_seconds || 0),
-      formatSeconds(m.untracked_seconds || 0),
-      `${prod}%`,
-    ]);
-  }
-
-  // Totals row
+  // Totals
   const totalActive = metrics.reduce((s, m) => s + (m.active_seconds || 0), 0);
   const totalIdle = metrics.reduce((s, m) => s + (m.idle_seconds || 0), 0);
   const totalUntracked = metrics.reduce((s, m) => s + (m.untracked_seconds || 0), 0);
   const totalTracked = totalActive + totalIdle;
-  const totalProd = totalTracked > 0 ? Math.round((totalActive / totalTracked) * 100) : 0;
-  rows.push(['TOTAL', '', formatSeconds(totalActive), formatSeconds(totalIdle), formatSeconds(totalUntracked), `${totalProd}%`]);
+  const productivityRate = totalTracked > 0 ? Math.round((totalActive / totalTracked) * 100) : 0;
 
-  const csvContent = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `produtime-${period}-${filterLabel.replace(/\s+/g, '_')}-${new Date().toISOString().slice(0, 10)}.csv`;
-  link.click();
-  URL.revokeObjectURL(url);
+  // Chart bar max
+  const maxDayTotal = Math.max(...metrics.map(m => (m.active_seconds || 0) + (m.idle_seconds || 0) + (m.untracked_seconds || 0)), 1);
+  const maxAppSeconds = topApps.length > 0 ? topApps[0].seconds : 1;
+
+  // Build chart bars HTML
+  const chartBarsHtml = metrics.map(m => {
+    const dayTotal = (m.active_seconds || 0) + (m.idle_seconds || 0) + (m.untracked_seconds || 0);
+    const barHeight = dayTotal > 0 ? (dayTotal / maxDayTotal) * 100 : 0;
+    const activePct = dayTotal > 0 ? ((m.active_seconds || 0) / dayTotal) * 100 : 0;
+    const idlePct = dayTotal > 0 ? ((m.idle_seconds || 0) / dayTotal) * 100 : 0;
+    const untrackedPct = dayTotal > 0 ? ((m.untracked_seconds || 0) / dayTotal) * 100 : 0;
+    const label = new Date(m.date_ymd + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return `
+      <div style="flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end; min-width:20px;">
+        <div style="width:100%; max-width:36px; height:${barHeight}%; display:flex; flex-direction:column; border-radius:3px 3px 0 0; overflow:hidden; min-height:${dayTotal > 0 ? '2px' : '0'};">
+          <div style="height:${untrackedPct}%; background:#f44336;"></div>
+          <div style="height:${idlePct}%; background:#FF9800;"></div>
+          <div style="height:${activePct}%; background:#4CAF50;"></div>
+        </div>
+        <div style="font-size:9px; color:#999; margin-top:4px; writing-mode:vertical-rl; text-orientation:mixed; height:50px; overflow:hidden;">${label}</div>
+      </div>`;
+  }).join('');
+
+  // Top apps bars HTML
+  const topAppsHtml = topApps.map((app, i) => `
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+      <span style="width:20px; font-size:13px; color:#999; font-weight:600; text-align:right;">${i + 1}</span>
+      <span style="width:180px; font-size:13px; font-weight:500; color:#333; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${app.app}</span>
+      <div style="flex:1; height:16px; background:#f0f0f0; border-radius:3px; overflow:hidden;">
+        <div style="width:${(app.seconds / maxAppSeconds) * 100}%; height:100%; background:#2196F3; border-radius:3px;"></div>
+      </div>
+      <span style="width:70px; font-size:13px; font-weight:600; color:#555; text-align:right;">${formatSeconds(app.seconds)}</span>
+    </div>`).join('');
+
+  // Daily breakdown rows
+  const tableRows = [...metrics].reverse().map(m => {
+    const dayTracked = (m.active_seconds || 0) + (m.idle_seconds || 0);
+    const dayProd = dayTracked > 0 ? Math.round(((m.active_seconds || 0) / dayTracked) * 100) : 0;
+    const dateLabel = new Date(m.date_ymd + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const prodColor = dayProd >= 70 ? '#2e7d32' : dayProd >= 40 ? '#e65100' : '#c62828';
+    const prodBg = dayProd >= 70 ? '#e8f5e9' : dayProd >= 40 ? '#fff3e0' : '#ffebee';
+    return `
+      <tr style="border-bottom:1px solid #f0f0f0;">
+        <td style="padding:8px 10px; font-weight:500; color:#333;">${dateLabel}</td>
+        <td style="padding:8px 10px; text-align:right; font-weight:600; color:#4CAF50;">${formatSeconds(m.active_seconds || 0)}</td>
+        <td style="padding:8px 10px; text-align:right; color:#FF9800;">${formatSeconds(m.idle_seconds || 0)}</td>
+        <td style="padding:8px 10px; text-align:right; color:#f44336;">${formatSeconds(m.untracked_seconds || 0)}</td>
+        <td style="padding:8px 10px; text-align:right;"><span style="padding:3px 8px; border-radius:8px; font-size:12px; font-weight:600; background:${prodBg}; color:${prodColor};">${dayProd}%</span></td>
+      </tr>`;
+  }).join('');
+
+  const prodColor = productivityRate >= 70 ? '#2e7d32' : productivityRate >= 40 ? '#e65100' : '#c62828';
+  const prodBg = productivityRate >= 70 ? '#e8f5e9' : productivityRate >= 40 ? '#fff3e0' : '#ffebee';
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ProduTime Report — ${filterLabel} — ${periodLabel}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #333; padding: 40px; max-width: 900px; margin: 0 auto; }
+    @media print {
+      body { padding: 20px; }
+      .no-print { display: none !important; }
+      @page { margin: 15mm; size: A4; }
+    }
+    h1 { font-size: 26px; color: #1a1a2e; margin-bottom: 4px; }
+    h2 { font-size: 18px; color: #1a1a2e; margin: 28px 0 14px 0; }
+    .subtitle { font-size: 14px; color: #666; margin-bottom: 24px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 28px; }
+    .summary-card { background: #f8f9fa; border-radius: 10px; padding: 18px; text-align: center; }
+    .summary-card .label { font-size: 12px; color: #666; font-weight: 500; margin-bottom: 6px; }
+    .summary-card .value { font-size: 28px; font-weight: 700; line-height: 1; }
+    .chart-box { background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 28px; }
+    .legend { display: flex; gap: 18px; font-size: 12px; color: #666; margin-bottom: 14px; }
+    .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: middle; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { text-align: left; padding: 10px; font-size: 12px; color: #666; font-weight: 600; border-bottom: 2px solid #e0e0e0; }
+    th.right { text-align: right; }
+    .print-btn { display: block; margin: 0 auto 30px; padding: 12px 40px; font-size: 16px; font-weight: 600; background: #1976d2; color: white; border: none; border-radius: 8px; cursor: pointer; }
+    .print-btn:hover { background: #1565c0; }
+    .footer { margin-top: 30px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 11px; color: #999; text-align: center; }
+  </style>
+</head>
+<body>
+  <button class="print-btn no-print" onclick="window.print()">Save as PDF</button>
+
+  <h1>ProduTime Activity Report</h1>
+  <div class="subtitle">${filterLabel} &mdash; ${periodLabel} &mdash; ${startDate} to ${endDate} &mdash; Generated ${new Date().toLocaleString()}</div>
+
+  <!-- Summary Cards -->
+  <div class="summary-grid">
+    <div class="summary-card"><div class="label">Total Active</div><div class="value" style="color:#4CAF50;">${formatSeconds(totalActive)}</div></div>
+    <div class="summary-card"><div class="label">Total Idle</div><div class="value" style="color:#FF9800;">${formatSeconds(totalIdle)}</div></div>
+    <div class="summary-card"><div class="label">Total Untracked</div><div class="value" style="color:#f44336;">${formatSeconds(totalUntracked)}</div></div>
+    <div class="summary-card"><div class="label">Productivity Rate</div><div class="value" style="color:#2196F3;">${productivityRate}%</div></div>
+  </div>
+
+  <!-- Activity Trend Chart -->
+  <h2>Activity Trend</h2>
+  <div class="chart-box">
+    <div class="legend">
+      <span><span class="legend-dot" style="background:#4CAF50;"></span>Active</span>
+      <span><span class="legend-dot" style="background:#FF9800;"></span>Idle</span>
+      <span><span class="legend-dot" style="background:#f44336;"></span>Untracked</span>
+    </div>
+    <div style="display:flex; align-items:flex-end; height:180px; gap:${metrics.length > 15 ? '2' : '4'}px; border-bottom:1px solid #e0e0e0; padding-bottom:4px;">
+      ${chartBarsHtml}
+    </div>
+  </div>
+
+  <!-- Top Apps -->
+  ${topApps.length > 0 ? `
+  <h2>Top Applications</h2>
+  <div class="chart-box">
+    ${topAppsHtml}
+  </div>` : ''}
+
+  <!-- Daily Breakdown -->
+  <h2>Daily Breakdown</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th class="right" style="text-align:right;">Active</th>
+        <th class="right" style="text-align:right;">Idle</th>
+        <th class="right" style="text-align:right;">Untracked</th>
+        <th class="right" style="text-align:right;">Productivity</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tableRows}
+    </tbody>
+    <tfoot>
+      <tr style="border-top:2px solid #ddd; font-weight:700;">
+        <td style="padding:10px;">Total</td>
+        <td style="padding:10px; text-align:right; color:#4CAF50;">${formatSeconds(totalActive)}</td>
+        <td style="padding:10px; text-align:right; color:#FF9800;">${formatSeconds(totalIdle)}</td>
+        <td style="padding:10px; text-align:right; color:#f44336;">${formatSeconds(totalUntracked)}</td>
+        <td style="padding:10px; text-align:right;"><span style="padding:3px 8px; border-radius:8px; font-size:12px; font-weight:600; background:${prodBg}; color:${prodColor};">${productivityRate}%</span></td>
+      </tr>
+    </tfoot>
+  </table>
+
+  <div class="footer">ProduTime &mdash; Activity Report &mdash; Generated automatically</div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (win) {
+    win.document.write(html);
+    win.document.close();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -305,13 +447,13 @@ export const Analytics: React.FC = () => {
 
           {/* Export button */}
           <button
-            onClick={() => exportCSV(metrics, devices, deviceFilter, period)}
+            onClick={() => exportPDF(metrics, devices, deviceFilter, period, topApps)}
             disabled={metrics.length === 0}
             style={{
               padding: '10px 20px',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: metrics.length > 0 ? '#4CAF50' : '#ccc',
+              backgroundColor: metrics.length > 0 ? '#1976d2' : '#ccc',
               color: 'white',
               cursor: metrics.length > 0 ? 'pointer' : 'not-allowed',
               fontWeight: 600,
@@ -321,7 +463,7 @@ export const Analytics: React.FC = () => {
               gap: '6px',
             }}
           >
-            Export CSV
+            Export PDF
           </button>
         </div>
       </div>
