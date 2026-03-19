@@ -1392,8 +1392,11 @@ export const ActivityDashboard: React.FC = () => {
                         onMouseOut={() => setHoveredActivityId(null)}
                       >
                         <div className="activity-info">
-                          <div className="title">{log.app_name}</div>
-                          <div className="subtitle">{log.window_title}</div>
+                          <div className="title">
+                            {log.window_title && log.window_title !== log.app_name
+                              ? `${log.app_name} · ${log.window_title}`
+                              : log.app_name}
+                          </div>
                         </div>
                         <div className="activity-actions">
                           <div className="meta">
