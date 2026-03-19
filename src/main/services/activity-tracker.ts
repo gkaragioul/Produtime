@@ -66,7 +66,7 @@ export class ActivityTracker {
       idleThreshold: 300,
       enableLogging: true,
       selfLogSuppressMs: 900,
-      selfAppNames: ['Electron', 'TimePort'],
+      selfAppNames: ['Electron', 'ProduTime', 'TimePort'],
       stabilizationSamples: 3,
       stabilizationWindowMs: 250,
       ignoreTransientApps: [
@@ -324,15 +324,15 @@ export class ActivityTracker {
       return { appName, windowTitle, wasSanitized: false };
     }
 
-    // For browsers: extract site name instead of stripping to just "Google Chrome"
+    // For browsers: extract site name and put it in app_name for visibility
     const isBrowser = ActivityTracker.BROWSER_APPS.some(b => appName.toLowerCase().includes(b));
     if (isBrowser) {
       const site = this.extractSiteFromBrowserTitle(windowTitle, appName);
       if (site) {
-        // Show as "Chrome · facebook.com" — privacy-safe, no page details
+        // Use site as the app name so it shows prominently in Recent Activity
         const shortBrowser = appName.replace(/Google\s*/i, '').trim();
-        const sanitizedTitle = `${shortBrowser} · ${site}`;
-        return { appName, windowTitle: sanitizedTitle, wasSanitized: true };
+        const displayName = `${shortBrowser} · ${site}`;
+        return { appName: displayName, windowTitle: displayName, wasSanitized: true };
       }
       // Couldn't extract site — fall through to strip title
     }
@@ -671,7 +671,7 @@ export class ActivityTracker {
         if (result) {
           let appName = result.owner?.name || 'Unknown';
           const windowTitle = result.title || 'Unknown Window';
-          if (/^electron$/i.test(appName)) appName = 'Electron';
+          if (/^electron$/i.test(appName)) appName = 'ProduTime';
           if (/^code(?:\.exe)?$/i.test(appName)) appName = 'Visual Studio Code';
           if (/^chrome(?:\.exe)?$/i.test(appName)) appName = 'Google Chrome';
           reads.push({ appName, windowTitle, timestamp: Date.now() });
