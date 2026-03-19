@@ -890,8 +890,10 @@ export class AgentService extends EventEmitter {
     try {
       const message = JSON.parse(data) as AdminProtocolMessage;
       
-      // Verify signature if we have admin's public key
-      if (this.pairingState?.adminPubKey) {
+      // Verify signature if we have admin's public key.
+      // Skip verification for PAIR_APPROVED — it carries the new admin public key
+      // and may be signed with a key we don't have yet (server keypair regeneration).
+      if (this.pairingState?.adminPubKey && message.type !== 'PAIR_APPROVED') {
         if (!this.crypto.verifyMessage(message, this.pairingState.adminPubKey)) {
           console.warn('Invalid message signature from admin');
           return;
