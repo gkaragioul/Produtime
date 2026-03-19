@@ -251,7 +251,7 @@ export class DatabaseManager {
         description: 'Add default privacy settings',
         up: `
           INSERT OR IGNORE INTO settings (key, value) VALUES
-            ('privacy_mode_enabled', 'false'),
+            ('privacy_mode_enabled', 'true'),
             ('privacy_apps', '${JSON.stringify(DEFAULT_PRIVACY_APPS).replace(/'/g, "''")}');
         `,
       },

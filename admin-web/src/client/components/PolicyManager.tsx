@@ -26,7 +26,7 @@ const defaultPolicyData: PolicyData = {
   workScheduleStart: '09:00',
   workScheduleEnd: '17:00',
   idleThreshold: 300,
-  privacyModeEnabled: false,
+  privacyModeEnabled: true,
   titleSharingEnabled: false,
   autoExportEnabled: true,
   autoExportTime: '18:00',
@@ -330,18 +330,6 @@ export const PolicyManager: React.FC = () => {
                   border: '1px solid #ddd',
                 }}
               />
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={policyData.privacyModeEnabled}
-                  onChange={(e) => setPolicyData({ ...policyData, privacyModeEnabled: e.target.checked })}
-                  disabled={!!(selectedPolicy && !editMode)}
-                />
-                <span style={{ fontSize: '14px' }}>Enable Privacy Mode</span>
-              </label>
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
