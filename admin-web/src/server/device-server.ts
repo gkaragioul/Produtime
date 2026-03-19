@@ -122,25 +122,32 @@ export class AdminServer {
    */
   private initializeKeypair(): void {
     const existing = this.db.getAdminKeypair();
-    
+
     if (existing) {
-      // Load existing keypair
-      this.adminKeyPair = {
-        publicKey: existing.public_key,
-        privateKey: this.decryptPrivateKey(existing.private_key_encrypted),
-      };
-    } else {
-      // Generate new keypair
-      const keyPair = nacl.sign.keyPair();
-      this.adminKeyPair = {
-        publicKey: Buffer.from(keyPair.publicKey).toString('base64'),
-        privateKey: Buffer.from(keyPair.secretKey).toString('base64'),
-      };
-      
-      // Store encrypted
-      const encrypted = this.encryptPrivateKey(this.adminKeyPair.privateKey);
-      this.db.setAdminKeypair(this.adminKeyPair.publicKey, encrypted);
+      try {
+        // Load existing keypair
+        this.adminKeyPair = {
+          publicKey: existing.public_key,
+          privateKey: this.decryptPrivateKey(existing.private_key_encrypted),
+        };
+        return;
+      } catch (err) {
+        // Decryption failed — machine identifiers changed (e.g. container redeployed
+        // without ENCRYPTION_KEY). Regenerate the keypair.
+        this.log(`[SERVER] Failed to decrypt stored keypair (machine changed?), regenerating: ${err}`);
+      }
     }
+
+    // Generate new keypair
+    const keyPair = nacl.sign.keyPair();
+    this.adminKeyPair = {
+      publicKey: Buffer.from(keyPair.publicKey).toString('base64'),
+      privateKey: Buffer.from(keyPair.secretKey).toString('base64'),
+    };
+
+    // Store encrypted
+    const encrypted = this.encryptPrivateKey(this.adminKeyPair.privateKey);
+    this.db.setAdminKeypair(this.adminKeyPair.publicKey, encrypted);
   }
 
   /**
