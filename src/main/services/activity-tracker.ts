@@ -318,26 +318,20 @@ export class ActivityTracker {
   }
 
   public sanitizeWindowTitle(appName: string, windowTitle: string): SanitizationResult {
-    const privacyEnabled = this.database.getSetting('privacy_mode_enabled') === 'true';
+    // Privacy mode is always on for managed deployments
 
-    if (!privacyEnabled) {
-      return { appName, windowTitle, wasSanitized: false };
-    }
-
-    // For browsers: extract site name and put it in app_name for visibility
+    // For browsers: extract site name into window_title
     const isBrowser = ActivityTracker.BROWSER_APPS.some(b => appName.toLowerCase().includes(b));
     if (isBrowser) {
       const site = this.extractSiteFromBrowserTitle(windowTitle, appName);
       if (site) {
-        // Use site as the app name so it shows prominently in Recent Activity
-        const shortBrowser = appName.replace(/Google\s*/i, '').trim();
-        const displayName = `${shortBrowser} · ${site}`;
-        return { appName: displayName, windowTitle: displayName, wasSanitized: true };
+        // Keep app_name as-is for Top Apps aggregation
+        // Put site in window_title for Recent Activity display
+        return { appName, windowTitle: site, wasSanitized: true };
       }
-      // Couldn't extract site — fall through to strip title
     }
 
-    // For non-browser apps: strip window title entirely
+    // For non-browser apps or when site can't be extracted: strip window title
     return { appName, windowTitle: appName, wasSanitized: true };
   }
 
