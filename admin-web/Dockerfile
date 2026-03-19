@@ -39,12 +39,12 @@ RUN npm install --omit=dev
 # Copy built artifacts
 COPY --from=builder /app/dist ./dist
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data
+# Create data directory for SQLite (mount a Railway Volume at /data for persistence)
+RUN mkdir -p /data
 
 # Environment variables (overridable)
 ENV PORT=17888
-ENV DATABASE_PATH=/app/data/admin-console.db
+ENV DATABASE_PATH=/data/admin-console.db
 ENV NODE_ENV=production
 
 # Expose port

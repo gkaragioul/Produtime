@@ -401,3 +401,6 @@ export const CLOUD_MAX_RECONNECT_ATTEMPTS = 10;  // Max 10 attempts before fallb
 // mDNS service type for discovery
 export const MDNS_SERVICE_TYPE = '_produtime-admin._tcp';
 export const MDNS_SERVICE_NAME = 'ProduTime Admin Console';
+
+// Hardcoded cloud admin endpoint for managed deployments
+export const CLOUD_ADMIN_WSS_URL = 'wss://wot-produtime-production.up.railway.app';
