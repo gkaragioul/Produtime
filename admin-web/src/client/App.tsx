@@ -140,12 +140,19 @@ const App: React.FC = () => {
 
     loadData();
 
+    const refreshConnectedCount = async () => {
+      try {
+        const info = await window.adminAPI.getServerInfo();
+        setConnectedCount(info.connectedDevices);
+      } catch {}
+    };
+
     const unsubConnect = window.adminAPI.onDeviceConnected(() => {
-      setConnectedCount((c) => c + 1);
+      refreshConnectedCount();
     });
 
     const unsubDisconnect = window.adminAPI.onDeviceDisconnected(() => {
-      setConnectedCount((c) => Math.max(0, c - 1));
+      refreshConnectedCount();
     });
 
     const unsubPairRequest = window.adminAPI.onPairRequest(() => {
