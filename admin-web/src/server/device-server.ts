@@ -725,6 +725,25 @@ export class AdminServer {
           });
           this.log(`[SERVER] Device ${deviceId} registered in connectedDevices`);
 
+          // Always send PAIR_APPROVED with current admin public key so the
+          // agent has the latest key (handles server keypair regeneration)
+          const publicUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+            ? `wss://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+            : null;
+          const welcomeMsg = this.signMessage('PAIR_APPROVED', deviceId!, {
+            adminName: 'ProduTime Admin Console',
+            adminPubKey: this.adminKeyPair?.publicKey,
+            sessionToken: crypto.randomUUID(),
+            initialPolicy: null,
+            wsEndpoint: publicUrl,
+          });
+          try {
+            ws.send(JSON.stringify(welcomeMsg));
+            this.log(`[SERVER] Sent PAIR_APPROVED (key refresh) to ${deviceId}`);
+          } catch (err) {
+            this.log(`[SERVER] Failed to send PAIR_APPROVED: ${err}`);
+          }
+
           this.db.updateDeviceStatus(deviceId!, 'online', Date.now());
           this.onDeviceConnected?.(deviceId!);
           // Fall through to handle any subsequent messages
