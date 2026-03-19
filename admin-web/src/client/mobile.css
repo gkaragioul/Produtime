@@ -66,10 +66,20 @@
     display: block !important;
   }
 
-  /* Main content — full width */
+  /* Main content — full width with top padding for hamburger */
   .app-main {
     width: 100% !important;
     min-width: 0 !important;
+  }
+
+  .app-main > div {
+    padding-top: 8px !important;
+  }
+
+  /* Page headers — indent past hamburger button */
+  .app-main h1 {
+    padding-left: 52px !important;
+    font-size: 22px !important;
   }
 
   /* Dashboard two-column → single column stack */
@@ -92,6 +102,11 @@
     overflow: visible !important;
   }
 
+  /* KPI cards — 2 columns on mobile */
+  .app-main [style*="flexWrap"] {
+    gap: 8px !important;
+  }
+
   /* Tables — horizontal scroll on mobile */
   table {
     display: block;
@@ -99,21 +114,59 @@
     -webkit-overflow-scrolling: touch;
   }
 
-  thead, tbody, tr {
+  thead, tbody, tfoot, tr {
     display: table;
     width: 100%;
     table-layout: auto;
   }
 
-  /* Larger touch targets for buttons and inputs */
+  /* Table cells — tighter padding */
+  th, td {
+    padding: 8px 6px !important;
+    font-size: 13px !important;
+  }
+
+  /* Larger touch targets */
   button, select, input {
     min-height: 40px;
   }
 
-  /* Cards — reduce padding on mobile */
-  .app-main [style*="padding: 24px"],
-  .app-main [style*="padding: '24px'"] {
-    padding: 14px !important;
+  /* Cards — tighter padding on mobile */
+  .app-main [style*="borderRadius: '12px'"],
+  .app-main [style*="borderRadius: 12px"] {
+    border-radius: 8px !important;
+  }
+
+  /* Fix clamp values that are too wide on mobile */
+  .app-main [style*="clamp(16px"] {
+    padding: 12px !important;
+  }
+
+  /* Summary card values — smaller on mobile */
+  .app-main [style*="fontSize: '32px'"],
+  .app-main [style*="fontSize: 32px"] {
+    font-size: 24px !important;
+  }
+
+  /* Flex wrap for filter rows */
+  .app-main [style*="flexWrap: 'wrap'"] {
+    gap: 8px !important;
+  }
+
+  /* Pre-shift / story cards — better text flow */
+  .app-main [style*="fontSize: 'clamp("] {
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Progress bar containers — full width */
+  .app-main [style*="minWidth: '280px'"] {
+    min-width: 0 !important;
+  }
+
+  /* Device list items — stack on mobile */
+  .app-main [style*="minWidth: '400px'"] {
+    min-width: 0 !important;
   }
 }
 
@@ -129,5 +182,15 @@
     width: 40px;
     height: 40px;
     font-size: 20px;
+  }
+
+  .app-main h1 {
+    padding-left: 48px !important;
+    font-size: 20px !important;
+  }
+
+  th, td {
+    padding: 6px 4px !important;
+    font-size: 12px !important;
   }
 }
