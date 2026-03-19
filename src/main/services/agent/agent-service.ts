@@ -137,50 +137,38 @@ export class AgentService extends EventEmitter {
     // Start discovery
     this.discovery.start();
     
-    // If already paired, try to connect
-    if (this.pairingState?.paired) {
-      // Requirement 11.2: Connect to stored cloud endpoint on startup
-      if (this.pairingState.cloudWsEndpoint) {
-        console.log('[AGENT] Already paired with cloud endpoint, connecting to:', this.pairingState.cloudWsEndpoint);
-        this.isCloudMode = true;
-        this.state.isCloudConnection = true;
-        this.state.tenantName = this.pairingState.tenantName;
-        this.connectToCloud(this.pairingState.cloudWsEndpoint);
-      } else if (this.pairingState.adminHost) {
-        // Fall back to local admin host
-        console.log('[AGENT] Already paired with local admin, connecting to:', this.pairingState.adminHost);
-        this.isCloudMode = false;
-        this.state.isCloudConnection = false;
-        this.connect(this.pairingState.adminHost);
-      }
-    } else {
-      // AUTO-CONNECT: Not paired yet — generate keys and connect to hardcoded cloud admin
-      console.log('[AGENT] Not paired — auto-connecting to cloud admin:', CLOUD_ADMIN_WSS_URL);
-
-      // Generate key pair if we don't have one
-      if (!this.pairingState?.devicePubKey) {
-        const keyPair = this.crypto.generateKeyPair();
-        this.pairingState = {
-          paired: false,
-          adminHost: null,
-          adminName: null,
-          adminPubKey: null,
-          devicePubKey: keyPair.publicKey,
-          devicePrivKeyEncrypted: this.crypto.encryptWithPassword(keyPair.privateKey, this.deviceId),
-          pairedAt: null,
-          lastConnectedAt: null,
-          sessionToken: null,
-          cloudWsEndpoint: CLOUD_ADMIN_WSS_URL,
-          tenantId: null,
-          tenantName: null,
-        };
-        await this.savePairingState();
-      }
-
-      this.isCloudMode = true;
-      this.state.isCloudConnection = true;
-      this.connectToCloud(CLOUD_ADMIN_WSS_URL);
+    // MANAGED DEPLOYMENT: Always connect to the hardcoded cloud admin URL.
+    // Generate keys if this is a fresh install, then connect.
+    if (!this.pairingState?.devicePubKey) {
+      console.log('[AGENT] Fresh install — generating keys for cloud auto-connect');
+      const keyPair = this.crypto.generateKeyPair();
+      this.pairingState = {
+        paired: false,
+        adminHost: null,
+        adminName: null,
+        adminPubKey: null,
+        devicePubKey: keyPair.publicKey,
+        devicePrivKeyEncrypted: this.crypto.encryptWithPassword(keyPair.privateKey, this.deviceId),
+        pairedAt: null,
+        lastConnectedAt: null,
+        sessionToken: null,
+        cloudWsEndpoint: CLOUD_ADMIN_WSS_URL,
+        tenantId: null,
+        tenantName: null,
+      };
+      await this.savePairingState();
     }
+
+    // Always override to cloud endpoint (even if old local pairing exists)
+    if (this.pairingState) {
+      this.pairingState.cloudWsEndpoint = CLOUD_ADMIN_WSS_URL;
+    }
+
+    console.log('[AGENT] Connecting to cloud admin:', CLOUD_ADMIN_WSS_URL);
+    this.isCloudMode = true;
+    this.state.isCloudConnection = true;
+    this.state.tenantName = this.pairingState?.tenantName || null;
+    this.connectToCloud(CLOUD_ADMIN_WSS_URL);
     
     console.log('Agent service initialized');
   }
