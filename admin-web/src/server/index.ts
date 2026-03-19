@@ -279,7 +279,7 @@ app.get('/api/stats/:deviceId', (req, res) => {
 
 // --- Dashboard routes ---
 app.get('/api/dashboard/summary', (req, res) => {
-  const range = (req.query.range as 'today' | '7d') || 'today';
+  const range = (req.query.range as 'today' | '7d' | '30d') || 'today';
   const dashboardService = deviceServer.getDashboardService();
   res.json(dashboardService.getDashboardSummary(range));
 });
@@ -290,7 +290,7 @@ app.get('/api/dashboard/devices', (_req, res) => {
 });
 
 app.get('/api/dashboard/devices/:id', (req, res) => {
-  const range = (req.query.range as 'today' | '7d') || 'today';
+  const range = (req.query.range as 'today' | '7d' | '30d') || 'today';
   const dashboardService = deviceServer.getDashboardService();
   res.json(dashboardService.getDeviceDetail(req.params.id, range));
 });
@@ -322,7 +322,7 @@ app.get('/api/dashboard/commands', (req, res) => {
 
 // Enhanced Dashboard API
 app.get('/api/dashboard/summary-enhanced', (req, res) => {
-  const range = (req.query.range as 'today' | '7d') || 'today';
+  const range = (req.query.range as 'today' | '7d' | '30d') || 'today';
   const dashboardService = deviceServer.getDashboardService();
   res.json(dashboardService.getDashboardSummaryEnhanced(range));
 });
