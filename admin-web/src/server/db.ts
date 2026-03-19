@@ -223,12 +223,20 @@ export class AdminDatabase {
         first_activity_ts INTEGER,
         last_activity_ts INTEGER,
         top_apps_json TEXT DEFAULT '[]',
+        detailed_apps_json TEXT DEFAULT '[]',
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         PRIMARY KEY (device_id, date_ymd)
       );
       CREATE INDEX IF NOT EXISTS idx_device_daily_metrics_date ON device_daily_metrics(date_ymd);
     `);
+
+    // Migration: add detailed_apps_json column if missing
+    try {
+      this.db.exec(`ALTER TABLE device_daily_metrics ADD COLUMN detailed_apps_json TEXT DEFAULT '[]'`);
+    } catch {
+      // Column already exists
+    }
 
     // Device status - real-time status tracking
     this.db.exec(`
@@ -608,14 +616,15 @@ export class AdminDatabase {
     first_activity_ts: number | null;
     last_activity_ts: number | null;
     top_apps_json: string;
+    detailed_apps_json?: string;
   }): void {
     const now = Date.now();
     this.db.prepare(`
-      INSERT INTO device_daily_metrics 
-        (device_id, date_ymd, productive_seconds, unproductive_seconds, idle_seconds, 
-         untracked_seconds, active_seconds, first_activity_ts, last_activity_ts, 
-         top_apps_json, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO device_daily_metrics
+        (device_id, date_ymd, productive_seconds, unproductive_seconds, idle_seconds,
+         untracked_seconds, active_seconds, first_activity_ts, last_activity_ts,
+         top_apps_json, detailed_apps_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(device_id, date_ymd) DO UPDATE SET
         productive_seconds = excluded.productive_seconds,
         unproductive_seconds = excluded.unproductive_seconds,
@@ -625,6 +634,7 @@ export class AdminDatabase {
         first_activity_ts = COALESCE(device_daily_metrics.first_activity_ts, excluded.first_activity_ts),
         last_activity_ts = excluded.last_activity_ts,
         top_apps_json = excluded.top_apps_json,
+        detailed_apps_json = excluded.detailed_apps_json,
         updated_at = excluded.updated_at
     `).run(
       metrics.device_id,
@@ -637,6 +647,7 @@ export class AdminDatabase {
       metrics.first_activity_ts,
       metrics.last_activity_ts,
       metrics.top_apps_json,
+      metrics.detailed_apps_json || '[]',
       now,
       now
     );
