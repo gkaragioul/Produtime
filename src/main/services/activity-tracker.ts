@@ -234,33 +234,111 @@ export class ActivityTracker {
    * When privacy mode is enabled and the app matches a privacy app,
    * the window title is replaced with just the app name.
    */
+  /**
+   * Browser app names that should have site extraction applied
+   */
+  private static readonly BROWSER_APPS = [
+    'google chrome', 'chrome', 'firefox', 'mozilla firefox',
+    'microsoft edge', 'edge', 'opera', 'brave browser', 'brave',
+    'safari', 'vivaldi', 'arc',
+  ];
+
+  /**
+   * Known site title → domain mappings for common sites
+   */
+  private static readonly SITE_MAPPINGS: Record<string, string> = {
+    'facebook': 'facebook.com', 'instagram': 'instagram.com',
+    'twitter': 'twitter.com', 'x': 'x.com',
+    'youtube': 'youtube.com', 'reddit': 'reddit.com',
+    'linkedin': 'linkedin.com', 'whatsapp': 'web.whatsapp.com',
+    'telegram': 'web.telegram.org', 'slack': 'slack.com',
+    'gmail': 'gmail.com', 'google mail': 'gmail.com',
+    'google docs': 'docs.google.com', 'google sheets': 'sheets.google.com',
+    'google drive': 'drive.google.com', 'google calendar': 'calendar.google.com',
+    'google meet': 'meet.google.com', 'google maps': 'maps.google.com',
+    'outlook': 'outlook.com', 'github': 'github.com',
+    'stack overflow': 'stackoverflow.com', 'stackoverflow': 'stackoverflow.com',
+    'notion': 'notion.so', 'figma': 'figma.com',
+    'trello': 'trello.com', 'jira': 'jira.atlassian.com',
+    'amazon': 'amazon.com', 'ebay': 'ebay.com',
+    'netflix': 'netflix.com', 'spotify': 'spotify.com',
+    'twitch': 'twitch.tv', 'tiktok': 'tiktok.com',
+    'pinterest': 'pinterest.com', 'tumblr': 'tumblr.com',
+    'discord': 'discord.com', 'messenger': 'messenger.com',
+    'chatgpt': 'chatgpt.com', 'claude': 'claude.ai',
+  };
+
+  /**
+   * Extract site/domain from a browser window title.
+   * Chrome titles: "Page Title - Site Name - Google Chrome"
+   * Returns the site name or domain if found.
+   */
+  private extractSiteFromBrowserTitle(windowTitle: string, appName: string): string | null {
+    // Remove the browser suffix (e.g. " - Google Chrome", " — Mozilla Firefox")
+    const browserSuffixes = [
+      / - Google Chrome$/i, / — Google Chrome$/i,
+      / - Mozilla Firefox$/i, / — Mozilla Firefox$/i,
+      / - Microsoft Edge$/i, / — Microsoft Edge$/i,
+      / - Opera$/i, / — Opera$/i,
+      / - Brave$/i, / — Brave$/i,
+      / - Vivaldi$/i, / — Vivaldi$/i,
+      / - Arc$/i, / — Arc$/i,
+      / - Safari$/i, / — Safari$/i,
+    ];
+
+    let title = windowTitle;
+    for (const suffix of browserSuffixes) {
+      title = title.replace(suffix, '');
+    }
+
+    if (!title || title === windowTitle) {
+      // No suffix found — return null
+      return null;
+    }
+
+    // Split by common separators: " - ", " — ", " | ", " · "
+    const parts = title.split(/\s[-—|·]\s/);
+
+    // The last part is usually the site name (e.g. "News Feed - Facebook" → "Facebook")
+    const sitePart = (parts.length > 1 ? parts[parts.length - 1] : parts[0]).trim();
+
+    // Check if it maps to a known domain
+    const siteKey = sitePart.toLowerCase();
+    if (ActivityTracker.SITE_MAPPINGS[siteKey]) {
+      return ActivityTracker.SITE_MAPPINGS[siteKey];
+    }
+
+    // If it looks like a domain already (contains a dot), use it
+    if (sitePart.includes('.') && !sitePart.includes(' ')) {
+      return sitePart.toLowerCase();
+    }
+
+    // Return the site part as-is (e.g. "Facebook", "YouTube")
+    return sitePart || null;
+  }
+
   public sanitizeWindowTitle(appName: string, windowTitle: string): SanitizationResult {
     const privacyEnabled = this.database.getSetting('privacy_mode_enabled') === 'true';
-    
-    console.log(`[PRIVACY] Checking: appName="${appName}", windowTitle="${windowTitle}", privacyEnabled=${privacyEnabled}`);
-    
+
     if (!privacyEnabled) {
       return { appName, windowTitle, wasSanitized: false };
     }
-    
-    const privacyApps = this.getPrivacyApps();
-    // Check both appName AND windowTitle for privacy app matches
-    const isPrivacyApp = privacyApps.some(app => {
-      const appLower = app.toLowerCase();
-      const matchesAppName = appName.toLowerCase().includes(appLower);
-      const matchesWindowTitle = windowTitle.toLowerCase().includes(appLower);
-      if (matchesAppName || matchesWindowTitle) {
-        console.log(`[PRIVACY] Match found: "${app}" in appName=${matchesAppName}, windowTitle=${matchesWindowTitle}`);
+
+    // For browsers: extract site name instead of stripping to just "Google Chrome"
+    const isBrowser = ActivityTracker.BROWSER_APPS.some(b => appName.toLowerCase().includes(b));
+    if (isBrowser) {
+      const site = this.extractSiteFromBrowserTitle(windowTitle, appName);
+      if (site) {
+        // Show as "Chrome · facebook.com" — privacy-safe, no page details
+        const shortBrowser = appName.replace(/Google\s*/i, '').trim();
+        const sanitizedTitle = `${shortBrowser} · ${site}`;
+        return { appName, windowTitle: sanitizedTitle, wasSanitized: true };
       }
-      return matchesAppName || matchesWindowTitle;
-    });
-    
-    if (isPrivacyApp) {
-      console.log(`[PRIVACY] Sanitizing: "${windowTitle}" -> "${appName}"`);
-      return { appName, windowTitle: appName, wasSanitized: true };
+      // Couldn't extract site — fall through to strip title
     }
-    
-    return { appName, windowTitle, wasSanitized: false };
+
+    // For non-browser apps: strip window title entirely
+    return { appName, windowTitle: appName, wasSanitized: true };
   }
 
   /**
