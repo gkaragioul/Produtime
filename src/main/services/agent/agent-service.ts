@@ -951,65 +951,50 @@ export class AgentService extends EventEmitter {
    * Handle pairing approval
    */
   private async handlePairApproved(message: AdminProtocolMessage): Promise<void> {
-    console.log('[AGENT] ========================================');
-    console.log('[AGENT] *** PAIR_APPROVED received! ***');
-    console.log('[AGENT] Message:', JSON.stringify(message).substring(0, 300));
-    
     const payload = (message as any).payload;
-    console.log('[AGENT] Payload adminName:', payload.adminName);
-    console.log('[AGENT] Payload adminPubKey:', payload.adminPubKey?.substring(0, 30) + '...');
-    console.log('[AGENT] Payload wsEndpoint:', payload.wsEndpoint);
-    console.log('[AGENT] Payload tenantId:', payload.tenantId);
-    console.log('[AGENT] Payload tenantName:', payload.tenantName);
-    
+    const wasAlreadyPaired = this.pairingState?.paired === true;
+
+    // Silently update the admin public key (handles server key rotation)
     this.pairingState = {
       ...this.pairingState!,
       paired: true,
       adminName: payload.adminName,
       adminPubKey: payload.adminPubKey,
-      pairedAt: Date.now(),
+      pairedAt: this.pairingState?.pairedAt || Date.now(),
       lastConnectedAt: Date.now(),
       sessionToken: payload.sessionToken,
-      // Store cloud WebSocket endpoint (Requirement 11.1)
-      cloudWsEndpoint: payload.wsEndpoint || null,
-      tenantId: payload.tenantId || null,
-      tenantName: payload.tenantName || payload.adminName || null,
+      cloudWsEndpoint: payload.wsEndpoint || this.pairingState?.cloudWsEndpoint || null,
+      tenantId: payload.tenantId || this.pairingState?.tenantId || null,
+      tenantName: payload.tenantName || payload.adminName || this.pairingState?.tenantName || null,
     };
-
-    console.log('[AGENT] Pairing state updated:', {
-      paired: this.pairingState.paired,
-      adminHost: this.pairingState.adminHost,
-      adminName: this.pairingState.adminName,
-      cloudWsEndpoint: this.pairingState.cloudWsEndpoint,
-      tenantId: this.pairingState.tenantId,
-      tenantName: this.pairingState.tenantName,
-    });
 
     // Save to database
     await this.savePairingState();
-    console.log('[AGENT] Pairing state saved to database');
 
     // Apply initial policy if provided
     if (payload.initialPolicy) {
       await this.applyPolicy(payload.initialPolicy);
     }
 
-    this.state.status = 'paired';
-    this.state.adminName = payload.adminName;
-    this.state.lastConnected = Date.now();
-    this.emit('stateChanged', this.state);
-    this.emit('paired', { 
-      adminName: payload.adminName,
-      tenantName: payload.tenantName || payload.adminName,
-      cloudWsEndpoint: payload.wsEndpoint,
-    });
-    
+    // Only emit events on first pairing (not on key refresh)
+    if (!wasAlreadyPaired) {
+      this.state.status = 'paired';
+      this.state.adminName = payload.adminName;
+      this.state.lastConnected = Date.now();
+      this.emit('stateChanged', this.state);
+      this.emit('paired', {
+        adminName: payload.adminName,
+        tenantName: payload.tenantName || payload.adminName,
+        cloudWsEndpoint: payload.wsEndpoint,
+      });
+      console.log(`[AGENT] Paired with Admin Console: ${payload.adminName}`);
+    } else {
+      // Already paired — just update last connected time silently
+      this.state.lastConnected = Date.now();
+    }
+
     // Start heartbeat to maintain connection and show as online
-    console.log('[AGENT] WebSocket state before startHeartbeat:', this.ws?.readyState, '(1=OPEN)');
     this.startHeartbeat();
-    
-    console.log(`[AGENT] Paired with Admin Console: ${payload.adminName}`);
-    console.log('[AGENT] ========================================');
   }
 
   /**
@@ -1284,6 +1269,7 @@ export class AgentService extends EventEmitter {
     const todayMetrics = this.metricsComputer.computeTodayMetrics();
     const last15mMetrics = this.metricsComputer.computeLast15mMetrics();
     const topAppsToday = this.metricsComputer.computeTopAppsToday();
+    const detailedAppsToday = this.metricsComputer.computeDetailedAppsToday();
 
     // Get local IP address
     const localIp = this.getLocalIpAddress();
@@ -1306,6 +1292,7 @@ export class AgentService extends EventEmitter {
       today: todayMetrics,
       last15m: last15mMetrics,
       topAppsToday,
+      detailedAppsToday,
     };
 
     // Also include legacy fields for backward compatibility

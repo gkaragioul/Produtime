@@ -432,6 +432,7 @@ app.get('/api/analytics/metrics', (req, res) => {
   const teamTotals = db.getTeamDailyMetricsRange(startDate, endDate);
   const devices = db.getAllDevices();
   const dateAppsMap = new Map<string, Map<string, number>>();
+  const dateDetailedAppsMap = new Map<string, Map<string, number>>();
   for (const device of devices) {
     const deviceMetrics = db.getDeviceDailyMetricsRange(device.device_id, startDate, endDate);
     for (const m of deviceMetrics) {
@@ -440,6 +441,16 @@ app.get('/api/analytics/metrics', (req, res) => {
           const apps = JSON.parse(m.top_apps_json);
           if (!dateAppsMap.has(m.date_ymd)) dateAppsMap.set(m.date_ymd, new Map());
           const dayMap = dateAppsMap.get(m.date_ymd)!;
+          for (const a of apps) {
+            dayMap.set(a.app, (dayMap.get(a.app) || 0) + (a.seconds || 0));
+          }
+        } catch {}
+      }
+      if (m.detailed_apps_json) {
+        try {
+          const apps = JSON.parse(m.detailed_apps_json);
+          if (!dateDetailedAppsMap.has(m.date_ymd)) dateDetailedAppsMap.set(m.date_ymd, new Map());
+          const dayMap = dateDetailedAppsMap.get(m.date_ymd)!;
           for (const a of apps) {
             dayMap.set(a.app, (dayMap.get(a.app) || 0) + (a.seconds || 0));
           }
@@ -456,6 +467,14 @@ app.get('/api/analytics/metrics', (req, res) => {
             .map(([a, seconds]) => ({ app: a, seconds }))
             .sort((a, b) => b.seconds - a.seconds)
             .slice(0, 20)
+        )
+      : undefined,
+    detailed_apps_json: dateDetailedAppsMap.has(row.date_ymd)
+      ? JSON.stringify(
+          Array.from(dateDetailedAppsMap.get(row.date_ymd)!.entries())
+            .map(([a, seconds]) => ({ app: a, seconds }))
+            .sort((a, b) => b.seconds - a.seconds)
+            .slice(0, 30)
         )
       : undefined,
   })));

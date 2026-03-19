@@ -258,23 +258,23 @@ export class MetricsComputer {
    */
   public computeTopAppsToday(): TopAppEntry[] {
     const today = new Date().toISOString().split('T')[0];
-    
+
     try {
       const aggregated = this.database.getActivityLogsByDateRangeAggregated(today, today);
-      
-      // Sum by app name
+
+      // Sum by app name (aggregated for top apps)
       const appTotals = new Map<string, number>();
       for (const entry of aggregated) {
         // Skip idle entries
-        if (entry.app_name === 'System' && 
+        if (entry.app_name === 'System' &&
             (entry.window_title_sample === 'Idle' || entry.window_title_sample === 'Paused')) {
           continue;
         }
-        
+
         const current = appTotals.get(entry.app_name) || 0;
         appTotals.set(entry.app_name, current + entry.total_duration);
       }
-      
+
       // Sort and take top 10, including category
       return Array.from(appTotals.entries())
         .map(([app, seconds]) => {
@@ -287,6 +287,53 @@ export class MetricsComputer {
         .slice(0, 10);
     } catch (err) {
       console.error('[MetricsComputer] Error computing top apps:', err);
+      return [];
+    }
+  }
+
+  /**
+   * Compute detailed site/app breakdown for analytics.
+   * For browsers, splits by site (window_title). For other apps, keeps aggregated.
+   */
+  public computeDetailedAppsToday(): TopAppEntry[] {
+    const today = new Date().toISOString().split('T')[0];
+
+    try {
+      const aggregated = this.database.getActivityLogsByDateRangeAggregated(today, today);
+
+      // For browsers, use "AppName · site" as the key; for others, just app name
+      const detailTotals = new Map<string, number>();
+      for (const entry of aggregated) {
+        if (entry.app_name === 'System' &&
+            (entry.window_title_sample === 'Idle' || entry.window_title_sample === 'Paused')) {
+          continue;
+        }
+
+        let key = entry.app_name;
+        // If window_title differs from app_name and is not empty, include it as detail
+        if (entry.window_title_sample &&
+            entry.window_title_sample !== entry.app_name &&
+            entry.window_title_sample !== '') {
+          key = `${entry.app_name} · ${entry.window_title_sample}`;
+        }
+
+        const current = detailTotals.get(key) || 0;
+        detailTotals.set(key, current + entry.total_duration);
+      }
+
+      return Array.from(detailTotals.entries())
+        .map(([app, seconds]) => {
+          // Categorize by base app name (before the ·)
+          const baseApp = app.split(' · ')[0];
+          const cat = this.categorizeApp(baseApp);
+          const category: 'productive' | 'unproductive' | 'neutral' =
+            cat === 'distracting' ? 'unproductive' : cat;
+          return { app, seconds, category };
+        })
+        .sort((a, b) => b.seconds - a.seconds)
+        .slice(0, 20);
+    } catch (err) {
+      console.error('[MetricsComputer] Error computing detailed apps:', err);
       return [];
     }
   }

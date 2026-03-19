@@ -111,6 +111,7 @@ export class DashboardService {
       first_activity_ts: heartbeat.today.firstActivityTs,
       last_activity_ts: heartbeat.today.lastActivityTs,
       top_apps_json: JSON.stringify(heartbeat.topAppsToday),
+      detailed_apps_json: JSON.stringify(heartbeat.detailedAppsToday || []),
     });
 
     // Update legacy device stats for backward compatibility

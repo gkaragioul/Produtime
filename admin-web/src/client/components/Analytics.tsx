@@ -383,6 +383,24 @@ export const Analytics: React.FC = () => {
     .slice(0, 10);
   const maxAppSeconds = topApps.length > 0 ? topApps[0].seconds : 1;
 
+  // Detailed apps (with site-level breakdown)
+  const detailedTotals = new Map<string, number>();
+  for (const m of metrics) {
+    if ((m as any).detailed_apps_json) {
+      try {
+        const apps: Array<{ app: string; seconds: number }> = JSON.parse((m as any).detailed_apps_json);
+        for (const a of apps) {
+          detailedTotals.set(a.app, (detailedTotals.get(a.app) || 0) + a.seconds);
+        }
+      } catch { /* ignore */ }
+    }
+  }
+  const detailedApps = Array.from(detailedTotals.entries())
+    .map(([app, seconds]) => ({ app, seconds }))
+    .sort((a, b) => b.seconds - a.seconds)
+    .slice(0, 20);
+  const maxDetailedSeconds = detailedApps.length > 0 ? detailedApps[0].seconds : 1;
+
   // Chart max for bar scaling
   const maxDayTotal = Math.max(...metrics.map(m => (m.active_seconds || 0) + (m.idle_seconds || 0) + (m.untracked_seconds || 0)), 1);
 
@@ -719,6 +737,60 @@ export const Analytics: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ================================================================= */}
+      {/* Detailed Activity Breakdown (per-site)                             */}
+      {/* ================================================================= */}
+      {detailedApps.length > 0 && (
+      <div style={{
+        backgroundColor: 'white',
+        borderRadius: '12px',
+        padding: 'clamp(16px, 2vw, 24px)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        marginBottom: 'clamp(16px, 2vw, 24px)',
+      }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 600, margin: '0 0 16px 0', color: '#1a1a2e' }}>
+          Detailed Activity ({period === 'daily' ? 'Today' : period === 'weekly' ? 'Last 7 Days' : 'Last 30 Days'})
+        </h2>
+        <p style={{ margin: '0 0 16px 0', color: '#888', fontSize: '13px' }}>
+          Site-level breakdown for browsers, per-app for other applications
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {detailedApps.map((app, i) => {
+            const parts = app.app.split(' · ');
+            const issite = parts.length > 1;
+            return (
+              <div key={app.app} style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <span style={{ width: '26px', fontSize: '14px', color: '#999', fontWeight: 600, textAlign: 'right' }}>{i + 1}</span>
+                <span style={{
+                  width: '260px', fontSize: '14px', fontWeight: 500,
+                  color: issite ? '#555' : '#333',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0,
+                }}>
+                  {issite ? (
+                    <><span style={{ color: '#999', fontSize: '12px' }}>{parts[0]} ›</span> {parts[1]}</>
+                  ) : app.app}
+                </span>
+                <div style={{ flex: 1, height: '18px', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${(app.seconds / maxDetailedSeconds) * 100}%`,
+                    height: '100%',
+                    backgroundColor: issite ? '#66bb6a' : '#2196F3',
+                    borderRadius: '4px',
+                    transition: 'width 0.3s ease',
+                    minWidth: '2px',
+                  }} />
+                </div>
+                <span style={{ width: '80px', fontSize: '14px', fontWeight: 600, color: '#555', textAlign: 'right', flexShrink: 0 }}>
+                  {formatSeconds(app.seconds)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      )}
 
       {/* ================================================================= */}
       {/* Daily Breakdown Table                                              */}
