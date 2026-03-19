@@ -175,9 +175,23 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
         <KPICard title="Active Now" value={summary?.totals.online || 0} color="#4CAF50" icon="🟢" />
         <KPICard title="Idle Now" value={summary?.totals.idle || 0} color="#FF9800" icon="🟡" />
         <KPICard title="Offline" value={summary?.totals.offline || 0} color="#9e9e9e" icon="⚫" />
-        <KPICard title="Active Time" value={secondsToShort(summary?.totals.activeSeconds || 0)} color="#2196F3" icon="⏱️" subtitle={range === 'today' ? 'Today' : range === '7d' ? '7 Days' : '30 Days'} />
-        <KPICard title="Idle Time" value={secondsToShort(summary?.totals.idleSeconds || 0)} color="#FF9800" icon="💤" subtitle={range === 'today' ? 'Today' : range === '7d' ? '7 Days' : '30 Days'} />
-        <KPICard title="Untracked" value={secondsToShort(summary?.totals.untrackedSeconds || 0)} color="#f44336" icon="❓" subtitle={range === 'today' ? 'Today' : range === '7d' ? '7 Days' : '30 Days'} />
+        {(() => {
+          const totalDevices = Math.max(summary?.totals.devicesTotal || 1, 1);
+          const activeS = summary?.totals.activeSeconds || 0;
+          const idleS = summary?.totals.idleSeconds || 0;
+          const tracked = activeS + idleS;
+          const productivity = tracked > 0 ? Math.round((activeS / tracked) * 100) : 0;
+          const avgActive = Math.round(activeS / totalDevices);
+          const avgIdle = Math.round(idleS / totalDevices);
+          const rangeLabel = range === 'today' ? 'Today' : range === '7d' ? '7 Days' : '30 Days';
+          return (
+            <>
+              <KPICard title="Avg Active" value={secondsToShort(avgActive)} color="#2196F3" icon="⏱️" subtitle={`Per person · ${rangeLabel}`} />
+              <KPICard title="Productivity" value={`${productivity}%`} color={productivity >= 70 ? '#4CAF50' : productivity >= 40 ? '#FF9800' : '#f44336'} icon="📊" subtitle={rangeLabel} />
+              <KPICard title="Avg Idle" value={secondsToShort(avgIdle)} color="#FF9800" icon="💤" subtitle={`Per person · ${rangeLabel}`} />
+            </>
+          );
+        })()}
       </div>
 
       <div className="dashboard-columns" style={{ display: 'flex', gap: 'clamp(16px, 2vw, 24px)', flex: 1, minHeight: 0, overflow: 'hidden' }}>
