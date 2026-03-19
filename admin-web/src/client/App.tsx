@@ -70,7 +70,7 @@ declare global {
       onServerLog: (callback: (message: string) => void) => () => void;
       getServerLogs: (count?: number) => Promise<string[]>;
       // Dashboard API
-      getDashboardSummary: (range: 'today' | '7d') => Promise<DashboardSummaryResponse | null>;
+      getDashboardSummary: (range: 'today' | '7d' | '30d') => Promise<DashboardSummaryResponse | null>;
       getDashboardDevices: () => Promise<DeviceListItem[]>;
       getDeviceDetail: (deviceId: string, range: 'today' | '7d') => Promise<DeviceDetailResponse | null>;
       getExceptions: (resolved?: boolean) => Promise<any[]>;
@@ -79,7 +79,7 @@ declare global {
       getRecentHeartbeats: (limit?: number) => Promise<any[]>;
       getRecentCommands: (limit?: number) => Promise<any[]>;
       // Enhanced Dashboard API
-      getDashboardSummaryEnhanced: (range: 'today' | '7d') => Promise<DashboardSummaryEnhanced | null>;
+      getDashboardSummaryEnhanced: (range: 'today' | '7d' | '30d') => Promise<DashboardSummaryEnhanced | null>;
       getDashboardDevicesEnhanced: () => Promise<DeviceListItemEnhanced[]>;
       getAttention: () => Promise<AttentionResponse>;
       getDashboardStory: () => Promise<DashboardStory | null>;

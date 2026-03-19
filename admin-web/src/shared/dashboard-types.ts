@@ -140,7 +140,7 @@ export interface ExceptionDetails {
 // ============================================================================
 
 export interface DashboardSummaryResponse {
-  range: 'today' | '7d';
+  range: 'today' | '7d' | '30d';
   totals: TeamTotals;
   trends7d: DailyTrend[];
   topApps: TopAppEntry[];

@@ -340,9 +340,9 @@ export class DashboardService {
   /**
    * Get dashboard summary
    */
-  public getDashboardSummary(range: 'today' | '7d'): DashboardSummaryResponse {
+  public getDashboardSummary(range: 'today' | '7d' | '30d'): DashboardSummaryResponse {
     const todayYmd = getTodayYmd();
-    const startDate = range === '7d' ? getDateNDaysAgo(6) : todayYmd;
+    const startDate = range === '30d' ? getDateNDaysAgo(29) : range === '7d' ? getDateNDaysAgo(6) : todayYmd;
     const now = Date.now();
     
     // Get all devices and compute status counts
@@ -537,7 +537,7 @@ export class DashboardService {
   /**
    * Get device detail
    */
-  public getDeviceDetail(deviceId: string, range: 'today' | '7d'): DeviceDetailResponse | null {
+  public getDeviceDetail(deviceId: string, range: 'today' | '7d' | '30d'): DeviceDetailResponse | null {
     const device = this.db.getDevice(deviceId);
     if (!device) return null;
 
@@ -663,7 +663,7 @@ export class DashboardService {
   /**
    * Get enhanced dashboard summary with story, attention, and rankings
    */
-  public getDashboardSummaryEnhanced(range: 'today' | '7d'): DashboardSummaryEnhanced {
+  public getDashboardSummaryEnhanced(range: 'today' | '7d' | '30d'): DashboardSummaryEnhanced {
     const baseSummary = this.getDashboardSummary(range);
     const story = this.performanceService.getDashboardStory();
     const attention = this.performanceService.getAttentionGroups();

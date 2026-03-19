@@ -240,9 +240,9 @@ export const adminAPI = {
   getServerLogs: (count?: number) => apiGet(`/api/server/logs?count=${count || 100}`),
 
   // Dashboard API
-  getDashboardSummary: (range: 'today' | '7d') => apiGet(`/api/dashboard/summary?range=${range}`),
+  getDashboardSummary: (range: 'today' | '7d' | '30d') => apiGet(`/api/dashboard/summary?range=${range}`),
   getDashboardDevices: () => apiGet('/api/dashboard/devices'),
-  getDeviceDetail: (deviceId: string, range: 'today' | '7d') =>
+  getDeviceDetail: (deviceId: string, range: 'today' | '7d' | '30d') =>
     apiGet(`/api/dashboard/devices/${deviceId}?range=${range}`),
   getExceptions: (resolved?: boolean) => apiGet(`/api/dashboard/exceptions${resolved !== undefined ? `?resolved=${resolved}` : ''}`),
   resolveException: (id: number) => apiPost(`/api/dashboard/exceptions/${id}/resolve`),
@@ -251,7 +251,7 @@ export const adminAPI = {
   getRecentCommands: (limit?: number) => apiGet(`/api/dashboard/commands?limit=${limit || 100}`),
 
   // Enhanced Dashboard API
-  getDashboardSummaryEnhanced: (range: 'today' | '7d') =>
+  getDashboardSummaryEnhanced: (range: 'today' | '7d' | '30d') =>
     apiGet(`/api/dashboard/summary-enhanced?range=${range}`),
   getDashboardDevicesEnhanced: () => apiGet('/api/dashboard/devices-enhanced'),
   getAttention: () => apiGet('/api/dashboard/attention'),

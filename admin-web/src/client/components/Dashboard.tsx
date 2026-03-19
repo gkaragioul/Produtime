@@ -28,7 +28,7 @@ import {
   formatDeltaPct,
 } from '../../shared/dashboard-types';
 
-type RangeType = 'today' | '7d';
+type RangeType = 'today' | '7d' | '30d';
 type RiskFilter = 'all' | 'on_track' | 'at_risk' | 'critical';
 
 interface DashboardProps {
@@ -160,6 +160,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
         <div style={{ display: 'flex', gap: '8px' }}>
           <button onClick={() => setRange('today')} style={rangeButtonStyle(range === 'today')}>Today</button>
           <button onClick={() => setRange('7d')} style={rangeButtonStyle(range === '7d')}>7 Days</button>
+          <button onClick={() => setRange('30d')} style={rangeButtonStyle(range === '30d')}>30 Days</button>
         </div>
       </div>
 
@@ -174,9 +175,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
         <KPICard title="Active Now" value={summary?.totals.online || 0} color="#4CAF50" icon="🟢" />
         <KPICard title="Idle Now" value={summary?.totals.idle || 0} color="#FF9800" icon="🟡" />
         <KPICard title="Offline" value={summary?.totals.offline || 0} color="#9e9e9e" icon="⚫" />
-        <KPICard title="Active Time" value={secondsToShort(summary?.totals.activeSeconds || 0)} color="#2196F3" icon="⏱️" subtitle={range === 'today' ? 'Today' : '7 Days'} />
-        <KPICard title="Idle Time" value={secondsToShort(summary?.totals.idleSeconds || 0)} color="#FF9800" icon="💤" subtitle={range === 'today' ? 'Today' : '7 Days'} />
-        <KPICard title="Untracked" value={secondsToShort(summary?.totals.untrackedSeconds || 0)} color="#f44336" icon="❓" subtitle={range === 'today' ? 'Today' : '7 Days'} />
+        <KPICard title="Active Time" value={secondsToShort(summary?.totals.activeSeconds || 0)} color="#2196F3" icon="⏱️" subtitle={range === 'today' ? 'Today' : range === '7d' ? '7 Days' : '30 Days'} />
+        <KPICard title="Idle Time" value={secondsToShort(summary?.totals.idleSeconds || 0)} color="#FF9800" icon="💤" subtitle={range === 'today' ? 'Today' : range === '7d' ? '7 Days' : '30 Days'} />
+        <KPICard title="Untracked" value={secondsToShort(summary?.totals.untrackedSeconds || 0)} color="#f44336" icon="❓" subtitle={range === 'today' ? 'Today' : range === '7d' ? '7 Days' : '30 Days'} />
       </div>
 
       <div className="dashboard-columns" style={{ display: 'flex', gap: 'clamp(16px, 2vw, 24px)', flex: 1, minHeight: 0, overflow: 'hidden' }}>
