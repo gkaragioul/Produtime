@@ -140,12 +140,6 @@ export const PolicyView: React.FC<PolicyViewProps> = ({ isManaged = false, admin
             <span style={{ color: '#666' }}>Idle Threshold</span>
             <span style={{ fontWeight: 500 }}>{formatDuration(policy?.idleThreshold)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ color: '#666' }}>Privacy Mode</span>
-            <span style={{ fontWeight: 500 }}>
-              {policy?.privacyModeEnabled ? 'Enabled' : 'Disabled'}
-            </span>
-          </div>
         </div>
       </div>
 
