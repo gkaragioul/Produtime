@@ -228,11 +228,15 @@ const App: React.FC = () => {
         className={`app-sidebar${sidebarOpen ? ' open' : ''}`}
         style={{
           width: '240px',
+          height: '100vh',
+          position: 'sticky',
+          top: 0,
           backgroundColor: '#1a1a2e',
           color: 'white',
           padding: '20px 0',
           display: 'flex',
           flexDirection: 'column',
+          flexShrink: 0,
         }}
       >
         {/* Logo */}
@@ -250,7 +254,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Navigation */}
-        <nav style={{ flex: 1, padding: '20px 0' }}>
+        <nav style={{ flex: 1, padding: '20px 0', overflow: 'auto' }}>
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -313,7 +317,6 @@ const App: React.FC = () => {
           {serverInfo ? (
             <>
               <div style={{ color: '#4CAF50', marginBottom: '4px' }}>● Online</div>
-              <div style={{ color: '#aaa' }}>Port: {serverInfo.port}</div>
               <div style={{ color: '#aaa' }}>{connectedCount} device(s) connected</div>
             </>
           ) : (
