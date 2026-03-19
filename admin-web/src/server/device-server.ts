@@ -674,27 +674,75 @@ export class AdminServer {
         if (!deviceId) {
           deviceId = message.deviceId;
           this.log(`[SERVER] First message from device ${deviceId}, checking if paired...`);
-          
-          // Verify device is paired
-          const device = this.db.getDevice(deviceId!);
-          if (!device) {
-            this.log(`[SERVER] Device ${deviceId} not found in database, closing connection`);
-            ws.close(4001, 'Device not paired');
-            return;
-          }
 
-          // Verify signature
-          if (!this.verifyMessage(message as AdminProtocolMessage, device.device_pubkey)) {
-            this.log(`[SERVER] Invalid signature from device ${deviceId}, closing connection`);
-            ws.close(4002, 'Invalid signature');
-            return;
+          // Check if device exists in database
+          let device = this.db.getDevice(deviceId!);
+
+          if (!device) {
+            // AUTO-REGISTER: device not known — register it automatically (TOFU)
+            // Trust-on-first-use: accept the public key from the IDENTIFY payload.
+            // Transport security (WSS/TLS) protects against MITM.
+            const payload = message.payload || {};
+            const deviceName = payload.deviceName || payload.deviceId || deviceId;
+            const devicePubKey = payload.devicePubKey || '';
+            const appVersion = payload.appVersion || 'unknown';
+
+            this.log(`[SERVER] Auto-registering new device: ${deviceId} (${deviceName})`);
+
+            this.db.insertDevice({
+              device_id: deviceId!,
+              device_name: deviceName,
+              device_pubkey: devicePubKey,
+              paired_at: Date.now(),
+              last_seen: Date.now(),
+              app_version: appVersion,
+              ip,
+            });
+
+            this.db.insertAuditLog({
+              action: 'AUTO_REGISTERED',
+              device_id: deviceId!,
+              details: `Auto-registered device ${deviceName} from ${ip}`,
+              timestamp: Date.now(),
+              admin_user: 'system',
+            });
+
+            // Send PAIR_APPROVED so the agent transitions to paired state
+            const publicUrl = process.env.RAILWAY_PUBLIC_DOMAIN
+              ? `wss://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+              : null;
+
+            const approvalMessage = this.signMessage('PAIR_APPROVED', deviceId!, {
+              adminName: 'ProduTime Admin Console',
+              adminPubKey: this.adminKeyPair?.publicKey,
+              sessionToken: crypto.randomUUID(),
+              initialPolicy: null,
+              wsEndpoint: publicUrl,
+            });
+
+            try {
+              ws.send(JSON.stringify(approvalMessage));
+              this.log(`[SERVER] Sent PAIR_APPROVED (auto-register) to ${deviceId}`);
+            } catch (err) {
+              this.log(`[SERVER] Failed to send PAIR_APPROVED: ${err}`);
+            }
+
+            // Re-read the device record we just inserted
+            device = this.db.getDevice(deviceId!);
+          } else {
+            // Existing device — verify signature
+            if (!this.verifyMessage(message as AdminProtocolMessage, device.device_pubkey)) {
+              this.log(`[SERVER] Invalid signature from device ${deviceId}, closing connection`);
+              ws.close(4002, 'Invalid signature');
+              return;
+            }
           }
 
           // Register connection
           this.connectedDevices.set(deviceId!, {
             ws,
             deviceId: deviceId!,
-            devicePubKey: device.device_pubkey,
+            devicePubKey: device!.device_pubkey,
             lastHeartbeat: Date.now(),
             ip,
           });

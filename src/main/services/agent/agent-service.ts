@@ -32,6 +32,7 @@ import {
   CLOUD_RECONNECT_BASE_DELAY_MS,
   CLOUD_RECONNECT_MAX_DELAY_MS,
   CLOUD_MAX_RECONNECT_ATTEMPTS,
+  CLOUD_ADMIN_WSS_URL,
 } from '../../../shared/admin-protocol';
 import {
   EnhancedHeartbeatPayload,
@@ -153,7 +154,32 @@ export class AgentService extends EventEmitter {
         this.connect(this.pairingState.adminHost);
       }
     } else {
-      console.log('[AGENT] Not paired, skipping auto-connect');
+      // AUTO-CONNECT: Not paired yet — generate keys and connect to hardcoded cloud admin
+      console.log('[AGENT] Not paired — auto-connecting to cloud admin:', CLOUD_ADMIN_WSS_URL);
+
+      // Generate key pair if we don't have one
+      if (!this.pairingState?.devicePubKey) {
+        const keyPair = this.crypto.generateKeyPair();
+        this.pairingState = {
+          paired: false,
+          adminHost: null,
+          adminName: null,
+          adminPubKey: null,
+          devicePubKey: keyPair.publicKey,
+          devicePrivKeyEncrypted: this.crypto.encryptWithPassword(keyPair.privateKey, this.deviceId),
+          pairedAt: null,
+          lastConnectedAt: null,
+          sessionToken: null,
+          cloudWsEndpoint: CLOUD_ADMIN_WSS_URL,
+          tenantId: null,
+          tenantName: null,
+        };
+        await this.savePairingState();
+      }
+
+      this.isCloudMode = true;
+      this.state.isCloudConnection = true;
+      this.connectToCloud(CLOUD_ADMIN_WSS_URL);
     }
     
     console.log('Agent service initialized');
@@ -778,8 +804,10 @@ export class AgentService extends EventEmitter {
             deviceName: require('os').hostname(),
             devicePubKey: this.pairingState!.devicePubKey,
             appVersion: this.appVersion,
+            osInfo: `${process.platform} ${require('os').release()}`,
             tenantId: this.pairingState?.tenantId,
             sessionToken: this.pairingState?.sessionToken,
+            isPairing: false,
           },
           this.getPrivateKey()
         );
@@ -820,42 +848,22 @@ export class AgentService extends EventEmitter {
     this.state.status = 'disconnected';
     this.emit('stateChanged', this.state);
 
-    // Attempt reconnect with exponential backoff if paired
-    if (this.pairingState?.paired && this.pairingState.cloudWsEndpoint) {
-      if (this.cloudReconnectAttempts < CLOUD_MAX_RECONNECT_ATTEMPTS) {
-        this.cloudReconnectAttempts++;
-        
-        // Exponential backoff: delay = base * 2^(attempt-1), capped at max
-        const delay = Math.min(
-          CLOUD_RECONNECT_BASE_DELAY_MS * Math.pow(2, this.cloudReconnectAttempts - 1),
-          CLOUD_RECONNECT_MAX_DELAY_MS
-        );
-        
-        console.log(`[AGENT] Cloud reconnecting in ${delay}ms (attempt ${this.cloudReconnectAttempts}/${CLOUD_MAX_RECONNECT_ATTEMPTS})`);
-        
-        this.reconnectTimeout = setTimeout(() => {
-          if (this.pairingState?.cloudWsEndpoint) {
-            this.connectToCloud(this.pairingState.cloudWsEndpoint);
-          }
-        }, delay);
-      } else {
-        // Requirement 11.4: Fall back to local-only mode
-        console.log('[AGENT] Cloud connection failed after max attempts, falling back to local-only mode');
-        this.state.cloudConnectionFailed = true;
-        this.isCloudMode = false;
-        this.emit('stateChanged', this.state);
-        this.emit('cloudConnectionFailed', { 
-          attempts: this.cloudReconnectAttempts,
-          endpoint: this.pairingState.cloudWsEndpoint,
-        });
-        
-        // Try local admin host if available
-        if (this.pairingState.adminHost) {
-          console.log('[AGENT] Attempting fallback to local admin:', this.pairingState.adminHost);
-          this.reconnectAttempts = 0;
-          this.connect(this.pairingState.adminHost);
-        }
-      }
+    // Always reconnect to cloud — never give up
+    const cloudEndpoint = this.pairingState?.cloudWsEndpoint || CLOUD_ADMIN_WSS_URL;
+    if (cloudEndpoint) {
+      this.cloudReconnectAttempts++;
+
+      // Exponential backoff: delay = base * 2^(attempt-1), capped at max (60s)
+      const delay = Math.min(
+        CLOUD_RECONNECT_BASE_DELAY_MS * Math.pow(2, this.cloudReconnectAttempts - 1),
+        CLOUD_RECONNECT_MAX_DELAY_MS
+      );
+
+      console.log(`[AGENT] Cloud reconnecting in ${delay}ms (attempt ${this.cloudReconnectAttempts})`);
+
+      this.reconnectTimeout = setTimeout(() => {
+        this.connectToCloud(cloudEndpoint);
+      }, delay);
     }
   }
 
