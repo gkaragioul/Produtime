@@ -38,6 +38,8 @@ export class DashboardService {
   private db: AdminDatabase;
   private performanceService: PerformanceService;
   private exceptionsEngineInterval: NodeJS.Timeout | null = null;
+  /** Set by device-server to provide live WebSocket connection truth */
+  public getConnectedDeviceIds: () => string[] = () => [];
 
   constructor(db: AdminDatabase) {
     this.db = db;
@@ -343,35 +345,20 @@ export class DashboardService {
   public getDashboardSummary(range: 'today' | '7d' | '30d'): DashboardSummaryResponse {
     const todayYmd = getTodayYmd();
     const startDate = range === '30d' ? getDateNDaysAgo(29) : range === '7d' ? getDateNDaysAgo(6) : todayYmd;
-    const now = Date.now();
-    
-    // Get all devices and compute status counts
-    // Use device_status table if available, otherwise fall back to devices table
+
     const devices = this.db.getAllDevices();
-    const deviceStatuses = this.db.getAllDeviceStatuses();
-    const statusMap = new Map(deviceStatuses.map(s => [s.device_id, s]));
-    
+    const liveSet = new Set(this.getConnectedDeviceIds());
+
     let onlineCount = 0;
     let idleCount = 0;
     let offlineCount = 0;
-    
+
     for (const device of devices) {
-      const status = statusMap.get(device.device_id);
-      if (status) {
-        // Use device_status table
-        if (status.status === 'online') onlineCount++;
-        else if (status.status === 'idle') idleCount++;
-        else offlineCount++;
+      // Use live WebSocket connections as the source of truth
+      if (liveSet.has(device.device_id)) {
+        onlineCount++;
       } else {
-        // Fall back to legacy devices table
-        const timeSinceLastSeen = now - device.last_seen;
-        if (device.status === 'online' && timeSinceLastSeen < 120000) {
-          onlineCount++;
-        } else if (timeSinceLastSeen < 120000) {
-          onlineCount++;
-        } else {
-          offlineCount++;
-        }
+        offlineCount++;
       }
     }
     
@@ -461,34 +448,16 @@ export class DashboardService {
     const devices = this.db.getAllDevices();
     const todayYmd = getTodayYmd();
     const result: DeviceListItem[] = [];
-    const now = Date.now();
+    const liveSet = new Set(this.getConnectedDeviceIds());
 
     for (const device of devices) {
       const status = this.db.getDeviceStatus(device.device_id);
       const metrics = this.db.getDeviceDailyMetrics(device.device_id, todayYmd);
       const policy = device.policy_id ? this.db.getPolicy(device.policy_id) : null;
 
-      // Determine device status - use device_status table if available,
-      // otherwise fall back to legacy devices table status
-      let deviceStatus: DeviceStatusType = 'offline';
-      let lastSeenTs = device.last_seen;
-      
-      if (status) {
-        // Use device_status table (populated by enhanced heartbeats)
-        deviceStatus = status.status as DeviceStatusType;
-        lastSeenTs = status.last_seen_ts;
-      } else {
-        // Fall back to legacy devices table
-        // Check if device was seen recently (within 2 minutes)
-        const timeSinceLastSeen = now - device.last_seen;
-        if (device.status === 'online' && timeSinceLastSeen < 120000) {
-          deviceStatus = 'online';
-        } else if (timeSinceLastSeen < 120000) {
-          deviceStatus = 'online';
-        } else {
-          deviceStatus = 'offline';
-        }
-      }
+      // Use live WebSocket connections as truth for online/offline
+      const deviceStatus: DeviceStatusType = liveSet.has(device.device_id) ? 'online' : 'offline';
+      const lastSeenTs = status?.last_seen_ts || device.last_seen;
 
       // Determine policy compliance
       let policyCompliant = true;
@@ -551,24 +520,10 @@ export class DashboardService {
     const policy = device.policy_id ? this.db.getPolicy(device.policy_id) : null;
     const exceptions = this.db.getExceptionsByDevice(deviceId, 20);
 
-    // Determine device status - use device_status table if available,
-    // otherwise fall back to legacy devices table status
-    let deviceStatus: DeviceStatusType = 'offline';
-    let lastSeenTs = device.last_seen;
-    
-    if (status) {
-      deviceStatus = status.status as DeviceStatusType;
-      lastSeenTs = status.last_seen_ts;
-    } else {
-      const timeSinceLastSeen = now - device.last_seen;
-      if (device.status === 'online' && timeSinceLastSeen < 120000) {
-        deviceStatus = 'online';
-      } else if (timeSinceLastSeen < 120000) {
-        deviceStatus = 'online';
-      } else {
-        deviceStatus = 'offline';
-      }
-    }
+    // Use live WebSocket connections as truth
+    const liveSet = new Set(this.getConnectedDeviceIds());
+    const deviceStatus: DeviceStatusType = liveSet.has(device.device_id) ? 'online' : 'offline';
+    const lastSeenTs = status?.last_seen_ts || device.last_seen;
 
     // Determine policy compliance
     let policyCompliant = true;
