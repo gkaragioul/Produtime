@@ -365,7 +365,7 @@ export class ActivityTracker {
           this.currentActivity.appName,
           this.currentActivity.windowTitle
         );
-        
+
         this.database.insertActivityLog({
           timestamp: this.currentActivity.startTime.toISOString(),
           app_name: sanitized.appName,
@@ -500,7 +500,7 @@ export class ActivityTracker {
           this.currentActivity.appName,
           this.currentActivity.windowTitle
         );
-        
+
         this.database.insertActivityLog({
           timestamp: this.currentActivity.startTime.toISOString(),
           app_name: sanitized.appName,
