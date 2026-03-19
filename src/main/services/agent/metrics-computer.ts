@@ -291,17 +291,68 @@ export class MetricsComputer {
     }
   }
 
+  // Browser app names for site extraction
+  private static readonly BROWSER_APPS = ['chrome', 'firefox', 'edge', 'opera', 'brave', 'vivaldi', 'arc', 'safari'];
+
+  // Known site name to domain mappings
+  private static readonly SITE_DOMAINS: Record<string, string> = {
+    'facebook': 'facebook.com', 'instagram': 'instagram.com',
+    'twitter': 'twitter.com', 'x': 'x.com',
+    'youtube': 'youtube.com', 'reddit': 'reddit.com',
+    'linkedin': 'linkedin.com', 'whatsapp': 'web.whatsapp.com',
+    'telegram': 'web.telegram.org', 'slack': 'slack.com',
+    'gmail': 'gmail.com', 'google mail': 'gmail.com',
+    'google docs': 'docs.google.com', 'google sheets': 'sheets.google.com',
+    'google drive': 'drive.google.com', 'google calendar': 'calendar.google.com',
+    'google meet': 'meet.google.com', 'google maps': 'maps.google.com',
+    'outlook': 'outlook.com', 'github': 'github.com',
+    'stack overflow': 'stackoverflow.com', 'stackoverflow': 'stackoverflow.com',
+    'notion': 'notion.so', 'figma': 'figma.com',
+    'trello': 'trello.com', 'jira': 'jira.atlassian.com',
+    'amazon': 'amazon.com', 'netflix': 'netflix.com', 'spotify': 'spotify.com',
+    'twitch': 'twitch.tv', 'tiktok': 'tiktok.com', 'discord': 'discord.com',
+    'chatgpt': 'chatgpt.com', 'claude': 'claude.ai',
+    'pinterest': 'pinterest.com', 'messenger': 'messenger.com',
+  };
+
+  /**
+   * Normalize a window_title to a site name for browsers.
+   * If already a domain (contains dot, no spaces), keep it.
+   * If a known site name, map to domain.
+   * Otherwise return null (skip — it's a page title we can't resolve).
+   */
+  private normalizeSiteName(windowTitle: string): string | null {
+    if (!windowTitle) return null;
+    const title = windowTitle.trim();
+
+    // Already a domain (e.g., "facebook.com", "chatgpt.com")
+    if (title.includes('.') && !title.includes(' ')) {
+      return title.toLowerCase();
+    }
+
+    // Check known mappings (case-insensitive)
+    const key = title.toLowerCase();
+    if (MetricsComputer.SITE_DOMAINS[key]) {
+      return MetricsComputer.SITE_DOMAINS[key];
+    }
+
+    // Unknown page title — can't resolve to a site
+    return null;
+  }
+
   /**
    * Compute detailed site/app breakdown for analytics.
-   * For browsers, splits by site (window_title). For other apps, keeps aggregated.
+   * For browsers, groups by site domain. For other apps, aggregates by app name.
+   * Entries that can't be resolved to a site name are grouped under the browser name.
    */
   public computeDetailedAppsToday(): TopAppEntry[] {
     const today = new Date().toISOString().split('T')[0];
 
     try {
       const aggregated = this.database.getActivityLogsByDateRangeAggregated(today, today);
+      const isBrowser = (appName: string) =>
+        MetricsComputer.BROWSER_APPS.some(b => appName.toLowerCase().includes(b));
 
-      // For browsers, use "AppName · site" as the key; for others, just app name
       const detailTotals = new Map<string, number>();
       for (const entry of aggregated) {
         if (entry.app_name === 'System' &&
@@ -310,11 +361,23 @@ export class MetricsComputer {
         }
 
         let key = entry.app_name;
-        // If window_title differs from app_name and is not empty, include it as detail
-        if (entry.window_title_sample &&
-            entry.window_title_sample !== entry.app_name &&
-            entry.window_title_sample !== '') {
-          key = `${entry.app_name} · ${entry.window_title_sample}`;
+
+        if (isBrowser(entry.app_name) &&
+            entry.window_title_sample &&
+            entry.window_title_sample !== entry.app_name) {
+          // Try to normalize to a site domain
+          const site = this.normalizeSiteName(entry.window_title_sample);
+          if (site) {
+            key = `${entry.app_name} · ${site}`;
+          } else {
+            // Can't resolve — group under "Other Sites"
+            key = `${entry.app_name} · Other Sites`;
+          }
+        } else if (!isBrowser(entry.app_name) &&
+                   entry.window_title_sample &&
+                   entry.window_title_sample !== entry.app_name) {
+          // Non-browser apps: just use app name (no detail)
+          key = entry.app_name;
         }
 
         const current = detailTotals.get(key) || 0;
@@ -323,7 +386,6 @@ export class MetricsComputer {
 
       return Array.from(detailTotals.entries())
         .map(([app, seconds]) => {
-          // Categorize by base app name (before the ·)
           const baseApp = app.split(' · ')[0];
           const cat = this.categorizeApp(baseApp);
           const category: 'productive' | 'unproductive' | 'neutral' =
