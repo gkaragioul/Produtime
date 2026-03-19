@@ -15,7 +15,8 @@ interface Policy {
 interface PolicyData {
   workScheduleStart: string;
   workScheduleEnd: string;
-  idleThreshold: number;
+  idleThreshold: number;       // stored in seconds
+  breakDuration: number;       // stored in minutes
   privacyModeEnabled: boolean;
   titleSharingEnabled: boolean;
   autoExportEnabled: boolean;
@@ -26,6 +27,7 @@ const defaultPolicyData: PolicyData = {
   workScheduleStart: '09:00',
   workScheduleEnd: '17:00',
   idleThreshold: 300,
+  breakDuration: 30,
   privacyModeEnabled: true,
   titleSharingEnabled: false,
   autoExportEnabled: true,
@@ -312,24 +314,45 @@ export const PolicyManager: React.FC = () => {
               </div>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
-                Idle Threshold (seconds)
-              </label>
-              <input
-                type="number"
-                value={policyData.idleThreshold}
-                onChange={(e) => setPolicyData({ ...policyData, idleThreshold: parseInt(e.target.value) || 300 })}
-                disabled={!!(selectedPolicy && !editMode)}
-                min={30}
-                max={3600}
-                style={{
-                  width: '100%',
-                  padding: '10px',
-                  borderRadius: '6px',
-                  border: '1px solid #ddd',
-                }}
-              />
+            <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
+                  Idle Threshold (minutes)
+                </label>
+                <input
+                  type="number"
+                  value={Math.round(policyData.idleThreshold / 60)}
+                  onChange={(e) => setPolicyData({ ...policyData, idleThreshold: (parseInt(e.target.value) || 5) * 60 })}
+                  disabled={!!(selectedPolicy && !editMode)}
+                  min={1}
+                  max={60}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
+                  Break / Lunch (minutes)
+                </label>
+                <input
+                  type="number"
+                  value={policyData.breakDuration || 30}
+                  onChange={(e) => setPolicyData({ ...policyData, breakDuration: parseInt(e.target.value) || 30 })}
+                  disabled={!!(selectedPolicy && !editMode)}
+                  min={0}
+                  max={120}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #ddd',
+                  }}
+                />
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>

@@ -249,9 +249,10 @@ export class DeviceDetailService {
     try {
       const policyData = JSON.parse(policy.policy_json);
       return {
-        workStart: policyData.workStart || DEFAULT_POLICY_EXPECTATIONS.workStart,
-        workEnd: policyData.workEnd || DEFAULT_POLICY_EXPECTATIONS.workEnd,
+        workStart: policyData.workStart || policyData.workScheduleStart || DEFAULT_POLICY_EXPECTATIONS.workStart,
+        workEnd: policyData.workEnd || policyData.workScheduleEnd || DEFAULT_POLICY_EXPECTATIONS.workEnd,
         lateGraceMinutes: policyData.lateGraceMinutes ?? DEFAULT_POLICY_EXPECTATIONS.lateGraceMinutes,
+        breakDurationMinutes: policyData.breakDuration ?? policyData.breakDurationMinutes ?? DEFAULT_POLICY_EXPECTATIONS.breakDurationMinutes,
         expectedActiveMinutesPerDay: policyData.expectedActiveMinutesPerDay ?? null,
         maxIdleMinutesPerDay: policyData.maxIdleMinutesPerDay ?? DEFAULT_POLICY_EXPECTATIONS.maxIdleMinutesPerDay,
         maxUntrackedMinutesPerDay: policyData.maxUntrackedMinutesPerDay ?? DEFAULT_POLICY_EXPECTATIONS.maxUntrackedMinutesPerDay,
