@@ -80,7 +80,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 15000); // Refresh every 15 seconds
+    const interval = setInterval(loadData, 5000); // Refresh every 5 seconds
     const unsubConnect = window.adminAPI.onDeviceConnected(() => loadData());
     const unsubDisconnect = window.adminAPI.onDeviceDisconnected(() => loadData());
     return () => {
