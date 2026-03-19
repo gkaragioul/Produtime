@@ -72,8 +72,10 @@ export class AdminServer {
     this.db = db;
     this.port = port;
     this.dashboardService = new DashboardService(db);
-    // Wire live connection truth into dashboard service
-    this.dashboardService.getConnectedDeviceIds = () => this.getConnectedDevices();
+    // Wire live connection truth into dashboard + performance services
+    const getIds = () => this.getConnectedDevices();
+    this.dashboardService.getConnectedDeviceIds = getIds;
+    (this.dashboardService as any).performanceService.getConnectedDeviceIds = getIds;
 
     // Initialize or load admin keypair
     this.initializeKeypair();

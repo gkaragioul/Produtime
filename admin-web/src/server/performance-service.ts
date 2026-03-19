@@ -45,6 +45,8 @@ import {
 
 export class PerformanceService {
   private db: AdminDatabase;
+  /** Set by device-server to provide live WebSocket connection truth */
+  public getConnectedDeviceIds: () => string[] = () => [];
 
   constructor(db: AdminDatabase) {
     this.db = db;
@@ -194,31 +196,18 @@ export class PerformanceService {
   public getDevicesListEnhanced(): DeviceListItemEnhanced[] {
     const devices = this.db.getAllDevices();
     const todayYmd = getTodayYmd();
-    const now = Date.now();
     const result: DeviceListItemEnhanced[] = [];
+    const liveSet = new Set(this.getConnectedDeviceIds());
 
     for (const device of devices) {
       const status = this.db.getDeviceStatus(device.device_id);
       const metrics = this.db.getDeviceDailyMetrics(device.device_id, todayYmd);
       const policy = device.policy_id ? this.db.getPolicy(device.policy_id) : null;
 
-      // Determine device status
-      let deviceStatus: DeviceStatusType = 'offline';
-      let lastSeenTs = device.last_seen;
-      let trackingRunning = true;
-      
-      if (status) {
-        deviceStatus = status.status as DeviceStatusType;
-        lastSeenTs = status.last_seen_ts;
-        trackingRunning = Boolean(status.tracking_running);
-      } else {
-        const timeSinceLastSeen = now - device.last_seen;
-        if (device.status === 'online' && timeSinceLastSeen < 120000) {
-          deviceStatus = 'online';
-        } else if (timeSinceLastSeen < 120000) {
-          deviceStatus = 'online';
-        }
-      }
+      // Use live WebSocket connections as truth
+      const deviceStatus: DeviceStatusType = liveSet.has(device.device_id) ? 'online' : 'offline';
+      const lastSeenTs = status?.last_seen_ts || device.last_seen;
+      const trackingRunning = status ? Boolean(status.tracking_running) : true;
 
       // Policy compliance
       let policyCompliant = true;
