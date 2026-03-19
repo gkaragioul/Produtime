@@ -35,6 +35,8 @@ export interface EnhancedHeartbeatPayload {
   
   // Top apps today (limit 10, no titles)
   topAppsToday: TopAppEntry[];
+  // Detailed apps with site-level breakdown (limit 20)
+  detailedAppsToday?: TopAppEntry[];
 }
 
 export interface DailyMetricsSummary {
