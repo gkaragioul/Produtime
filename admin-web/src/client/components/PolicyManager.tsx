@@ -344,38 +344,6 @@ export const PolicyManager: React.FC = () => {
               </label>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={policyData.autoExportEnabled}
-                  onChange={(e) => setPolicyData({ ...policyData, autoExportEnabled: e.target.checked })}
-                  disabled={!!(selectedPolicy && !editMode)}
-                />
-                <span style={{ fontSize: '14px' }}>Enable Auto-Export</span>
-              </label>
-            </div>
-
-            {policyData.autoExportEnabled && (
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, marginBottom: '6px' }}>
-                  Auto-Export Time
-                </label>
-                <input
-                  type="time"
-                  value={policyData.autoExportTime}
-                  onChange={(e) => setPolicyData({ ...policyData, autoExportTime: e.target.value })}
-                  disabled={!!(selectedPolicy && !editMode)}
-                  style={{
-                    width: '200px',
-                    padding: '10px',
-                    borderRadius: '6px',
-                    border: '1px solid #ddd',
-                  }}
-                />
-              </div>
-            )}
-
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
               {selectedPolicy ? (
                 editMode ? (
