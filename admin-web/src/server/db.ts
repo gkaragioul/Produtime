@@ -416,6 +416,10 @@ export class AdminDatabase {
     const updates: string[] = [];
     const values: any[] = [];
 
+    if (info.device_name !== undefined) {
+      updates.push('device_name = ?');
+      values.push(info.device_name);
+    }
     if (info.app_version !== undefined) {
       updates.push('app_version = ?');
       values.push(info.app_version);

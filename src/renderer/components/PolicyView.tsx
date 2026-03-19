@@ -29,6 +29,9 @@ interface PolicyViewProps {
 export const PolicyView: React.FC<PolicyViewProps> = ({ isManaged = false, adminName = null }) => {
   const [policy, setPolicy] = useState<PolicyData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [nameInput, setNameInput] = useState('');
+  const [nameSaved, setNameSaved] = useState(false);
+
   useEffect(() => {
     const loadPolicy = async () => {
       try {
@@ -69,7 +72,18 @@ export const PolicyView: React.FC<PolicyViewProps> = ({ isManaged = false, admin
       }
     };
 
+    // Load employee name directly from settings
+    const loadName = async () => {
+      try {
+        const ipcService = IPCService.getInstance();
+        const allSettings = await ipcService.getAllSettings();
+        const nameEntry = allSettings.find(s => s.key === 'employee_name');
+        if (nameEntry?.value) setNameInput(nameEntry.value);
+      } catch {}
+    };
+
     loadPolicy();
+    loadName();
 
     // Listen for policy updates when managed
     if (isManaged) {
@@ -115,6 +129,48 @@ export const PolicyView: React.FC<PolicyViewProps> = ({ isManaged = false, admin
         </p>
       )}
 
+      {/* Your Name */}
+      <div style={{ marginBottom: '24px' }}>
+        <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', color: '#444' }}>
+          Your Name
+        </h3>
+        <div style={{ backgroundColor: '#f5f5f5', borderRadius: '8px', padding: '16px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type="text"
+              value={nameInput}
+              onChange={(e) => { setNameInput(e.target.value); setNameSaved(false); }}
+              placeholder="Enter your name"
+              style={{
+                flex: 1, padding: '8px 12px', border: '1px solid #ddd',
+                borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box',
+              }}
+            />
+            <button
+              onClick={async () => {
+                try {
+                  await window.electronAPI.setSetting({ key: 'employee_name', value: nameInput.trim() });
+                  setNameSaved(true);
+                  setTimeout(() => setNameSaved(false), 2000);
+                } catch {}
+              }}
+              style={{
+                padding: '8px 18px', backgroundColor: '#4a90d9', color: '#fff',
+                border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+              }}
+            >
+              Save
+            </button>
+          </div>
+          {nameSaved && (
+            <div style={{ fontSize: '12px', color: '#28a745', marginTop: '6px' }}>Name saved — it will sync to the admin panel on next heartbeat.</div>
+          )}
+          {!nameInput && (
+            <div style={{ fontSize: '12px', color: '#999', marginTop: '6px' }}>Please enter your name so your administrator can identify you.</div>
+          )}
+        </div>
+      </div>
+
       {/* Work Schedule Section */}
       <div style={{ marginBottom: '24px' }}>
         <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', color: '#444' }}>
@@ -149,20 +205,6 @@ export const PolicyView: React.FC<PolicyViewProps> = ({ isManaged = false, admin
         </div>
       </div>
 
-      {/* Employee Info Section */}
-      {policy?.employeeName && (
-        <div style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', color: '#444' }}>
-            Employee Info
-          </h3>
-          <div style={{ backgroundColor: '#f5f5f5', borderRadius: '8px', padding: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#666' }}>Name</span>
-              <span style={{ fontWeight: 500 }}>{policy.employeeName}</span>
-            </div>
-          </div>
-        </div>
-      )}
 
     </div>
   );
