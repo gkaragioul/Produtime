@@ -296,11 +296,17 @@ export class ActivityTracker {
       return null;
     }
 
+    // Strip notification counts like "(1) ", "(23) " from the beginning
+    title = title.replace(/^\(\d+\)\s*/, '');
+
     // Split by common separators: " - ", " — ", " | ", " · "
     const parts = title.split(/\s[-—|·]\s/);
 
     // The last part is usually the site name (e.g. "News Feed - Facebook" → "Facebook")
-    const sitePart = (parts.length > 1 ? parts[parts.length - 1] : parts[0]).trim();
+    let sitePart = (parts.length > 1 ? parts[parts.length - 1] : parts[0]).trim();
+
+    // Also strip notification counts from the site part itself
+    sitePart = sitePart.replace(/^\(\d+\)\s*/, '');
 
     // Check if it maps to a known domain
     const siteKey = sitePart.toLowerCase();
