@@ -715,6 +715,13 @@ export class AdminServer {
             device = this.db.getDevice(deviceId!);
           }
 
+          // Close old connection for this device if it exists (prevents flickering)
+          const oldConn = this.connectedDevices.get(deviceId!);
+          if (oldConn && oldConn.ws !== ws) {
+            this.log(`[SERVER] Closing stale WebSocket for ${deviceId}`);
+            try { oldConn.ws.removeAllListeners(); oldConn.ws.close(); } catch {}
+          }
+
           // Register in connectedDevices
           this.connectedDevices.set(deviceId!, {
             ws,
@@ -754,11 +761,7 @@ export class AdminServer {
         const isConnected = deviceId && this.connectedDevices.has(deviceId);
         const isPending = deviceId && this.pendingConnections.has(deviceId);
         
-        this.log(`[SERVER] After IDENTIFY check:`);
-        this.log(`[SERVER]   deviceId=${deviceId}`);
-        this.log(`[SERVER]   isConnected=${isConnected}`);
-        this.log(`[SERVER]   isPending=${isPending}`);
-        this.log(`[SERVER]   connectedDevices keys: [${Array.from(this.connectedDevices.keys()).join(', ')}]`);
+        // Route message to handler if connected
         
         // Fallback: first message without prior IDENTIFY (shouldn't happen normally)
         if (!deviceId) {
@@ -787,19 +790,23 @@ export class AdminServer {
       this.log(`[SERVER] Close code: ${code}, reason: ${reason?.toString() || 'none'}`);
       
       if (deviceId) {
-        // Check current state - device could be in either map
         if (this.pendingConnections.has(deviceId)) {
-          this.pendingConnections.delete(deviceId);
-          this.log(`[SERVER] Removed ${deviceId} from pendingConnections (was waiting for approval)`);
-          this.log(`[SERVER] pendingConnections size now: ${this.pendingConnections.size}`);
+          const pending = this.pendingConnections.get(deviceId);
+          if (pending?.ws === ws) {
+            this.pendingConnections.delete(deviceId);
+            this.log(`[SERVER] Removed ${deviceId} from pendingConnections`);
+          }
         } else if (this.connectedDevices.has(deviceId)) {
-          this.connectedDevices.delete(deviceId);
-          this.db.updateDeviceStatus(deviceId, 'offline');
-          this.onDeviceDisconnected?.(deviceId);
-          this.log(`[SERVER] Removed ${deviceId} from connectedDevices (was connected)`);
-          this.log(`[SERVER] connectedDevices size now: ${this.connectedDevices.size}`);
-        } else {
-          this.log(`[SERVER] Device ${deviceId} was not in any map`);
+          const connected = this.connectedDevices.get(deviceId);
+          // Only remove if this is the CURRENT socket (not a stale replaced one)
+          if (connected?.ws === ws) {
+            this.connectedDevices.delete(deviceId);
+            this.db.updateDeviceStatus(deviceId, 'offline');
+            this.onDeviceDisconnected?.(deviceId);
+            this.log(`[SERVER] Removed ${deviceId} from connectedDevices`);
+          } else {
+            this.log(`[SERVER] Stale socket closed for ${deviceId}, ignoring (new connection active)`);
+          }
         }
       }
     });
