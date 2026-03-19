@@ -639,7 +639,7 @@ export class AdminServer {
           this.log(`[SERVER] Setting deviceId=${deviceId}`);
           this.log(`[SERVER] isPairing=${payload.isPairing}`);
           this.log(`[SERVER] devicePubKey=${payload.devicePubKey?.substring(0, 20)}...`);
-          
+
           if (payload.isPairing) {
             // Device is waiting for pairing approval
             this.pendingConnections.set(deviceId!, {
@@ -649,10 +649,8 @@ export class AdminServer {
               ip,
             });
             this.log(`[SERVER] Device ${deviceId} added to pendingConnections`);
-            this.log(`[SERVER] pendingConnections size: ${this.pendingConnections.size}`);
-            this.log(`[SERVER] pendingConnections keys: [${Array.from(this.pendingConnections.keys()).join(', ')}]`);
-            
-            // Keep the connection alive - send a ping periodically
+
+            // Keep the connection alive
             const pingInterval = setInterval(() => {
               if (ws.readyState === WebSocket.OPEN) {
                 ws.ping();
@@ -660,37 +658,17 @@ export class AdminServer {
                 clearInterval(pingInterval);
               }
             }, 15000);
-            
+
             this.log(`[SERVER] Returning after IDENTIFY (isPairing=true)`);
             return;
           }
-        }
-        
-        // Check if device is in connectedDevices (either already paired or just approved)
-        // This check must be dynamic - don't use a closure variable
-        const isConnected = deviceId && this.connectedDevices.has(deviceId);
-        const isPending = deviceId && this.pendingConnections.has(deviceId);
-        
-        this.log(`[SERVER] After IDENTIFY check:`);
-        this.log(`[SERVER]   deviceId=${deviceId}`);
-        this.log(`[SERVER]   isConnected=${isConnected}`);
-        this.log(`[SERVER]   isPending=${isPending}`);
-        this.log(`[SERVER]   connectedDevices keys: [${Array.from(this.connectedDevices.keys()).join(', ')}]`);
-        
-        // First message should identify the device (for non-pairing connections)
-        if (!deviceId) {
-          deviceId = message.deviceId;
-          this.log(`[SERVER] First message from device ${deviceId}, checking if paired...`);
 
-          // Check if device exists in database
+          // Not pairing — check if device exists in DB
           let device = this.db.getDevice(deviceId!);
 
           if (!device) {
-            // AUTO-REGISTER: device not known — register it automatically (TOFU)
-            // Trust-on-first-use: accept the public key from the IDENTIFY payload.
-            // Transport security (WSS/TLS) protects against MITM.
-            const payload = message.payload || {};
-            const deviceName = payload.deviceName || payload.deviceId || deviceId;
+            // AUTO-REGISTER: unknown device — register automatically (TOFU)
+            const deviceName = payload.deviceName || deviceId;
             const devicePubKey = payload.devicePubKey || '';
             const appVersion = payload.appVersion || 'unknown';
 
@@ -734,30 +712,41 @@ export class AdminServer {
               this.log(`[SERVER] Failed to send PAIR_APPROVED: ${err}`);
             }
 
-            // Re-read the device record we just inserted
             device = this.db.getDevice(deviceId!);
-          } else {
-            // Existing device — verify signature
-            if (!this.verifyMessage(message as AdminProtocolMessage, device.device_pubkey)) {
-              this.log(`[SERVER] Invalid signature from device ${deviceId}, closing connection`);
-              ws.close(4002, 'Invalid signature');
-              return;
-            }
           }
 
-          // Register connection
+          // Register in connectedDevices
           this.connectedDevices.set(deviceId!, {
             ws,
             deviceId: deviceId!,
-            devicePubKey: device!.device_pubkey,
+            devicePubKey: device?.device_pubkey || payload.devicePubKey || '',
             lastHeartbeat: Date.now(),
             ip,
           });
           this.log(`[SERVER] Device ${deviceId} registered in connectedDevices`);
 
-          // Update device status
           this.db.updateDeviceStatus(deviceId!, 'online', Date.now());
           this.onDeviceConnected?.(deviceId!);
+          // Fall through to handle any subsequent messages
+        }
+        
+        // Check if device is in connectedDevices (either already paired or just approved)
+        // This check must be dynamic - don't use a closure variable
+        const isConnected = deviceId && this.connectedDevices.has(deviceId);
+        const isPending = deviceId && this.pendingConnections.has(deviceId);
+        
+        this.log(`[SERVER] After IDENTIFY check:`);
+        this.log(`[SERVER]   deviceId=${deviceId}`);
+        this.log(`[SERVER]   isConnected=${isConnected}`);
+        this.log(`[SERVER]   isPending=${isPending}`);
+        this.log(`[SERVER]   connectedDevices keys: [${Array.from(this.connectedDevices.keys()).join(', ')}]`);
+        
+        // Fallback: first message without prior IDENTIFY (shouldn't happen normally)
+        if (!deviceId) {
+          deviceId = message.deviceId;
+          this.log(`[SERVER] First message without IDENTIFY from ${deviceId}, closing`);
+          ws.close(4001, 'Send IDENTIFY first');
+          return;
         }
 
         // Handle message if device is connected (approved)
