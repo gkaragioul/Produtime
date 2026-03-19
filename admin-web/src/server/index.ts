@@ -235,7 +235,9 @@ app.post('/api/pairing/deny', (req, res) => {
 
 // --- Device control routes ---
 app.post('/api/devices/:id/lock', (req, res) => {
+  console.log(`[API] Lock request for device ${req.params.id}, connected: [${deviceServer.getConnectedDevices().join(', ')}]`);
   const success = deviceServer.lockDevice(req.params.id, req.body.reason, req.body.message);
+  console.log(`[API] Lock result: ${success}`);
   res.json({ success });
 });
 
