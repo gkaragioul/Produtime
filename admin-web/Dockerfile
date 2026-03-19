@@ -42,17 +42,12 @@ COPY --from=builder /app/dist ./dist
 # Create data directory for SQLite (mount a Railway Volume at /data for persistence)
 RUN mkdir -p /data
 
-# Environment variables (overridable)
-ENV PORT=17888
+# Environment variables (overridable — Railway sets PORT automatically)
 ENV DATABASE_PATH=/data/admin-console.db
 ENV NODE_ENV=production
 
-# Expose port
-EXPOSE 17888
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD node -e "fetch('http://localhost:17888/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
+# No HEALTHCHECK here — Railway manages its own healthcheck via /health
+# No EXPOSE — Railway assigns the port dynamically
 
 # Start server
 CMD ["node", "dist/server/server/index.js"]

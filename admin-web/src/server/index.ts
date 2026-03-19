@@ -711,14 +711,16 @@ async function startServer(): Promise<void> {
   console.log(`[SERVER] Database: ${DATABASE_PATH}`);
   console.log(`[SERVER] Static files: ${staticDir}`);
 
-  // Start the device server's internal logic (mDNS, exceptions engine)
-  // but don't call server.start() which would listen on its own
-  // Instead, manually trigger what start() does minus the listen:
-  try {
-    // Start mDNS advertising (for LAN discovery)
-    (deviceServer as any).startMdnsAdvertising();
-  } catch (err) {
-    console.log('[SERVER] mDNS advertising skipped (not available in cloud)');
+  // Start the device server's internal logic (exceptions engine).
+  // Skip mDNS in cloud/Railway — it uses UDP multicast which doesn't work in containers.
+  if (!process.env.RAILWAY_PUBLIC_DOMAIN) {
+    try {
+      (deviceServer as any).startMdnsAdvertising();
+    } catch (err) {
+      console.log('[SERVER] mDNS advertising skipped:', err);
+    }
+  } else {
+    console.log('[SERVER] Cloud mode detected — skipping mDNS advertising');
   }
 
   // Start exceptions engine
