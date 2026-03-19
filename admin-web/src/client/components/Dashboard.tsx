@@ -56,17 +56,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
       const devicesData = results[1].status === 'fulfilled' ? results[1].value : null;
       const trendsData = results[2].status === 'fulfilled' ? results[2].value : null;
 
-      if (summaryData) setSummary(summaryData);
-      if (devicesData) setDevices(devicesData);
-      if (trendsData) setTrends(trendsData);
-
-      // Log any failures for debugging
-      results.forEach((result, i) => {
-        if (result.status === 'rejected') {
-          const labels = ['summary', 'devices', 'trends'];
-          console.error(`Failed to load dashboard ${labels[i]}:`, result.reason);
-        }
-      });
+      // Only update state if data changed (prevents UI flashing)
+      if (summaryData) setSummary(prev => JSON.stringify(prev) === JSON.stringify(summaryData) ? prev : summaryData);
+      if (devicesData) setDevices(prev => JSON.stringify(prev) === JSON.stringify(devicesData) ? prev : devicesData);
+      if (trendsData) setTrends(prev => JSON.stringify(prev) === JSON.stringify(trendsData) ? prev : trendsData);
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -219,27 +212,12 @@ const rangeButtonStyle = (active: boolean): React.CSSProperties => ({
 });
 
 // Today Story Panel with Manager Sentence - MODE AWARE
-const TodayStoryPanel: React.FC<{ story: DashboardStory; onViewIssues: () => void }> = ({ story, onViewIssues }) => {
-  const healthDisplay = getModeHealthLabelDisplay(story.mode, story.healthLabel);
-  
-  // Determine manager sentence style based on content
-  const isAtRisk = story.managerSentence.startsWith('At risk:');
-  const isBehind = story.managerSentence.startsWith('Behind schedule:');
-  const isWatch = story.managerSentence.startsWith('Watch:');
-  const isPreShift = story.mode === 'PRE_SHIFT';
-  const isWaiting = story.mode === 'NO_DATA_YET' || story.mode === 'NO_DEVICES';
-  
-  const sentenceColor = isAtRisk ? '#c62828' : isBehind ? '#e65100' : isWatch ? '#f57c00' : isPreShift ? '#1976d2' : isWaiting ? '#9e9e9e' : '#2e7d32';
-  const sentenceBg = isAtRisk ? '#ffebee' : isBehind ? '#fff3e0' : isWatch ? '#fff8e1' : isPreShift ? '#e3f2fd' : isWaiting ? '#f5f5f5' : '#e8f5e9';
-  
+const TodayStoryPanel: React.FC<{ story: DashboardStory; onViewIssues: () => void }> = ({ story }) => {
   // Format progress display
-  const progressDisplay = story.progress.progressPctTeam !== null 
+  const progressDisplay = story.progress.progressPctTeam !== null
     ? `${Math.round(story.progress.progressPctTeam * 100)}%`
     : '—';
-  
-  // Format health score display
-  const healthScoreDisplay = story.healthScore !== null ? story.healthScore : '—';
-  
+
   return (
     <div style={{
       backgroundColor: 'white',
@@ -253,58 +231,29 @@ const TodayStoryPanel: React.FC<{ story: DashboardStory; onViewIssues: () => voi
       flexShrink: 0,
       flexWrap: 'wrap',
     }}>
-      {/* Health Score */}
-      <div style={{ textAlign: 'center', minWidth: '140px' }}>
-        <div style={{ fontSize: '16px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>Team Health</div>
-        <div style={{ fontSize: '56px', fontWeight: 700, color: healthDisplay.color, lineHeight: 1 }}>{healthScoreDisplay}</div>
-        <div style={{ fontSize: '18px', color: healthDisplay.color, fontWeight: 600, marginTop: '6px' }}>{healthDisplay.text}</div>
-      </div>
-      
-      {/* Divider */}
-      <div style={{ width: '1px', height: '90px', backgroundColor: '#e0e0e0' }} />
-      
-      {/* Manager Sentence + Insights */}
+      {/* Summary */}
       <div style={{ flex: 1 }}>
-        {/* Manager Sentence - prominent */}
-        <div style={{
-          padding: '14px 18px',
-          borderRadius: '8px',
-          backgroundColor: sentenceBg,
-          marginBottom: '16px',
-          borderLeft: `4px solid ${sentenceColor}`,
-        }}>
-          <div style={{ fontSize: '18px', fontWeight: 600, color: sentenceColor, lineHeight: 1.4 }}>
-            {story.managerSentence}
-          </div>
-        </div>
-        
-        {/* Expected window microcopy */}
         {story.expected && (
           <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>
-            Expected: {story.expected.workStart}–{story.expected.workEnd} ({Math.round(story.expected.expectedTotalSeconds / 3600)}h)
-            {story.expected.mixedPolicies && ' • mixed policies'}
+            Work window: {story.expected.workStart}–{story.expected.workEnd} ({Math.round(story.expected.expectedTotalSeconds / 3600)}h)
           </div>
         )}
-        
         <div style={{ fontSize: '16px', fontWeight: 600, marginBottom: '10px', color: '#555' }}>Today so far</div>
         <ul style={{ margin: 0, padding: '0 0 0 20px', fontSize: '15px', color: '#555', lineHeight: 1.7 }}>
-          {story.bullets.slice(0, 4).map((bullet, i) => (
+          {story.bullets.filter(b => !b.includes('Critical') && !b.includes('at risk')).slice(0, 3).map((bullet, i) => (
             <li key={i}>{bullet}</li>
           ))}
         </ul>
       </div>
-      
-      {/* Progress + Actions */}
-      <div style={{ textAlign: 'center', minWidth: '160px' }}>
+
+      {/* Progress */}
+      <div style={{ textAlign: 'center', minWidth: '140px' }}>
         <div style={{ fontSize: '16px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>Team Progress</div>
-        <div style={{ fontSize: '44px', fontWeight: 700, color: story.mode === 'PRE_SHIFT' ? '#9e9e9e' : '#1976d2', lineHeight: 1 }}>
+        <div style={{ fontSize: '44px', fontWeight: 700, color: '#1976d2', lineHeight: 1 }}>
           {progressDisplay}
         </div>
         {story.progress.progressPctTeam !== null && (
           <div style={{ marginTop: '10px' }}><ProgressBarMini value={story.progress.progressPctTeam} /></div>
-        )}
-        {story.mode === 'PRE_SHIFT' && (
-          <div style={{ fontSize: '14px', color: '#999', marginTop: '8px' }}>Pre-shift</div>
         )}
       </div>
     </div>
