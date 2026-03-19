@@ -1,0 +1,133 @@
+/* Mobile-responsive overrides — only affects screens ≤ 768px */
+/* Desktop is completely unaffected by these rules */
+
+/* Hamburger button — hidden on desktop */
+.mobile-menu-btn {
+  display: none !important;
+}
+
+/* Overlay — hidden on desktop */
+.sidebar-overlay {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  /* Show hamburger button */
+  .mobile-menu-btn {
+    display: flex !important;
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 1001;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    background-color: #1a1a2e;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 22px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Sidebar — off-screen by default, slides in */
+  .app-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100vh !important;
+    width: 260px !important;
+    z-index: 1000;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto !important;
+  }
+
+  .app-sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Dark overlay behind sidebar */
+  .sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+    display: none !important;
+  }
+
+  .sidebar-overlay.visible {
+    display: block !important;
+  }
+
+  /* Main content — full width */
+  .app-main {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Dashboard two-column → single column stack */
+  .dashboard-columns {
+    flex-direction: column !important;
+    overflow: auto !important;
+  }
+
+  .dashboard-main {
+    flex: none !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  .dashboard-sidebar {
+    flex: none !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  /* Tables — horizontal scroll on mobile */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  thead, tbody, tr {
+    display: table;
+    width: 100%;
+    table-layout: auto;
+  }
+
+  /* Larger touch targets for buttons and inputs */
+  button, select, input {
+    min-height: 40px;
+  }
+
+  /* Cards — reduce padding on mobile */
+  .app-main [style*="padding: 24px"],
+  .app-main [style*="padding: '24px'"] {
+    padding: 14px !important;
+  }
+}
+
+/* Small phones */
+@media (max-width: 480px) {
+  .app-sidebar {
+    width: 220px !important;
+  }
+
+  .mobile-menu-btn {
+    top: 8px;
+    left: 8px;
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+}
