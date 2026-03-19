@@ -174,6 +174,17 @@ export class AgentService extends EventEmitter {
   }
 
   /**
+   * Get device display name — employee name from settings, or hostname as fallback
+   */
+  private getDeviceDisplayName(): string {
+    try {
+      const name = this.database.getSetting('employee_name');
+      if (name && name.trim()) return name.trim();
+    } catch {}
+    return os.hostname();
+  }
+
+  /**
    * Get current agent state
    */
   public getState(): AgentState {
@@ -345,7 +356,7 @@ export class AgentService extends EventEmitter {
       const payload = {
         pairCode,
         deviceId: this.deviceId,
-        deviceName: require('os').hostname(),
+        deviceName: this.getDeviceDisplayName(),
         devicePubKey: this.pairingState!.devicePubKey!,
         appVersion: this.appVersion,
         osInfo: `${process.platform} ${require('os').release()}`,
@@ -579,7 +590,7 @@ export class AgentService extends EventEmitter {
           'IDENTIFY',
           this.deviceId,
           {
-            deviceName: require('os').hostname(),
+            deviceName: this.getDeviceDisplayName(),
             devicePubKey: this.pairingState!.devicePubKey,
             appVersion: this.appVersion,
             isPairing: true,
@@ -633,7 +644,7 @@ export class AgentService extends EventEmitter {
   private async sendPairRequest(adminHost: string, pairCode: string): Promise<{ success: boolean; error?: string }> {
     return new Promise((resolve) => {
       const payload: PairRequestPayload = {
-        deviceName: require('os').hostname(),
+        deviceName: this.getDeviceDisplayName(),
         devicePubKey: this.pairingState!.devicePubKey!,
         appVersion: this.appVersion,
         osInfo: `${process.platform} ${require('os').release()}`,
@@ -789,7 +800,7 @@ export class AgentService extends EventEmitter {
           'IDENTIFY',
           this.deviceId,
           {
-            deviceName: require('os').hostname(),
+            deviceName: this.getDeviceDisplayName(),
             devicePubKey: this.pairingState!.devicePubKey,
             appVersion: this.appVersion,
             osInfo: `${process.platform} ${require('os').release()}`,
@@ -1285,7 +1296,7 @@ export class AgentService extends EventEmitter {
     // Build enhanced heartbeat payload
     const enhancedPayload: EnhancedHeartbeatPayload = {
       deviceId: this.deviceId,
-      deviceName: os.hostname(),
+      deviceName: this.getDeviceDisplayName(),
       ip: localIp,
       appVersion: this.appVersion,
       trackingRunning: this.trackingRunning,

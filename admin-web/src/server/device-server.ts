@@ -875,12 +875,16 @@ export class AdminServer {
       this.log(`[SERVER] connectedDevices keys: [${Array.from(this.connectedDevices.keys()).join(', ')}]`);
     }
 
-    // Update legacy device info
-    this.db.updateDeviceInfo(deviceId, {
+    // Update device info — include device_name from enhanced heartbeat if present
+    const updateInfo: any = {
       last_seen: Date.now(),
       status: 'online',
       app_version: payload.appVersion,
-    });
+    };
+    if (payload.enhanced?.deviceName) {
+      updateInfo.device_name = payload.enhanced.deviceName;
+    }
+    this.db.updateDeviceInfo(deviceId, updateInfo);
 
     // Process enhanced heartbeat if present
     if (payload.enhanced) {
