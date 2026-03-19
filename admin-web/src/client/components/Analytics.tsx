@@ -88,6 +88,52 @@ function pct(n: number, total: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// CSV Export
+// ---------------------------------------------------------------------------
+
+function exportCSV(metrics: DailyMetric[], devices: DeviceInfo[], deviceFilter: string, period: PeriodType): void {
+  if (metrics.length === 0) return;
+
+  const filterLabel = deviceFilter === 'all'
+    ? 'All Team'
+    : devices.find(d => d.device_id === deviceFilter)?.device_name || deviceFilter;
+
+  const rows: string[][] = [
+    ['Date', 'Device', 'Active Time', 'Idle Time', 'Untracked', 'Productivity %'],
+  ];
+
+  for (const m of [...metrics].reverse()) {
+    const dayTracked = (m.active_seconds || 0) + (m.idle_seconds || 0);
+    const prod = dayTracked > 0 ? Math.round(((m.active_seconds || 0) / dayTracked) * 100) : 0;
+    rows.push([
+      m.date_ymd,
+      m.device_id ? (devices.find(d => d.device_id === m.device_id)?.device_name || m.device_id) : filterLabel,
+      formatSeconds(m.active_seconds || 0),
+      formatSeconds(m.idle_seconds || 0),
+      formatSeconds(m.untracked_seconds || 0),
+      `${prod}%`,
+    ]);
+  }
+
+  // Totals row
+  const totalActive = metrics.reduce((s, m) => s + (m.active_seconds || 0), 0);
+  const totalIdle = metrics.reduce((s, m) => s + (m.idle_seconds || 0), 0);
+  const totalUntracked = metrics.reduce((s, m) => s + (m.untracked_seconds || 0), 0);
+  const totalTracked = totalActive + totalIdle;
+  const totalProd = totalTracked > 0 ? Math.round((totalActive / totalTracked) * 100) : 0;
+  rows.push(['TOTAL', '', formatSeconds(totalActive), formatSeconds(totalIdle), formatSeconds(totalUntracked), `${totalProd}%`]);
+
+  const csvContent = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `produtime-${period}-${filterLabel.replace(/\s+/g, '_')}-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+// ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
@@ -256,6 +302,27 @@ export const Analytics: React.FC = () => {
               <option key={d.device_id} value={d.device_id}>{d.device_name}</option>
             ))}
           </select>
+
+          {/* Export button */}
+          <button
+            onClick={() => exportCSV(metrics, devices, deviceFilter, period)}
+            disabled={metrics.length === 0}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: 'none',
+              backgroundColor: metrics.length > 0 ? '#4CAF50' : '#ccc',
+              color: 'white',
+              cursor: metrics.length > 0 ? 'pointer' : 'not-allowed',
+              fontWeight: 600,
+              fontSize: '15px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            Export CSV
+          </button>
         </div>
       </div>
 
