@@ -29,8 +29,6 @@ import {
 } from '../../shared/dashboard-types';
 
 type RangeType = 'today' | '7d' | '30d';
-type RiskFilter = 'all' | 'on_track' | 'at_risk' | 'critical';
-
 interface DashboardProps {
   onDeviceClick?: (deviceId: string) => void;
 }
@@ -43,10 +41,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
   const [loading, setLoading] = useState(true);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [riskFilter, setRiskFilter] = useState<RiskFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [trendScope, setTrendScope] = useState<'team' | 'device'>('team');
-  const [selectedAttentionType, setSelectedAttentionType] = useState<AttentionType | null>(null);
   const teamOverviewRef = useRef<HTMLDivElement>(null);
 
   const loadData = useCallback(async () => {
@@ -100,41 +96,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
   // Filter devices
   const filteredDevices = devices.filter(d => {
     if (statusFilter !== 'all' && d.status !== statusFilter) return false;
-    if (riskFilter !== 'all' && d.performance.risk.label !== riskFilter) return false;
     if (searchQuery && !d.deviceName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    // Filter by attention type if selected
-    if (selectedAttentionType) {
-      const attentionGroup = summary?.attention?.groups.find(g => g.type === selectedAttentionType);
-      if (!attentionGroup || !attentionGroup.deviceIds.includes(d.deviceId)) return false;
-    }
     return true;
   });
-
-  const handleAttentionClick = (group: AttentionGroup) => {
-    // Toggle attention type filter
-    if (selectedAttentionType === group.type) {
-      // Clear filter
-      setSelectedAttentionType(null);
-      setStatusFilter('all');
-      setRiskFilter('all');
-    } else {
-      // Set filter to this attention type
-      setSelectedAttentionType(group.type);
-      setStatusFilter('all');
-      // Auto-set risk filter based on severity
-      if (group.severity === 'crit') {
-        setRiskFilter('all'); // Show all to see the critical ones
-      } else {
-        setRiskFilter('all');
-      }
-    }
-  };
-
-  const clearAttentionFilter = () => {
-    setSelectedAttentionType(null);
-    setStatusFilter('all');
-    setRiskFilter('all');
-  };
 
   if (loading) {
     return (
@@ -166,7 +130,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
 
       {/* Today Story + Health Score */}
       {summary?.story && <TodayStoryPanel story={summary.story} onViewIssues={() => {
-        setRiskFilter('at_risk');
         setTimeout(() => teamOverviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
       }} />}
 
@@ -197,15 +160,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
       <div className="dashboard-columns" style={{ display: 'flex', gap: 'clamp(16px, 2vw, 24px)', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Main Content - takes 65-70% */}
         <div className="dashboard-main" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', flex: '1 1 65%', minWidth: 0 }}>
-          {/* Attention Groups - ALWAYS RENDER */}
-          <AttentionPanel 
-            attention={summary?.attention || { groups: [], totalCount: 0 }} 
-            onClick={handleAttentionClick} 
-            selectedType={selectedAttentionType}
-            onClearFilter={clearAttentionFilter}
-            mode={summary?.story?.mode || 'NO_DEVICES'}
-          />
-
           {/* Team Table */}
           <div ref={teamOverviewRef} />
           <TeamTable
@@ -216,8 +170,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
             onDeviceClick={onDeviceClick}
             statusFilter={statusFilter}
             onStatusFilterChange={setStatusFilter}
-            riskFilter={riskFilter}
-            onRiskFilterChange={setRiskFilter}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
           />
@@ -587,11 +539,9 @@ const TeamTable: React.FC<{
   onDeviceClick?: (deviceId: string) => void;
   statusFilter: string;
   onStatusFilterChange: (v: string) => void;
-  riskFilter: RiskFilter;
-  onRiskFilterChange: (v: RiskFilter) => void;
   searchQuery: string;
   onSearchChange: (v: string) => void;
-}> = ({ devices, allDevices, selectedDevice, onSelectDevice, onDeviceClick, statusFilter, onStatusFilterChange, riskFilter, onRiskFilterChange, searchQuery, onSearchChange }) => {
+}> = ({ devices, allDevices, selectedDevice, onSelectDevice, onDeviceClick, statusFilter, onStatusFilterChange, searchQuery, onSearchChange }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'online': return '#4CAF50';
@@ -630,12 +580,6 @@ const TeamTable: React.FC<{
             <option value="idle">Idle</option>
             <option value="offline">Offline</option>
           </select>
-          <select value={riskFilter} onChange={(e) => onRiskFilterChange(e.target.value as RiskFilter)} style={selectStyle}>
-            <option value="all">All Risk</option>
-            <option value="on_track">On Track</option>
-            <option value="at_risk">At Risk</option>
-            <option value="critical">Critical</option>
-          </select>
         </div>
       </div>
 
@@ -643,105 +587,65 @@ const TeamTable: React.FC<{
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'clamp(13px, 1.2vw, 15px)', tableLayout: 'auto' }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #eee', position: 'sticky', top: 0, backgroundColor: 'white' }}>
-              <th style={thStyle}>Device</th>
+              <th style={thStyle}>Name</th>
               <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
-              <th style={{ ...thStyle, textAlign: 'center' }}>Risk</th>
-              <th style={{ ...thStyle, textAlign: 'center' }}>Progress</th>
               <th style={{ ...thStyle, textAlign: 'right' }}>Active</th>
               <th style={{ ...thStyle, textAlign: 'right' }}>Idle</th>
-              <th style={{ ...thStyle, textAlign: 'right' }}>Untracked</th>
-              <th style={{ ...thStyle, textAlign: 'center' }}>Start</th>
-              <th style={{ ...thStyle, textAlign: 'center' }}>Δ 7d</th>
-              <th style={{ ...thStyle, textAlign: 'center' }}>Policy</th>
+              <th style={{ ...thStyle, textAlign: 'center' }}>Progress</th>
             </tr>
           </thead>
           <tbody>
             {devices.length === 0 ? (
               <tr>
-                <td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: '#666', fontSize: '16px' }}>
+                <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: '#666', fontSize: '16px' }}>
                   {allDevices.length === 0 ? 'No devices paired yet' : 'No devices match filters'}
                 </td>
               </tr>
             ) : (
-              devices.map((device) => {
-                const activeDelta = formatDeltaPct(device.deltas.deltaActivePct);
-                const untrackedDelta = formatDeltaPct(device.deltas.deltaUntrackedPct);
-                
-                return (
-                  <tr
-                    key={device.deviceId}
-                    onClick={() => onSelectDevice(device.deviceId === selectedDevice ? null : device.deviceId)}
-                    onDoubleClick={() => onDeviceClick?.(device.deviceId)}
-                    style={{
-                      borderBottom: '1px solid #f0f0f0',
-                      cursor: 'pointer',
-                      backgroundColor: selectedDevice === device.deviceId ? '#e3f2fd' : 'transparent',
-                    }}
-                  >
-                    <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)' }}>
-                      <div style={{ fontWeight: 600, fontSize: 'clamp(14px, 1.3vw, 16px)', color: '#333' }}>{device.deviceName}</div>
-                      <div style={{ fontSize: 'clamp(11px, 1vw, 13px)', color: '#999' }}>v{device.appVersion}</div>
-                    </td>
-                    <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'center' }}>
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        padding: '6px 12px',
-                        borderRadius: '12px',
-                        fontSize: 'clamp(12px, 1.1vw, 14px)',
-                        fontWeight: 500,
-                        backgroundColor: `${getStatusColor(device.status)}20`,
-                        color: getStatusColor(device.status),
-                      }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStatusColor(device.status) }} />
-                        {device.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'center' }}>
-                      <RiskBadge label={device.performance.risk.label} />
-                    </td>
-                    <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
-                        <span style={{ fontSize: 'clamp(14px, 1.3vw, 16px)', fontWeight: 600 }}>{Math.round(device.performance.progressPct * 100)}%</span>
-                        <div style={{ width: 'clamp(40px, 5vw, 60px)' }}><ProgressBarMini value={device.performance.progressPct} /></div>
-                      </div>
-                    </td>
-                    <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'right', fontWeight: 600, fontSize: 'clamp(14px, 1.3vw, 16px)' }}>
-                      {secondsToShort(device.today.activeSeconds)}
-                    </td>
-                    <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'right', color: '#FF9800', fontSize: 'clamp(14px, 1.3vw, 16px)' }}>
-                      {secondsToShort(device.today.idleSeconds)}
-                    </td>
-                    <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'right', color: device.today.untrackedSeconds > 1800 ? '#f44336' : '#666', fontSize: 'clamp(14px, 1.3vw, 16px)' }}>
-                      {secondsToShort(device.today.untrackedSeconds)}
-                    </td>
-                    <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'center', fontSize: 'clamp(13px, 1.2vw, 15px)' }}>
-                      {device.today.firstActivityTs ? tsToLocalTime(device.today.firstActivityTs) : '—'}
-                    </td>
-                    <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                        <span style={{ fontSize: 'clamp(12px, 1.1vw, 14px)', color: activeDelta.color, fontWeight: 500 }}>{activeDelta.arrow} {activeDelta.text}</span>
-                      </div>
-                    </td>
-                    <td style={{ padding: '14px 8px', textAlign: 'center' }}>
-                      {device.policy.id ? (
-                        <span style={{
-                          padding: '3px 6px',
-                          borderRadius: '4px',
-                          fontSize: '10px',
-                          backgroundColor: device.policy.compliant ? '#e8f5e9' : '#ffebee',
-                          color: device.policy.compliant ? '#2e7d32' : '#c62828',
-                        }}>
-                          {device.policy.compliant ? '✓' : '⚠️'}
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: '10px', color: '#999' }}>—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
+              devices.map((device) => (
+                <tr
+                  key={device.deviceId}
+                  onClick={() => onSelectDevice(device.deviceId === selectedDevice ? null : device.deviceId)}
+                  onDoubleClick={() => onDeviceClick?.(device.deviceId)}
+                  style={{
+                    borderBottom: '1px solid #f0f0f0',
+                    cursor: 'pointer',
+                    backgroundColor: selectedDevice === device.deviceId ? '#e3f2fd' : 'transparent',
+                  }}
+                >
+                  <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)' }}>
+                    <div style={{ fontWeight: 600, fontSize: 'clamp(14px, 1.3vw, 16px)', color: '#333' }}>{device.deviceName}</div>
+                  </td>
+                  <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'center' }}>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '6px 12px',
+                      borderRadius: '12px',
+                      fontSize: 'clamp(12px, 1.1vw, 14px)',
+                      fontWeight: 500,
+                      backgroundColor: `${getStatusColor(device.status)}20`,
+                      color: getStatusColor(device.status),
+                    }}>
+                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: getStatusColor(device.status) }} />
+                      {device.status}
+                    </span>
+                  </td>
+                  <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'right', fontWeight: 600, fontSize: 'clamp(14px, 1.3vw, 16px)' }}>
+                    {secondsToShort(device.today.activeSeconds)}
+                  </td>
+                  <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'right', color: '#FF9800', fontSize: 'clamp(14px, 1.3vw, 16px)' }}>
+                    {secondsToShort(device.today.idleSeconds)}
+                  </td>
+                  <td style={{ padding: 'clamp(10px, 1.2vw, 16px) clamp(6px, 0.8vw, 10px)', textAlign: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+                      <span style={{ fontSize: 'clamp(14px, 1.3vw, 16px)', fontWeight: 600 }}>{Math.round(device.performance.progressPct * 100)}%</span>
+                      <div style={{ width: 'clamp(40px, 5vw, 60px)' }}><ProgressBarMini value={device.performance.progressPct} /></div>
+                    </div>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
