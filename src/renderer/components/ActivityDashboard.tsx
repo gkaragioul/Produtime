@@ -1128,12 +1128,13 @@ export const ActivityDashboard: React.FC = () => {
                   className={`current-activity-card ${!isTracking ? "stopped" : isPaused || current.isIdle ? "idle" : "active"}`}
                 >
                   <div className="app-name">
-                    {current.appName}
+                    {current.windowTitle && current.windowTitle !== current.appName
+                      ? `${current.appName} · ${current.windowTitle}`
+                      : current.appName}
                     {current.isIdle && (
                       <span className="badge idle-badge">Idle</span>
                     )}
                   </div>
-                  <div className="window-title">{current.windowTitle}</div>
                   <div className="status">
                     Status:{" "}
                     {!isTracking
