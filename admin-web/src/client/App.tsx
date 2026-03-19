@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import './mobile.css';
 import { AdminLogin } from './components/AdminLogin';
 import { DeviceList } from './components/DeviceList';
 import { PairingInbox } from './components/PairingInbox';
@@ -109,6 +110,7 @@ const App: React.FC = () => {
   const [pendingCount, setPendingCount] = useState(0);
   const [connectedCount, setConnectedCount] = useState(0);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Check auth state on mount
   useEffect(() => {
@@ -199,15 +201,33 @@ const App: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
+      {/* Mobile hamburger button */}
+      <button
+        className="mobile-menu-btn"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        aria-label="Toggle menu"
+      >
+        {sidebarOpen ? '✕' : '☰'}
+      </button>
+
+      {/* Mobile overlay */}
+      <div
+        className={`sidebar-overlay${sidebarOpen ? ' visible' : ''}`}
+        onClick={() => setSidebarOpen(false)}
+      />
+
       {/* Sidebar */}
-      <div style={{
-        width: '240px',
-        backgroundColor: '#1a1a2e',
-        color: 'white',
-        padding: '20px 0',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+      <div
+        className={`app-sidebar${sidebarOpen ? ' open' : ''}`}
+        style={{
+          width: '240px',
+          backgroundColor: '#1a1a2e',
+          color: 'white',
+          padding: '20px 0',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Logo */}
         <div style={{ padding: '10px 20px 20px', borderBottom: '1px solid #333' }}>
           <img
@@ -227,7 +247,7 @@ const App: React.FC = () => {
           {navItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => setCurrentPage(item.id as PageType)}
+              onClick={() => { setCurrentPage(item.id as PageType); setSidebarOpen(false); }}
               style={{
                 width: '100%',
                 padding: '12px 20px',
@@ -296,7 +316,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div style={{ flex: 1, backgroundColor: '#f5f5f5', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div className="app-main" style={{ flex: 1, backgroundColor: '#f5f5f5', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={{ flex: 1, overflow: 'auto' }}>
           {currentPage === 'dashboard' && <Dashboard onDeviceClick={navigateToDeviceDetail} />}
           {currentPage === 'analytics' && <Analytics />}

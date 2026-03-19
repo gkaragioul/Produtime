@@ -179,9 +179,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
         <KPICard title="Untracked" value={secondsToShort(summary?.totals.untrackedSeconds || 0)} color="#f44336" icon="❓" subtitle={range === 'today' ? 'Today' : '7 Days'} />
       </div>
 
-      <div style={{ display: 'flex', gap: 'clamp(16px, 2vw, 24px)', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="dashboard-columns" style={{ display: 'flex', gap: 'clamp(16px, 2vw, 24px)', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Main Content - takes 65-70% */}
-        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', flex: '1 1 65%', minWidth: 0 }}>
+        <div className="dashboard-main" style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', flex: '1 1 65%', minWidth: 0 }}>
           {/* Attention Groups - ALWAYS RENDER */}
           <AttentionPanel 
             attention={summary?.attention || { groups: [], totalCount: 0 }} 
@@ -209,7 +209,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
         </div>
 
         {/* Sidebar - takes 30-35% */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(12px, 1.5vw, 16px)', overflow: 'auto', minHeight: 0, flex: '0 0 30%', minWidth: '280px', maxWidth: '400px' }}>
+        <div className="dashboard-sidebar" style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(12px, 1.5vw, 16px)', overflow: 'auto', minHeight: 0, flex: '0 0 30%', minWidth: '280px', maxWidth: '400px' }}>
           {/* Trend Chart */}
           <TrendChartPanel
             trends={trends}
