@@ -196,16 +196,55 @@ export class MetricsComputer {
   /**
    * Compute today's metrics summary
    */
+  /**
+   * Get the configured work start/end hours from policy or settings.
+   * Returns { startHour, endHour } in 24h format. Defaults to 09:00-17:00.
+   */
+  private getWorkSchedule(): { startHour: number; startMinute: number; endHour: number; endMinute: number } {
+    try {
+      // Try effective_policy first (from admin), then settings
+      const policyRaw = this.database.getSetting('effective_policy');
+      if (policyRaw) {
+        const policy = JSON.parse(policyRaw);
+        if (policy.workStartTime && policy.workEndTime) {
+          const [sh, sm] = policy.workStartTime.split(':').map(Number);
+          const [eh, em] = policy.workEndTime.split(':').map(Number);
+          return { startHour: sh || 9, startMinute: sm || 0, endHour: eh || 17, endMinute: em || 0 };
+        }
+      }
+      const startTime = this.database.getSetting('work_start_time');
+      const endTime = this.database.getSetting('work_end_time');
+      if (startTime && endTime) {
+        const [sh, sm] = startTime.split(':').map(Number);
+        const [eh, em] = endTime.split(':').map(Number);
+        return { startHour: sh || 9, startMinute: sm || 0, endHour: eh || 17, endMinute: em || 0 };
+      }
+    } catch { /* ignore */ }
+    return { startHour: 9, startMinute: 0, endHour: 17, endMinute: 0 };
+  }
+
   public computeTodayMetrics(): DailyMetricsSummary {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
-    
-    // Get start of today in local time
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
-    const startOfDayTs = startOfDay.getTime();
-    
-    return this.computeMetricsForRange(todayStr, todayStr, startOfDayTs);
+
+    // Use work start time, not midnight
+    const schedule = this.getWorkSchedule();
+    const workStart = new Date(today);
+    workStart.setHours(schedule.startHour, schedule.startMinute, 0, 0);
+    const workStartTs = workStart.getTime();
+
+    // Use work end time as the upper bound (or now if still within work hours)
+    const workEnd = new Date(today);
+    workEnd.setHours(schedule.endHour, schedule.endMinute, 0, 0);
+    const now = Date.now();
+    const rangeEndTs = Math.min(now, workEnd.getTime());
+
+    // If we haven't reached work start yet, no untracked time
+    if (now < workStartTs) {
+      return this.computeMetricsForRange(todayStr, todayStr, now);
+    }
+
+    return this.computeMetricsForRange(todayStr, todayStr, workStartTs, rangeEndTs);
   }
 
   /**
@@ -406,29 +445,30 @@ export class MetricsComputer {
   private computeMetricsForRange(
     startDate: string,
     endDate: string,
-    rangeStartTs: number
+    rangeStartTs: number,
+    rangeEndTs?: number
   ): DailyMetricsSummary {
     try {
       const summary = this.database.getActivitySummaryByDateRange(startDate, endDate);
-      
+
       // Get first and last activity timestamps
       const logs = this.database.getActivityLogsByDateRange(startDate, endDate, 1000);
-      
+
       let firstActivityTs: number | null = null;
       let lastActivityTs: number | null = null;
-      
+
       if (logs.length > 0) {
         // Logs are ordered DESC, so last in array is first activity
         const firstLog = logs[logs.length - 1];
         const lastLog = logs[0];
-        
+
         firstActivityTs = new Date(firstLog.timestamp).getTime();
         lastActivityTs = new Date(lastLog.timestamp).getTime() + (lastLog.duration * 1000);
       }
-      
-      // Compute untracked time
+
+      // Compute untracked time — only within work hours
       const now = Date.now();
-      const rangeEnd = Math.min(now, new Date(endDate + 'T23:59:59').getTime());
+      const rangeEnd = rangeEndTs || Math.min(now, new Date(endDate + 'T23:59:59').getTime());
       const untrackedSeconds = this.computeUntrackedTimeFromSummary(
         summary.total_active_seconds + summary.total_idle_seconds,
         rangeStartTs,
