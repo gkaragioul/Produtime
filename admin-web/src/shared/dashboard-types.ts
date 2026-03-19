@@ -337,17 +337,24 @@ export function computeExpectedSecondsSoFar(
     return 0;
   }
   
+  const breakSeconds = (expectations.breakDurationMinutes || 0) * 60;
+
   // After work end
   if (currentMinutes >= workEndMinutes) {
-    return (workEndMinutes - workStartMinutes) * 60;
+    return Math.max(0, (workEndMinutes - workStartMinutes) * 60 - breakSeconds);
   }
-  
-  // During work hours
-  return (currentMinutes - workStartMinutes) * 60;
+
+  // During work hours — subtract break proportionally through the day
+  const elapsedSeconds = (currentMinutes - workStartMinutes) * 60;
+  const totalWorkWindow = (workEndMinutes - workStartMinutes) * 60;
+  const breakSoFar = totalWorkWindow > 0
+    ? Math.round(breakSeconds * (elapsedSeconds / totalWorkWindow))
+    : 0;
+  return Math.max(0, elapsedSeconds - breakSoFar);
 }
 
 /**
- * Compute expected total seconds for the day
+ * Compute expected total seconds for the day (subtracts break)
  */
 export function computeExpectedTotalSeconds(expectations: PolicyExpectations): number {
   if (expectations.expectedActiveMinutesPerDay) {
@@ -355,7 +362,8 @@ export function computeExpectedTotalSeconds(expectations: PolicyExpectations): n
   }
   const workStartMinutes = parseTimeToMinutes(expectations.workStart);
   const workEndMinutes = parseTimeToMinutes(expectations.workEnd);
-  return (workEndMinutes - workStartMinutes) * 60;
+  const breakSeconds = (expectations.breakDurationMinutes || 0) * 60;
+  return Math.max(0, (workEndMinutes - workStartMinutes) * 60 - breakSeconds);
 }
 
 /**
@@ -543,7 +551,8 @@ export interface PolicyExpectations {
   workStart: string;           // HH:mm format, default "09:00"
   workEnd: string;             // HH:mm format, default "18:00"
   lateGraceMinutes: number;    // default 15
-  expectedActiveMinutesPerDay: number | null;  // null = derived from work window
+  breakDurationMinutes: number;      // default 30 — lunch/break allowance
+  expectedActiveMinutesPerDay: number | null;  // null = derived from work window minus break
   maxIdleMinutesPerDay: number;      // default 60
   maxUntrackedMinutesPerDay: number; // default 30
   minActiveMinutesByMidday: number;  // default 120 (for early warning)
@@ -553,7 +562,8 @@ export const DEFAULT_POLICY_EXPECTATIONS: PolicyExpectations = {
   workStart: '09:00',
   workEnd: '18:00',
   lateGraceMinutes: 15,
-  expectedActiveMinutesPerDay: null,  // Will be derived: 9 hours = 540 minutes
+  breakDurationMinutes: 30,
+  expectedActiveMinutesPerDay: null,  // Will be derived: (work window - break)
   maxIdleMinutesPerDay: 60,
   maxUntrackedMinutesPerDay: 30,
   minActiveMinutesByMidday: 120,

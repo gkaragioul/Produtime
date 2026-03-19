@@ -112,6 +112,7 @@ export interface PolicyData {
   
   // Tracking settings
   idleThreshold: number;      // Seconds
+  breakDuration?: number;     // Minutes — lunch/break allowance
   
   // Privacy settings
   privacyModeEnabled: boolean;

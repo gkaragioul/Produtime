@@ -1042,7 +1042,7 @@ export class AgentService extends EventEmitter {
     // Save policy to database
     const policyKeys: (keyof PolicyData)[] = [
       'workScheduleStart', 'workScheduleEnd', 'workScheduleWeekly',
-      'idleThreshold', 'privacyModeEnabled', 'privacyApps',
+      'idleThreshold', 'breakDuration', 'privacyModeEnabled', 'privacyApps',
       'titleSharingEnabled', 'autoExportEnabled', 'autoExportTime',
       'exportFolder', 'reportRetentionDays', 'employeeName',
       'appCategories',
@@ -1077,6 +1077,7 @@ export class AgentService extends EventEmitter {
       workScheduleEnd: 'work_schedule_end',
       workScheduleWeekly: 'work_schedule_weekly',
       idleThreshold: 'idle_threshold',
+      breakDuration: 'break_duration',
       privacyModeEnabled: 'privacy_mode_enabled',
       privacyApps: 'privacy_apps',
       titleSharingEnabled: 'title_sharing_enabled',

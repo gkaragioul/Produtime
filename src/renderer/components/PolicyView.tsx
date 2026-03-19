@@ -13,6 +13,7 @@ interface PolicyData {
   workScheduleStart: string;
   workScheduleEnd: string;
   idleThreshold: number;
+  breakDuration: number;
   privacyModeEnabled: boolean;
   autoExportEnabled: boolean;
   autoExportTime: string;
@@ -53,6 +54,7 @@ export const PolicyView: React.FC<PolicyViewProps> = ({ isManaged = false, admin
             workScheduleStart: settingsMap.work_schedule_start || '09:00',
             workScheduleEnd: settingsMap.work_schedule_end || '17:00',
             idleThreshold: parseInt(settingsMap.idle_threshold || '300', 10),
+            breakDuration: parseInt(settingsMap.break_duration || '30', 10),
             privacyModeEnabled: settingsMap.privacy_mode_enabled === 'true',
             autoExportEnabled: settingsMap.auto_export_enabled !== 'false',
             autoExportTime: settingsMap.auto_export_time || '',
@@ -123,9 +125,13 @@ export const PolicyView: React.FC<PolicyViewProps> = ({ isManaged = false, admin
             <span style={{ color: '#666' }}>Start Time</span>
             <span style={{ fontWeight: 500 }}>{formatTime(policy?.workScheduleStart)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
             <span style={{ color: '#666' }}>End Time</span>
             <span style={{ fontWeight: 500 }}>{formatTime(policy?.workScheduleEnd)}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: '#666' }}>Break / Lunch</span>
+            <span style={{ fontWeight: 500 }}>{policy?.breakDuration ? `${policy.breakDuration} minutes` : 'Not set'}</span>
           </div>
         </div>
       </div>
