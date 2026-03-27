@@ -184,10 +184,6 @@ class TimePortApp {
         startupLogger.info("Initializing auto-updater...");
         await this.initializeAutoUpdater();
 
-        // Initialize assisted updater (needs window)
-        startupLogger.info("Initializing assisted updater...");
-        await this.initializeAssistedUpdater();
-
         // Initialize PDF generator (needs database)
         startupLogger.info("Initializing PDF generator...");
         await this.initializePDFGenerator();
@@ -681,8 +677,13 @@ class TimePortApp {
   }
 
   private async initializeAutoUpdater(): Promise<void> {
-    // Freeware: auto-updater disabled — no network update checks
-    console.log("[FREEWARE] Auto-updater disabled");
+    if (!this.mainWindow) {
+      startupLogger.warn("AutoUpdater: no main window, skipping");
+      return;
+    }
+    const { AutoUpdaterManager } = await import("./auto-updater");
+    this.autoUpdater = new AutoUpdaterManager(this.mainWindow, this.database || undefined);
+    startupLogger.info("AutoUpdater initialized");
   }
 
   private async initializeAssistedUpdater(): Promise<void> {
@@ -981,7 +982,7 @@ class TimePortApp {
                 await dialog.showMessageBox(this.mainWindow!, {
                   type: "info",
                   title: "About ProduTime",
-                  message: `ProduTime v${version}${licenseLine}\n\nDeveloped by George Karagioules\n\nThis software is subject to the End-User License Agreement (EULA) included with the installer.\n\nCopyright © 2025 ProduTime. All rights reserved.`,
+                  message: `ProduTime v${version}${licenseLine}\n\nDeveloped by George Karagioules\nwww.georgekaragioules.com\n\nProvided free of charge to World of Travel as a freeware productivity tool.\nFree to use. Not for resale or redistribution.\n\nCopyright © 2026 George Karagioules. All rights reserved.`,
                   buttons: ["OK"],
                 });
               },

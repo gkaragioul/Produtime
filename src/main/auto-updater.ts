@@ -118,42 +118,10 @@ export class AutoUpdaterManager {
       logger.info('UPDATER', 'Silent background check started', {
         timestamp: this.lastCheckTime.toISOString(),
       });
-
-      if (this.isPortableWindows()) {
-        await this.portableCheckForUpdates();
-
-        // Only show notification if update available
-        if (this.currentState.status === UpdateStatus.AVAILABLE) {
-          const info = this.currentState.info;
-
-          logger.info('UPDATER', 'Background check found update', {
-            version: info?.version,
-            currentVersion: app.getVersion(),
-          });
-
-          // Show system notification
-          try {
-            const notification = new Notification({
-              title: 'ProduTime Update Available',
-              body: `Version ${info?.version} is available. Click to download.`,
-              silent: false,
-            });
-
-            notification.on('click', () => {
-              logger.info('UPDATER', 'User clicked update notification');
-              this.showUpdateDialog();
-            });
-
-            notification.show();
-          } catch (notifError) {
-            logger.error('UPDATER', 'Failed to show notification', notifError);
-          }
-        } else {
-          logger.info('UPDATER', 'Background check: no update available');
-        }
-      }
+      // electron-updater fires update-available event which sends IPC to renderer
+      await autoUpdater.checkForUpdates();
     } catch (error) {
-      // Silent failure - don't bother user with background check errors
+      // Silent failure — don't bother user with background check errors
       logger.error('UPDATER', 'Background check failed (silent)', error);
     }
   }
@@ -253,6 +221,11 @@ export class AutoUpdaterManager {
         info: updateInfo,
       });
       this.isUpdateInProgress = false;
+      // Auto-install silently after 2s — renderer shows "Installing..." during this window
+      setTimeout(() => {
+        logger.info('UPDATER', 'Auto-installing downloaded update');
+        autoUpdater.quitAndInstall(true, true);
+      }, 2000);
     });
   }
 
@@ -274,120 +247,14 @@ export class AutoUpdaterManager {
       if (this.isUpdateInProgress) {
         throw new Error('Update operation already in progress');
       }
-
-      const isWindows = process.platform === 'win32';
-      const isPortable = this.isPortableWindows();
-      logger.info('UPDATER', 'Update channel selection', {
-        isWindows,
-        isPortable,
-      });
-
-      if (isWindows) {
-        logger.info('UPDATER', 'Running License Manager update check (Windows)');
-        await this.portableCheckForUpdates();
-
-        logger.info('UPDATER', 'Portable check completed, status', {
-          status: this.currentState.status,
-        });
-
-        // Show result to user
-        if (this.currentState.status === UpdateStatus.AVAILABLE && this.mainWindow && !this.mainWindow.isDestroyed()) {
-          logger.info('UPDATER', 'Update available, showing dialog');
-          const info = this.currentState.info;
-          const response = await dialog.showMessageBox(this.mainWindow, {
-            type: 'info',
-            title: 'Update Available',
-            message: `Version ${info?.version} is available!`,
-            detail: `Current version: ${app.getVersion()}\nNew version: ${info?.version}\n\nWould you like to download it now?`,
-            buttons: ['Download', 'Later'],
-            defaultId: 0,
-            cancelId: 1,
-          });
-          logger.info('UPDATER', 'User response', {
-            response: response.response,
-          });
-          if (response.response === 0) {
-            try {
-              await this.downloadUpdate();
-              // After successful download, immediately prompt to install
-              await this.installUpdate();
-            } catch (e) {
-              logger.error('UPDATER', 'Download failed', e);
-              await dialog.showMessageBox(this.mainWindow!, {
-                type: 'error',
-                title: 'Download Failed',
-                message: 'Failed to download update',
-                detail: String(e),
-                buttons: ['OK'],
-              });
-            }
-          }
-        } else if (this.currentState.status === UpdateStatus.NOT_AVAILABLE) {
-          logger.info('UPDATER', 'No update available, showing dialog');
-          await dialog.showMessageBox(this.mainWindow!, {
-            type: 'info',
-            title: 'No Updates',
-            message: 'You are running the latest version.',
-            detail: `Current version: ${app.getVersion()}`,
-            buttons: ['OK'],
-          });
-          logger.info('UPDATER', 'No update dialog closed');
-        } else if (this.currentState.status === UpdateStatus.ERROR) {
-          logger.error('UPDATER', 'Update check resulted in error status', {
-            error: this.currentState.error,
-          });
-
-          // Provide user-friendly error message with actionable guidance
-          const errorDetail = this.getUserFriendlyErrorMessage(
-            this.currentState.error || 'Unknown error'
-          );
-
-          // Check if this is a license manager offline error (less severe)
-          const errorLower = (this.currentState.error || '').toLowerCase();
-          const isLicenseManagerOffline =
-            (errorLower.includes('econnrefused') ||
-              errorLower.includes('etimedout') ||
-              errorLower.includes('aggregateerror') ||
-              errorLower.includes('enotfound') ||
-              errorLower.includes('econnreset')) &&
-            (errorLower.includes('localhost') ||
-              errorLower.includes('127.0.0.1') ||
-              errorLower.includes('192.168') ||
-              errorLower.includes(':3000'));
-
-          await dialog.showMessageBox(this.mainWindow!, {
-            type: isLicenseManagerOffline ? 'info' : 'error',
-            title: isLicenseManagerOffline
-              ? 'License Manager Offline'
-              : 'Update Check Failed',
-            message: isLicenseManagerOffline
-              ? 'License Manager server is not available. You are running the latest version.'
-              : 'Unable to check for updates',
-            detail: errorDetail,
-            buttons: ['OK'],
-          });
-        } else {
-          logger.warn('UPDATER', 'Unexpected status after check', {
-            status: this.currentState.status,
-          });
-        }
-      } else {
-        logger.info('UPDATER', 'Running standard electron-updater check');
-        await autoUpdater.checkForUpdates();
-      }
+      // Use electron-updater natively — events fire to renderer via updateState()
+      logger.info('UPDATER', 'Running electron-updater check');
+      await autoUpdater.checkForUpdates();
     } catch (error) {
       logger.error('UPDATER', 'Exception in checkForUpdates', error);
       this.updateState({
         status: UpdateStatus.ERROR,
         error: `Failed to check for updates: ${error}`,
-      });
-      // Show error to user
-      await dialog.showMessageBox(this.mainWindow!, {
-        type: 'error',
-        title: 'Update Check Failed',
-        message: 'Failed to check for updates',
-        detail: String(error),
-        buttons: ['OK'],
       });
       throw error;
     }
@@ -404,15 +271,10 @@ export class AutoUpdaterManager {
       }
 
       this.isUpdateInProgress = true;
-      console.log('Starting update download...');
-
-      if (process.platform === 'win32') {
-        await this.portableDownloadUpdate();
-      } else {
-        await autoUpdater.downloadUpdate();
-      }
+      logger.info('UPDATER', 'Starting update download via electron-updater');
+      await autoUpdater.downloadUpdate();
     } catch (error) {
-      console.error('Error downloading update:', error);
+      logger.error('UPDATER', 'Error downloading update', error);
       this.isUpdateInProgress = false;
       this.updateState({
         status: UpdateStatus.ERROR,
@@ -427,41 +289,10 @@ export class AutoUpdaterManager {
       if (this.currentState.status !== UpdateStatus.DOWNLOADED) {
         throw new Error('No update downloaded to install');
       }
-
-      console.log('Installing update and restarting...');
-
-      const showShortcutCheckbox = process.platform === 'win32';
-      const response = await dialog.showMessageBox(this.mainWindow!, {
-        type: 'info',
-        title: 'Install Update',
-        message:
-          'Update is ready. The application will restart and switch to the new version.',
-        buttons: ['Restart and Switch', 'Later'],
-        defaultId: 0,
-        cancelId: 1,
-        checkboxLabel: showShortcutCheckbox
-          ? 'Update desktop shortcut (if found)'
-          : undefined,
-        checkboxChecked: showShortcutCheckbox ? true : undefined,
-      });
-
-      if (response.response === 0) {
-        if (process.platform === 'win32') {
-          const updateShortcuts =
-            showShortcutCheckbox && response.checkboxChecked !== undefined
-              ? !!response.checkboxChecked
-              : true;
-          await this.portableInstallUpdate(updateShortcuts);
-          return; // portable path quits app
-        } else {
-          autoUpdater.quitAndInstall();
-          return;
-        }
-      } else {
-        console.log('User chose to install later');
-      }
+      logger.info('UPDATER', 'Installing update and restarting');
+      autoUpdater.quitAndInstall(true, true);
     } catch (error) {
-      console.error('Error installing update:', error);
+      logger.error('UPDATER', 'Error installing update', error);
       this.updateState({
         status: UpdateStatus.ERROR,
         error: `Failed to install update: ${error}`,
@@ -499,11 +330,10 @@ export class AutoUpdaterManager {
     if (fs.existsSync(uninstallerPath)) {
       logger.info(
         'UPDATER',
-        'Detected NSIS installation - using License Manager updater for all builds'
+        'Detected NSIS installation - using electron-updater natively'
       );
-      // Return true to force License Manager updater for NSIS builds
-      // This unifies update distribution through License Manager instead of GitHub
-      return true;
+      // Return false: NSIS installed build uses electron-updater (not portable path)
+      return false;
     }
 
     // Check if running from Program Files (typical installation location)
