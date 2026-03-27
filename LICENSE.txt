@@ -1,0 +1,107 @@
+PRODUTIME - END USER LICENSE AGREEMENT (FREEWARE)
+==================================================
+
+Copyright (c) 2025-2026 George Karagioules / World of Travel
+All rights reserved.
+
+PLEASE READ THIS LICENSE AGREEMENT CAREFULLY BEFORE INSTALLING OR USING
+PRODUTIME. BY INSTALLING, COPYING, OR OTHERWISE USING THIS SOFTWARE, YOU
+AGREE TO BE BOUND BY THE TERMS OF THIS AGREEMENT.
+
+--------------------------------------------------------------------------------
+1. LICENSE GRANT
+--------------------------------------------------------------------------------
+
+World of Travel ("Licensor") grants you ("User") a free, non-exclusive,
+non-transferable, worldwide license to download, install, and use ProduTime
+("Software") on any computer you own or control, for personal or professional
+purposes, subject to the terms of this Agreement.
+
+--------------------------------------------------------------------------------
+2. FREEWARE
+--------------------------------------------------------------------------------
+
+ProduTime is provided FREE OF CHARGE. You may use it without payment for any
+lawful purpose. You may freely share the original installer with others,
+provided no fee is charged and this Agreement is included.
+
+--------------------------------------------------------------------------------
+3. RESTRICTIONS
+--------------------------------------------------------------------------------
+
+You may NOT:
+
+  a) Sell, sublicense, rent, lease, or otherwise commercialise the Software;
+  b) Modify, decompile, disassemble, or create derivative works from the
+     Software, except to the extent permitted by applicable law;
+  c) Remove or alter any copyright, trademark, or other proprietary notices;
+  d) Distribute modified versions of the Software under the "ProduTime" name.
+
+--------------------------------------------------------------------------------
+4. DATA & PRIVACY
+--------------------------------------------------------------------------------
+
+ProduTime operates entirely locally on your device. No personal data, activity
+records, or usage information is transmitted to Licensor or any third party.
+All data is stored locally in your AppData folder and never leaves your machine.
+
+--------------------------------------------------------------------------------
+5. UPDATES
+--------------------------------------------------------------------------------
+
+The Software may notify you when a newer version is available. Updates are
+optional and initiated solely by you. Licensor reserves the right to
+discontinue updates at any time without notice.
+
+--------------------------------------------------------------------------------
+6. INTELLECTUAL PROPERTY
+--------------------------------------------------------------------------------
+
+ProduTime and all associated intellectual property rights remain the exclusive
+property of George Karagioules / World of Travel. This Agreement does not
+transfer any ownership rights to you.
+
+--------------------------------------------------------------------------------
+7. DISCLAIMER OF WARRANTIES
+--------------------------------------------------------------------------------
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. THE LICENSOR DOES NOT
+WARRANT THAT THE SOFTWARE WILL BE ERROR-FREE OR UNINTERRUPTED.
+
+--------------------------------------------------------------------------------
+8. LIMITATION OF LIABILITY
+--------------------------------------------------------------------------------
+
+IN NO EVENT SHALL LICENSOR BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING BUT NOT LIMITED TO LOSS OF
+DATA, LOSS OF PROFITS, OR BUSINESS INTERRUPTION) ARISING OUT OF OR IN
+CONNECTION WITH THE USE OR INABILITY TO USE THE SOFTWARE, EVEN IF LICENSOR
+HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+
+--------------------------------------------------------------------------------
+9. GOVERNING LAW
+--------------------------------------------------------------------------------
+
+This Agreement shall be governed by and construed in accordance with the laws
+of the jurisdiction in which Licensor operates, without regard to its conflict
+of law provisions.
+
+--------------------------------------------------------------------------------
+10. CONTACT
+--------------------------------------------------------------------------------
+
+For questions regarding this Agreement, please contact:
+
+  World of Travel
+  Contact: George Karagioules
+  Email:   worldoftravelbyalice@gmail.com
+  Web:     https://github.com/wotbyalice
+
+--------------------------------------------------------------------------------
+
+By installing ProduTime, you acknowledge that you have read, understood, and
+agree to be bound by the terms of this End User License Agreement.
+
+ProduTime v0.5.x - (c) 2025-2026 World of Travel / George Karagioules

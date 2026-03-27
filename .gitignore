@@ -4,7 +4,6 @@ package-lock.json
 
 # Build output
 dist/
-build/
 build-output/
 *.tsbuildinfo
 

@@ -134,9 +134,9 @@
     ]
   },
   "build": {
-    "appId": "com.produtime.app",
+    "appId": "com.worldoftravel.produtime",
     "productName": "ProduTime",
-    "icon": "../assets/icon.ico",
+    "icon": "assets/icon.ico",
     "asar": false,
     "directories": {
       "output": "build-output"
@@ -167,7 +167,7 @@
         }
       ],
       "artifactName": "ProduTime-Setup-${version}-x64.${ext}",
-      "icon": "../assets/icon.ico",
+      "icon": "assets/icon.ico",
       "forceCodeSigning": false,
       "verifyUpdateCodeSignature": false,
       "signAndEditExecutable": false
@@ -182,7 +182,7 @@
           ]
         }
       ],
-      "icon": "../assets/icon.icns"
+      "icon": "assets/icon.icns"
     },
     "linux": {
       "target": [
@@ -193,12 +193,12 @@
           ]
         }
       ],
-      "icon": "../assets/icon.png"
+      "icon": "assets/icon.png"
     },
     "publish": {
       "provider": "github",
-      "owner": "georgekgr12",
-      "repo": "timeport"
+      "owner": "wotbyalice",
+      "repo": "WOT-Produtime-Releases"
     },
     "nsis": {
       "oneClick": false,
@@ -206,10 +206,10 @@
       "license": "LICENSE.txt",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "installerIcon": "../assets/icon.ico",
-      "uninstallerIcon": "../assets/icon.ico",
-      "runAfterFinish": false,
-      "perMachine": true,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "runAfterFinish": true,
+      "perMachine": false,
       "displayLanguageSelector": false,
       "allowElevation": true,
       "warningsAsErrors": false,
