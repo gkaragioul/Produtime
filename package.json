@@ -168,9 +168,7 @@
       ],
       "artifactName": "ProduTime-Setup-${version}-x64.${ext}",
       "icon": "assets/icon.ico",
-      "forceCodeSigning": false,
-      "verifyUpdateCodeSignature": false,
-      "signAndEditExecutable": false
+      "forceCodeSigning": false
     },
     "mac": {
       "target": [
@@ -211,7 +209,7 @@
       "runAfterFinish": true,
       "perMachine": false,
       "displayLanguageSelector": false,
-      "allowElevation": true,
+      "allowElevation": false,
       "warningsAsErrors": false,
       "include": "build/installer.nsh"
     }
