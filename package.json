@@ -137,7 +137,13 @@
     "appId": "com.worldoftravel.produtime",
     "productName": "ProduTime",
     "icon": "assets/icon.ico",
-    "asar": false,
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*",
+      "node_modules/active-win/**/*",
+      "node_modules/@mapbox/node-pre-gyp/**/*",
+      "node_modules/bindings/**/*"
+    ],
     "directories": {
       "output": "build-output"
     },
