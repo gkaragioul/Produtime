@@ -44,8 +44,6 @@ startupLogger.info("IPCHandlers imported");
 import type { AutoUpdaterManager } from "./auto-updater";
 startupLogger.info("AutoUpdaterManager type imported");
 
-import type { AssistedUpdater } from "./assisted-updater";
-startupLogger.info("AssistedUpdater type imported");
 
 import type { PDFGenerator } from "./pdf-generator";
 startupLogger.info("PDFGenerator type imported");
@@ -74,7 +72,7 @@ class TimePortApp {
   private database: DatabaseManager | null = null;
   private ipcHandlers: IPCHandlers | null = null;
   private autoUpdater: AutoUpdaterManager | null = null;
-  private assistedUpdater: AssistedUpdater | null = null;
+
   private pdfGenerator: PDFGenerator | null = null;
   private systemTray: SystemTrayManager | null = null;
 
@@ -686,18 +684,6 @@ class TimePortApp {
     startupLogger.info("AutoUpdater initialized");
   }
 
-  private async initializeAssistedUpdater(): Promise<void> {
-    const { AssistedUpdater } = await import("./assisted-updater");
-    const manifestUrl =
-      process.env.ASSISTED_UPDATE_MANIFEST_URL ||
-      "https://wot-produtime-production.up.railway.app/updates/latest.json";
-    this.assistedUpdater = new AssistedUpdater(this.mainWindow, {
-      manifestUrl,
-    });
-    this.assistedUpdater.startBackgroundChecks();
-    startupLogger.info("Assisted updater initialized", { manifestUrl });
-  }
-
   private async initializePDFGenerator(): Promise<void> {
     if (process.env.DIAGNOSTIC_SKIP_PDF === "1") {
       console.warn("[DIAGNOSTIC] Skipping PDF generator initialization");
@@ -879,7 +865,7 @@ class TimePortApp {
         label: "Check for Updates…",
         click: async () => {
           logger.info("MENU", "Check for Updates menu item clicked");
-          await this.handleAssistedUpdateCheck();
+          await this.handleCheckForUpdatesMenuClick();
         },
       });
       helpSubmenu.push({ type: "separator" });
@@ -1037,35 +1023,6 @@ class TimePortApp {
       logger.info("UPDATE", "checkForUpdates completed successfully");
     } catch (e) {
       logger.error("UPDATE", "Check for updates failed", e);
-      await dialog.showMessageBox(this.mainWindow!, {
-        type: "error",
-        title: "Error",
-        message: "Failed to check for updates",
-        detail: String(e),
-        buttons: ["OK"],
-      });
-    }
-  }
-
-  private async handleAssistedUpdateCheck(): Promise<void> {
-    logger.section("ASSISTED UPDATE CHECK");
-    logger.info("ASSISTED_UPDATE", "handleAssistedUpdateCheck called");
-    try {
-      if (!this.assistedUpdater) {
-        logger.error("ASSISTED_UPDATE", "Assisted updater is not initialized");
-        await dialog.showMessageBox(this.mainWindow!, {
-          type: "error",
-          title: "Error",
-          message: "Assisted updater is not initialized",
-          buttons: ["OK"],
-        });
-        return;
-      }
-      logger.info("ASSISTED_UPDATE", "Assisted updater exists, calling checkForUpdates");
-      await this.assistedUpdater.checkForUpdates(true); // Interactive check
-      logger.info("ASSISTED_UPDATE", "checkForUpdates completed successfully");
-    } catch (e) {
-      logger.error("ASSISTED_UPDATE", "Assisted update check failed", e);
       await dialog.showMessageBox(this.mainWindow!, {
         type: "error",
         title: "Error",
@@ -1327,19 +1284,7 @@ class TimePortApp {
       }
     }
 
-    // 5. Stop assisted updater (clears background check timer)
-    if (this.assistedUpdater) {
-      try {
-        console.log("  → Stopping assisted updater...");
-        this.assistedUpdater.cleanup();
-        this.assistedUpdater = null;
-        console.log("  ✅ Assisted updater stopped");
-      } catch (error) {
-        console.error("  ❌ Error stopping assisted updater:", error);
-      }
-    }
-
-    // 6. Cleanup PDF generator
+    // 5. Cleanup PDF generator
     if (this.pdfGenerator) {
       try {
         console.log("  → Cleaning up PDF generator...");
