@@ -114,4 +114,4 @@ For questions regarding this Agreement, please contact the Developer:
 By installing ProduTime, you acknowledge that you have read, understood, and
 agree to be bound by the terms of this End User License Agreement.
 
-ProduTime v0.5.4 — Developed by George Karagioules — (c) 2026
+ProduTime v0.5.5 — Developed by George Karagioules — (c) 2026
