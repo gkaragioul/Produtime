@@ -106,6 +106,7 @@ export class AdminDatabase {
     this.dbPath = dbPath;
     this.db = new Database(this.dbPath);
     this.db.pragma('journal_mode = WAL');
+    this.db.pragma('busy_timeout = 10000'); // 10s retry on SQLITE_BUSY (rolling deploys)
     this.initializeDatabase();
   }
 

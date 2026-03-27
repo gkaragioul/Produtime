@@ -686,8 +686,15 @@ class TimePortApp {
   }
 
   private async initializeAssistedUpdater(): Promise<void> {
-    // Freeware: assisted updater disabled — no network update checks
-    console.log("[FREEWARE] Assisted updater disabled");
+    const { AssistedUpdater } = await import("./assisted-updater");
+    const manifestUrl =
+      process.env.ASSISTED_UPDATE_MANIFEST_URL ||
+      "https://wot-produtime-production.up.railway.app/updates/latest.json";
+    this.assistedUpdater = new AssistedUpdater(this.mainWindow, {
+      manifestUrl,
+    });
+    this.assistedUpdater.startBackgroundChecks();
+    startupLogger.info("Assisted updater initialized", { manifestUrl });
   }
 
   private async initializePDFGenerator(): Promise<void> {

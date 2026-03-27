@@ -67,6 +67,22 @@ app.get('/info', (_req, res) => {
   });
 });
 
+// Public update manifest — fetched by ProduTime assisted updater (no auth required)
+app.get('/updates/latest.json', (_req, res) => {
+  const raw = db.getSetting('update_manifest');
+  if (!raw) {
+    res.status(404).json({ error: 'No update manifest published yet' });
+    return;
+  }
+  try {
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.send(raw);
+  } catch {
+    res.status(500).json({ error: 'Failed to read manifest' });
+  }
+});
+
 // Serve static frontend files
 // __dirname = dist/server/server/, client is at dist/client/
 const staticDir = path.join(__dirname, '../../client');
@@ -483,6 +499,43 @@ app.get('/api/analytics/metrics', (req, res) => {
 // --- Version ---
 app.get('/api/version', (_req, res) => {
   res.json({ version: '1.0.0-web' });
+});
+
+// --- Update manifest management (auth required) ---
+app.get('/api/updates/manifest', (_req, res) => {
+  const raw = db.getSetting('update_manifest');
+  res.json(raw ? JSON.parse(raw) : null);
+});
+
+app.post('/api/updates/publish', (req, res) => {
+  const { version, url, releaseNotesUrl, sha256, mandatory } = req.body;
+  if (!version || !url) {
+    res.status(400).json({ error: 'version and url are required' });
+    return;
+  }
+  if (!/^\d+\.\d+\.\d+/.test(version)) {
+    res.status(400).json({ error: 'version must be in semver format (e.g. 0.5.2)' });
+    return;
+  }
+  if (!url.startsWith('https://')) {
+    res.status(400).json({ error: 'url must use HTTPS' });
+    return;
+  }
+  const manifest = {
+    product: 'ProduTime',
+    channel: 'stable',
+    publishedAt: new Date().toISOString(),
+    latest: {
+      version,
+      url,
+      ...(releaseNotesUrl && { releaseNotesUrl }),
+      ...(sha256 && { sha256 }),
+      ...(mandatory !== undefined && { mandatory: Boolean(mandatory) }),
+    },
+  };
+  db.setSetting('update_manifest', JSON.stringify(manifest, null, 2));
+  console.log(`[UPDATES] Manifest published: v${version} → ${url}`);
+  res.json({ success: true, manifest });
 });
 
 // ============================================================================
