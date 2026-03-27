@@ -9,7 +9,9 @@ import { ManagedBadge } from "./components/ManagedBadge";
 import { PolicyView } from "./components/PolicyView";
 import { AdminLockScreen } from "./components/AdminLockScreen";
 import { PairingModal } from "./components/PairingModal";
+import { UpdateProgressBar } from "./components/UpdateProgressBar";
 import logoHeader from "../../assets/logo-header.png";
+import { UpdateState } from "../shared/types";
 
 type TabType = "dashboard" | "settings" | "policy";
 
@@ -32,6 +34,10 @@ const App: React.FC = () => {
 
   // Tracks if a logout occurred via timeout modal so we can gate Settings view in tests
   const [wasLoggedOut, setWasLoggedOut] = useState<boolean>(false);
+
+  // Auto-updater state
+  const [updateState, setUpdateState] = useState<UpdateState | null>(null);
+  const [updateDismissed, setUpdateDismissed] = useState(false);
 
   // Admin Console (Agent) state
   const [isManaged, setIsManaged] = useState<boolean>(false);
@@ -57,6 +63,15 @@ const App: React.FC = () => {
       }
     };
     getVersion();
+  }, []);
+
+  // Auto-updater listener
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onUpdateStatusChanged?.((state: UpdateState) => {
+      setUpdateState(state);
+      setUpdateDismissed(false); // reset dismiss on new state
+    });
+    return () => unsubscribe?.();
   }, []);
 
   // Check if device is managed by Admin Console
@@ -436,6 +451,15 @@ const App: React.FC = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Update progress bar — fixed bottom-left, always on top */}
+      {!updateDismissed && (
+        <UpdateProgressBar
+          updateState={updateState}
+          onDownload={() => window.electronAPI.downloadUpdate()}
+          onDismiss={() => setUpdateDismissed(true)}
+        />
       )}
     </div>
   );
