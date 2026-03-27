@@ -872,7 +872,7 @@ class TimePortApp {
 
       // Add Admin Console pairing option
       helpSubmenu.push({
-        label: "Connect to Admin Console…",
+        label: "Register Device…",
         click: () => {
           logger.info("MENU", "Connect to Admin Console clicked");
           try {
