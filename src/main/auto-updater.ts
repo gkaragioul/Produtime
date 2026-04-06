@@ -85,6 +85,7 @@ export class AutoUpdaterManager {
     });
 
     autoUpdater.on('update-downloaded', (info: ElectronUpdateInfo) => {
+      console.log(`[AUTO-UPDATER] Update downloaded: v${info.version} — installing now`);
       this.broadcastState({
         status: UpdateStatus.DOWNLOADED,
         info: {
@@ -95,6 +96,15 @@ export class AutoUpdaterManager {
             : undefined,
         },
       });
+
+      // Auto-install immediately — close all windows and quit
+      setTimeout(() => {
+        app.removeAllListeners('window-all-closed');
+        const windows = BrowserWindow.getAllWindows();
+        windows.forEach(w => w.removeAllListeners('close'));
+        windows.forEach(w => w.close());
+        autoUpdater.quitAndInstall(false, true);
+      }, 1500); // Brief delay so user sees "ready to install" before restart
     });
 
     autoUpdater.on('error', (err) => {
