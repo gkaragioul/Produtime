@@ -29,7 +29,7 @@ import {
   ExpectedWindow,
   FocusStats,
 } from '../services/daily-insight-engine';
-import { TodayGuidance } from './TodayGuidance';
+
 
 interface CurrentActivityUI {
   appName: string;
@@ -426,9 +426,6 @@ export const DailyPerformanceConsole: React.FC = () => {
             untrackedSeconds={0}
             isTracking={isTracking}
           />
-          
-          {/* GUIDANCE - Micro-coaching message */}
-          <TodayGuidance guidance={dailyInsight.guidance} />
           
           {/* C) PERFORMANCE METRICS - Simplified */}
           <PerformanceMetrics
