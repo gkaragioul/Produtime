@@ -145,7 +145,7 @@ export class AutoUpdaterManager {
     const tempDir = path.join(os.tmpdir(), 'produtime-update');
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-    const fileName = `ProduTime-${this.latestVersion}-x64.exe`;
+    const fileName = 'WOT Produtime.exe';
     const tempPath = path.join(tempDir, fileName);
 
     this.broadcastState({
