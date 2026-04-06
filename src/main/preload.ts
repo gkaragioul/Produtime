@@ -13,6 +13,7 @@ import type {
   ActivityLog,
   Setting,
   Analytics,
+  UpdateState,
   GenerateReportRequest,
   GenerateReportResponse,
   ReportOptions,
@@ -185,9 +186,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDbHealth: (): Promise<IPCResponse<boolean>> =>
     ipcRenderer.invoke(IPCChannels.GET_DB_HEALTH),
 
-  // Assisted updater API
+  // Auto-updater API
   checkForUpdates: (): Promise<IPCResponse<void>> =>
     ipcRenderer.invoke(IPCChannels.CHECK_FOR_UPDATES),
+  downloadUpdate: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPCChannels.DOWNLOAD_UPDATE),
+  installUpdate: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPCChannels.INSTALL_UPDATE),
+  getUpdateStatus: (): Promise<IPCResponse<UpdateState>> =>
+    ipcRenderer.invoke(IPCChannels.GET_UPDATE_STATUS),
+
+  // Auto-updater events (main -> renderer)
+  onUpdateStatusChanged: (callback: (status: UpdateState) => void) => {
+    const listener = (_event: any, status: UpdateState) => callback(status);
+    ipcRenderer.on(IPCChannels.UPDATE_STATUS_CHANGED, listener);
+    return () => {
+      ipcRenderer.removeListener(IPCChannels.UPDATE_STATUS_CHANGED, listener);
+    };
+  },
 
   // Activity events (main -> renderer)
   onActivityChanged: (callback: (activity: any) => void) => {

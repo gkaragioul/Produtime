@@ -4,12 +4,14 @@ import { UpdateState, UpdateStatus } from "../../shared/types";
 interface Props {
   updateState: UpdateState | null;
   onDownload: () => void;
+  onInstall: () => void;
   onDismiss: () => void;
 }
 
 export const UpdateProgressBar: React.FC<Props> = ({
   updateState,
   onDownload,
+  onInstall,
   onDismiss,
 }) => {
   const [visible, setVisible] = useState(false);
@@ -93,9 +95,15 @@ export const UpdateProgressBar: React.FC<Props> = ({
           <div style={styles.icon}>✔</div>
           <div style={styles.text}>
             <span style={styles.title}>
-              Installing {info?.version}… App will restart shortly
+              ProduTime {info?.version} ready to install
             </span>
           </div>
+          <button style={styles.downloadBtn} onClick={onInstall}>
+            Restart &amp; Update
+          </button>
+          <button style={styles.dismissBtn} onClick={onDismiss} title="Dismiss">
+            ✕
+          </button>
         </>
       )}
 

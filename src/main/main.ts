@@ -41,8 +41,8 @@ startupLogger.info("DatabaseManager type imported");
 import { IPCHandlers } from "./ipc-handlers";
 startupLogger.info("IPCHandlers imported");
 
-import type { AssistedUpdater } from "./assisted-updater";
-startupLogger.info("AssistedUpdater type imported");
+import type { AutoUpdaterManager } from "./auto-updater";
+startupLogger.info("AutoUpdaterManager type imported");
 
 
 import type { PDFGenerator } from "./pdf-generator";
@@ -71,7 +71,7 @@ class TimePortApp {
   private mainWindow: BrowserWindow | null = null;
   private database: DatabaseManager | null = null;
   private ipcHandlers: IPCHandlers | null = null;
-  private updater: AssistedUpdater | null = null;
+  private autoUpdater: AutoUpdaterManager | null = null;
 
   private pdfGenerator: PDFGenerator | null = null;
   private systemTray: SystemTrayManager | null = null;
@@ -185,9 +185,6 @@ class TimePortApp {
         // Initialize PDF generator (needs database)
         startupLogger.info("Initializing PDF generator...");
         await this.initializePDFGenerator();
-
-        // Ensure auto-start is enabled (silently, no dialogs)
-        this.ensureAutoStartEnabled();
 
         // Initialize system tray (needs window)
         startupLogger.info("Initializing system tray...");
@@ -679,39 +676,12 @@ class TimePortApp {
 
   private async initializeAutoUpdater(): Promise<void> {
     if (!this.mainWindow) {
-      startupLogger.warn("AssistedUpdater: no main window, skipping");
+      startupLogger.warn("AutoUpdater: no main window, skipping");
       return;
     }
-    const { AssistedUpdater } = await import("./assisted-updater");
-    this.updater = new AssistedUpdater(this.mainWindow, {
-      manifestUrl: "https://wot-produtime-production.up.railway.app/updates/latest.json",
-    });
-    this.updater.startBackgroundChecks();
-
-    // Register IPC handler for renderer "Check for Updates" button
-    const { ipcMain } = await import("electron");
-    ipcMain.handle("updater:checkForUpdates", async () => {
-      try {
-        await this.updater?.checkForUpdates(true);
-        return { success: true };
-      } catch (error) {
-        return { success: false, error: String(error) };
-      }
-    });
-
-    startupLogger.info("AssistedUpdater initialized with background checks");
-  }
-
-  private async ensureAutoStartEnabled(): Promise<void> {
-    try {
-      const { StartupHelper } = await import("./startup-helper");
-      if (!StartupHelper.hasStartupShortcut()) {
-        await StartupHelper.createStartupShortcut();
-        console.log("[STARTUP] Auto-start enabled for ProduTime");
-      }
-    } catch (error) {
-      console.warn("[STARTUP] Failed to enable auto-start:", error);
-    }
+    const { AutoUpdaterManager } = await import("./auto-updater");
+    this.autoUpdater = new AutoUpdaterManager(this.mainWindow);
+    startupLogger.info("AutoUpdater initialized — checks GitHub releases on schedule");
   }
 
   private async initializePDFGenerator(): Promise<void> {
@@ -843,7 +813,7 @@ class TimePortApp {
   private initializeApplicationMenu(): void {
     logger.section("APPLICATION MENU INITIALIZATION");
     logger.info("MENU", "Starting menu initialization");
-    logger.debug("MENU", "Updater exists", { exists: !!this.updater });
+    logger.debug("MENU", "Updater exists", { exists: !!this.autoUpdater });
     try {
       // Check if license is active to determine menu items
       let isLicenseActive = false;
@@ -1038,7 +1008,7 @@ class TimePortApp {
     logger.section("CHECK FOR UPDATES");
     logger.info("UPDATE", "handleCheckForUpdatesMenuClick called");
     try {
-      if (!this.updater) {
+      if (!this.autoUpdater) {
         logger.error("UPDATE", "Updater is not initialized");
         await dialog.showMessageBox(this.mainWindow!, {
           type: "error",
@@ -1048,7 +1018,7 @@ class TimePortApp {
         });
         return;
       }
-      await this.updater.checkForUpdates(true);
+      await this.autoUpdater.checkForUpdates();
       logger.info("UPDATE", "checkForUpdates completed successfully");
     } catch (e) {
       logger.error("UPDATE", "Check for updates failed", e);
@@ -1160,7 +1130,7 @@ class TimePortApp {
     try {
       console.log("🔍 TESTING UPDATER FUNCTIONALITY...");
 
-      if (!this.updater) {
+      if (!this.autoUpdater) {
         throw new Error("Updater not initialized");
       }
 
@@ -1278,11 +1248,11 @@ class TimePortApp {
     }
 
     // 4. Stop assisted updater (clears background check timer)
-    if (this.updater) {
+    if (this.autoUpdater) {
       try {
         console.log("  → Stopping updater...");
-        this.updater.cleanup();
-        this.updater = null;
+        this.autoUpdater.cleanup();
+        this.autoUpdater = null;
         console.log("  ✅ Updater stopped");
       } catch (error) {
         console.error("  ❌ Error stopping updater:", error);

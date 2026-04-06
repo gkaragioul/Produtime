@@ -39,8 +39,12 @@ export interface ElectronAPI {
   clearAllData: () => Promise<IPCResponse<void>>;
   getDbHealth: () => Promise<IPCResponse<boolean>>;
 
-  // Assisted updater API
+  // Auto-updater API
   checkForUpdates: () => Promise<IPCResponse<void>>;
+  downloadUpdate: () => Promise<IPCResponse<void>>;
+  installUpdate: () => Promise<IPCResponse<void>>;
+  getUpdateStatus: () => Promise<IPCResponse<UpdateState>>;
+  onUpdateStatusChanged: (callback: (status: UpdateState) => void) => () => void;
 
   // Activity events (main -> renderer)
   onActivityChanged: (callback: (activity: any) => void) => () => void;

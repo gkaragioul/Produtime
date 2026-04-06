@@ -172,7 +172,7 @@
           ]
         }
       ],
-      "artifactName": "ProduTime-${version}-x64.${ext}",
+      "artifactName": "ProduTime-Setup-${version}-x64.${ext}",
       "icon": "assets/icon.ico",
       "forceCodeSigning": false
     },
@@ -207,7 +207,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "license": "LICENSE.txt",
+      "license": "LICENSE_EULA.txt",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "installerIcon": "assets/icon.ico",
