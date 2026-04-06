@@ -400,20 +400,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   agentGetPairingState: (): Promise<IPCResponse<any>> =>
     ipcRenderer.invoke('agent:getPairingState'),
 
-  agentGetDiscoveredAdmins: (): Promise<IPCResponse<any[]>> =>
-    ipcRenderer.invoke('agent:getDiscoveredAdmins'),
-
-  agentStartPairing: (adminHost: string, pairCode: string): Promise<IPCResponse<{ success: boolean; error?: string }>> =>
-    ipcRenderer.invoke('agent:startPairing', { adminHost, pairCode }),
-
   agentStartCloudPairing: (cloudApiUrl: string, pairCode: string): Promise<IPCResponse<{ success: boolean; error?: string }>> =>
     ipcRenderer.invoke('agent:startCloudPairing', { cloudApiUrl, pairCode }),
 
   agentUnpair: (): Promise<IPCResponse<void>> =>
     ipcRenderer.invoke('agent:unpair'),
-
-  agentAddManualAdmin: (host: string, port?: number): Promise<IPCResponse<any>> =>
-    ipcRenderer.invoke('agent:addManualAdmin', { host, port }),
 
   agentGetEffectivePolicy: (): Promise<IPCResponse<any>> =>
     ipcRenderer.invoke('agent:getEffectivePolicy'),

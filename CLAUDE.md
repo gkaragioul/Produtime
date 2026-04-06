@@ -125,7 +125,7 @@ unset ELECTRON_RUN_AS_NODE && "node_modules/electron/dist/electron.exe" .
 - **Daily insight engine assumes 100% active time:** `computeExpectedWindow()` expects linear 100% productivity from shift start — no allowance for breaks/idle. Fresh installs instantly show "Off Schedule". (NOT YET FIXED)
 
 ## Remaining Known Issues
-- Cloud pairing is disabled (freeware edition — local LAN only)
+- Local network pairing removed — cloud-only via Railway (`wot-produtime-production.up.railway.app`)
 - Auto-updater is disabled (no update server)
 - Licensing is stubbed (always activated)
 - Daily insight engine assumes 100% active time (no break allowance)

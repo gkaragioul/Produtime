@@ -135,11 +135,8 @@ export interface ElectronAPI {
   // Agent (Admin Console) API
   agentGetState: () => Promise<IPCResponse<any>>;
   agentGetPairingState: () => Promise<IPCResponse<any>>;
-  agentGetDiscoveredAdmins: () => Promise<IPCResponse<any[]>>;
-  agentStartPairing: (adminHost: string, pairCode: string) => Promise<IPCResponse<{ success: boolean; error?: string }>>;
   agentStartCloudPairing: (cloudApiUrl: string, pairCode: string) => Promise<IPCResponse<{ success: boolean; error?: string }>>;
   agentUnpair: () => Promise<IPCResponse<void>>;
-  agentAddManualAdmin: (host: string, port?: number) => Promise<IPCResponse<any>>;
   agentGetEffectivePolicy: () => Promise<IPCResponse<any>>;
   agentIsManaged: () => Promise<IPCResponse<boolean>>;
 
