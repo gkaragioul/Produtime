@@ -391,17 +391,9 @@ export const HEARTBEAT_INTERVAL_MS = 10000;  // 10 seconds
 export const STATS_SUMMARY_INTERVAL_MS = 60000;  // 1 minute
 export const NONCE_EXPIRY_MS = 300000;  // 5 minutes
 export const SESSION_TOKEN_EXPIRY_MS = 86400000;  // 24 hours
-export const RECONNECT_DELAY_MS = 5000;  // 5 seconds
-export const MAX_RECONNECT_ATTEMPTS = 10;
-
 // Cloud connection constants (Requirement 11.3)
 export const CLOUD_RECONNECT_BASE_DELAY_MS = 1000;  // 1 second base delay
 export const CLOUD_RECONNECT_MAX_DELAY_MS = 60000;  // 60 seconds max delay
-export const CLOUD_MAX_RECONNECT_ATTEMPTS = 10;  // Max 10 attempts before fallback
-
-// mDNS service type for discovery
-export const MDNS_SERVICE_TYPE = '_produtime-admin._tcp';
-export const MDNS_SERVICE_NAME = 'ProduTime Admin Console';
 
 // Hardcoded cloud admin endpoint for managed deployments
 export const CLOUD_ADMIN_WSS_URL = 'wss://wot-produtime-production.up.railway.app';

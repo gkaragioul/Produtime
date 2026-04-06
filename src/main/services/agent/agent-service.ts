@@ -10,11 +10,9 @@
 
 import { EventEmitter } from 'events';
 import WebSocket from 'ws';
-import * as http from 'http';
 import * as os from 'os';
 import { DatabaseManager } from '../../database';
 import { AgentCryptoService } from './crypto';
-import { AgentDiscoveryService, DiscoveredAdmin } from './discovery';
 import { MetricsComputer } from './metrics-computer';
 import {
   AdminProtocolMessage,
@@ -23,15 +21,10 @@ import {
   HeartbeatPayload,
   StatsSummaryPayload,
   AppSummary,
-  PairRequestPayload,
-  ADMIN_CONSOLE_DEFAULT_PORT,
   HEARTBEAT_INTERVAL_MS,
   STATS_SUMMARY_INTERVAL_MS,
-  RECONNECT_DELAY_MS,
-  MAX_RECONNECT_ATTEMPTS,
   CLOUD_RECONNECT_BASE_DELAY_MS,
   CLOUD_RECONNECT_MAX_DELAY_MS,
-  CLOUD_MAX_RECONNECT_ATTEMPTS,
   CLOUD_ADMIN_WSS_URL,
 } from '../../../shared/admin-protocol';
 import {
@@ -65,7 +58,6 @@ export class AgentService extends EventEmitter {
   
   private database: DatabaseManager;
   private crypto: AgentCryptoService;
-  private discovery: AgentDiscoveryService;
   private deviceIdService: DeviceIdService;
   private metricsComputer: MetricsComputer;
   
@@ -76,7 +68,6 @@ export class AgentService extends EventEmitter {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private statsInterval: NodeJS.Timeout | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
-  private reconnectAttempts: number = 0;
   
   private state: AgentState = {
     status: 'disconnected',
@@ -105,7 +96,6 @@ export class AgentService extends EventEmitter {
     super();
     this.database = database;
     this.crypto = AgentCryptoService.getInstance();
-    this.discovery = AgentDiscoveryService.getInstance();
     this.metricsComputer = new MetricsComputer(database);
     this.deviceIdService = DeviceIdService.getInstance();
   }
@@ -133,9 +123,6 @@ export class AgentService extends EventEmitter {
     
     // Load effective policy
     await this.loadEffectivePolicy();
-    
-    // Start discovery
-    this.discovery.start();
     
     // MANAGED DEPLOYMENT: Always connect to the hardcoded cloud admin URL.
     // Generate keys if this is a fresh install, then connect.
@@ -210,66 +197,6 @@ export class AgentService extends EventEmitter {
    */
   public isManaged(): boolean {
     return this.pairingState?.paired === true;
-  }
-
-  /**
-   * Start pairing process with admin console
-   */
-  public async startPairing(adminHost: string, pairCode: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      // Generate device key pair if not exists
-      if (!this.pairingState?.devicePubKey) {
-        const keyPair = this.crypto.generateKeyPair();
-        this.pairingState = {
-          paired: false,
-          adminHost,
-          adminName: null,
-          adminPubKey: null,
-          devicePubKey: keyPair.publicKey,
-          devicePrivKeyEncrypted: this.crypto.encryptWithPassword(keyPair.privateKey, this.deviceId),
-          pairedAt: null,
-          lastConnectedAt: null,
-          sessionToken: null,
-          // Cloud pairing fields - initialized as null
-          cloudWsEndpoint: null,
-          tenantId: null,
-          tenantName: null,
-        };
-      } else {
-        // Update adminHost even if we already have keys
-        this.pairingState = {
-          ...this.pairingState,
-          adminHost,
-          paired: false,
-          // Reset cloud fields for new pairing attempt
-          cloudWsEndpoint: null,
-          tenantId: null,
-          tenantName: null,
-        };
-      }
-
-      this.state.status = 'pairing';
-      this.state.adminHost = adminHost;
-      this.emit('stateChanged', this.state);
-
-      // Send pairing request via HTTP
-      const response = await this.sendPairRequest(adminHost, pairCode);
-      
-      if (response.success) {
-        // Connect via WebSocket to wait for approval
-        // The WebSocket connection will receive PAIR_APPROVED or PAIR_DENIED
-        this.connectForPairing(adminHost);
-        return { success: true };
-      } else {
-        this.state.status = 'disconnected';
-        this.emit('stateChanged', this.state);
-        return { success: false, error: response.error };
-      }
-    } catch (error) {
-      this.state.status = 'disconnected';
-      this.emit('stateChanged', this.state);
-      return { success: false, error: String(error) };
-    }
   }
 
   /**
@@ -557,217 +484,6 @@ export class AgentService extends EventEmitter {
   }
 
   /**
-   * Connect to admin console for pairing (waiting for approval)
-   */
-  private connectForPairing(adminHost: string): void {
-    console.log('[AGENT] ========================================');
-    console.log('[AGENT] connectForPairing() called');
-    console.log('[AGENT] adminHost:', adminHost);
-    
-    if (this.ws) {
-      console.log('[AGENT] Closing existing WebSocket connection');
-      this.ws.close();
-    }
-
-    const [host, portStr] = adminHost.split(':');
-    const port = parseInt(portStr) || ADMIN_CONSOLE_DEFAULT_PORT;
-    const wsUrl = `ws://${host}:${port}/ws`;
-
-    console.log(`[AGENT] Connecting to Admin Console for pairing: ${wsUrl}`);
-
-    try {
-      const ws = new WebSocket(wsUrl);
-      this.ws = ws;
-
-      ws.on('open', () => {
-        console.log('[AGENT] ========================================');
-        console.log('[AGENT] WebSocket OPEN - connected to Admin Console');
-        console.log('[AGENT] WebSocket readyState:', ws.readyState);
-        console.log('[AGENT] Preparing IDENTIFY message...');
-        
-        // Send identification message so admin knows who we are
-        const identifyMsg = this.crypto.createSignedMessage(
-          'IDENTIFY',
-          this.deviceId,
-          {
-            deviceName: this.getDeviceDisplayName(),
-            devicePubKey: this.pairingState!.devicePubKey,
-            appVersion: this.appVersion,
-            isPairing: true,
-          },
-          this.getPrivateKey()
-        );
-        
-        console.log('[AGENT] Sending IDENTIFY message...');
-        console.log('[AGENT] IDENTIFY deviceId:', this.deviceId);
-        ws.send(JSON.stringify(identifyMsg));
-        console.log('[AGENT] IDENTIFY message sent, waiting for approval...');
-        console.log('[AGENT] ========================================');
-      });
-
-      ws.on('message', (data) => {
-        console.log('[AGENT] ========================================');
-        console.log('[AGENT] WebSocket MESSAGE received');
-        console.log('[AGENT] Data preview:', data.toString().substring(0, 200));
-        this.handleMessage(data.toString());
-      });
-
-      ws.on('close', (code, reason) => {
-        console.log('[AGENT] ========================================');
-        console.log('[AGENT] WebSocket CLOSED during pairing');
-        console.log('[AGENT] Close code:', code);
-        console.log('[AGENT] Close reason:', reason?.toString() || 'none');
-        console.log('[AGENT] Current state.status:', this.state.status);
-        
-        if (this.state.status === 'pairing') {
-          this.state.status = 'disconnected';
-          this.emit('stateChanged', this.state);
-        }
-      });
-
-      ws.on('error', (err) => {
-        console.error('[AGENT] ========================================');
-        console.error('[AGENT] WebSocket ERROR during pairing:', err);
-        this.state.status = 'disconnected';
-        this.emit('stateChanged', this.state);
-      });
-    } catch (err) {
-      console.error('[AGENT] Failed to connect for pairing:', err);
-      this.state.status = 'disconnected';
-      this.emit('stateChanged', this.state);
-    }
-  }
-
-  /**
-   * Send pairing request to admin console
-   */
-  private async sendPairRequest(adminHost: string, pairCode: string): Promise<{ success: boolean; error?: string }> {
-    return new Promise((resolve) => {
-      const payload: PairRequestPayload = {
-        deviceName: this.getDeviceDisplayName(),
-        devicePubKey: this.pairingState!.devicePubKey!,
-        appVersion: this.appVersion,
-        osInfo: `${process.platform} ${require('os').release()}`,
-        pairCode,
-      };
-
-      const message = this.crypto.createSignedMessage(
-        'PAIR_REQUEST',
-        this.deviceId,
-        payload,
-        this.getPrivateKey()
-      );
-
-      const postData = JSON.stringify(message);
-      const [host, portStr] = adminHost.split(':');
-      const port = parseInt(portStr) || ADMIN_CONSOLE_DEFAULT_PORT;
-
-      const req = http.request(
-        {
-          hostname: host,
-          port,
-          path: '/pair/request',
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(postData),
-          },
-          timeout: 10000,
-        },
-        (res) => {
-          let data = '';
-          res.on('data', (chunk) => (data += chunk));
-          res.on('end', () => {
-            try {
-              const result = JSON.parse(data);
-              resolve(result);
-            } catch {
-              resolve({ success: false, error: 'Invalid response from admin' });
-            }
-          });
-        }
-      );
-
-      req.on('error', (err) => {
-        resolve({ success: false, error: `Connection failed: ${err.message}` });
-      });
-
-      req.on('timeout', () => {
-        req.destroy();
-        resolve({ success: false, error: 'Connection timeout' });
-      });
-
-      req.write(postData);
-      req.end();
-    });
-  }
-
-  /**
-   * Connect to admin console via WebSocket
-   */
-  private connect(adminHost: string): void {
-    // Clean up old socket without triggering reconnect via handleDisconnect
-    if (this.ws) {
-      try {
-        this.ws.removeAllListeners();
-        this.ws.close();
-      } catch {}
-      this.ws = null;
-    }
-    this.stopHeartbeat();
-
-    const [host, portStr] = adminHost.split(':');
-    const port = parseInt(portStr) || ADMIN_CONSOLE_DEFAULT_PORT;
-    const wsUrl = `ws://${host}:${port}/ws`;
-
-    console.log(`[AGENT] Connecting to Admin Console: ${wsUrl}`);
-    this.state.status = 'connecting';
-    this.emit('stateChanged', this.state);
-
-    try {
-      const ws = new WebSocket(wsUrl);
-
-      ws.on('open', () => {
-        // Store reference only once connection is actually open
-        this.ws = ws;
-        console.log('[AGENT] Connected to Admin Console');
-        console.log('[AGENT] WebSocket readyState after open:', this.ws?.readyState);
-        this.reconnectAttempts = 0;
-        this.state.status = this.pairingState?.paired ? 'paired' : 'pairing';
-        this.state.lastConnected = Date.now();
-        this.emit('stateChanged', this.state);
-
-        // Start heartbeat
-        this.startHeartbeat();
-      });
-
-      ws.on('message', (data) => {
-        console.log('[AGENT] Received message:', data.toString().substring(0, 100));
-        this.handleMessage(data.toString());
-      });
-
-      ws.on('close', (code, reason) => {
-        console.log(`[AGENT] Disconnected from Admin Console: code=${code}, reason=${reason}`);
-        // Only handle disconnect if this is still the active socket
-        if (this.ws === ws) {
-          this.handleDisconnect();
-        }
-      });
-
-      ws.on('error', (err) => {
-        console.error('[AGENT] WebSocket error:', err);
-        // Only handle disconnect if this is still the active socket
-        if (this.ws === ws || this.ws === null) {
-          this.handleDisconnect();
-        }
-      });
-    } catch (err) {
-      console.error('[AGENT] Failed to connect:', err);
-      this.handleDisconnect();
-    }
-  }
-
-  /**
    * Connect to cloud admin console via WebSocket
    * Requirement 11.2: Connect to stored cloud endpoint on startup
    * Requirement 11.3: Implement exponential backoff retry (max 10 attempts)
@@ -863,34 +579,6 @@ export class AgentService extends EventEmitter {
       this.reconnectTimeout = setTimeout(() => {
         this.connectToCloud(cloudEndpoint);
       }, delay);
-    }
-  }
-
-  /**
-   * Handle WebSocket disconnection
-   */
-  private handleDisconnect(): void {
-    this.stopHeartbeat();
-    this.ws = null;
-    this.state.status = 'disconnected';
-    this.emit('stateChanged', this.state);
-
-    // If in cloud mode, use cloud reconnect logic
-    if (this.isCloudMode && this.pairingState?.cloudWsEndpoint) {
-      this.handleCloudDisconnect();
-      return;
-    }
-
-    // Attempt reconnect if paired (local mode)
-    if (this.pairingState?.paired && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-      this.reconnectAttempts++;
-      console.log(`Reconnecting in ${RECONNECT_DELAY_MS}ms (attempt ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-      
-      this.reconnectTimeout = setTimeout(() => {
-        if (this.pairingState?.adminHost) {
-          this.connect(this.pairingState.adminHost);
-        }
-      }, RECONNECT_DELAY_MS);
     }
   }
 
@@ -1573,20 +1261,6 @@ export class AgentService extends EventEmitter {
   }
 
   /**
-   * Get discovered admin consoles
-   */
-  public getDiscoveredAdmins(): DiscoveredAdmin[] {
-    return this.discovery.getDiscoveredAdmins();
-  }
-
-  /**
-   * Add manual admin host
-   */
-  public addManualAdmin(host: string, port?: number): DiscoveredAdmin {
-    return this.discovery.addManualAdmin(host, port);
-  }
-
-  /**
    * Send export result back to admin
    */
   public sendExportResult(result: any): void {
@@ -1650,9 +1324,7 @@ export class AgentService extends EventEmitter {
     if (this.ws) {
       this.ws.close();
     }
-    
-    this.discovery.stop();
-    
+
     console.log('Agent service shutdown');
   }
 }

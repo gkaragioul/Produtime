@@ -40,7 +40,7 @@ import {
   ActivationStatus,
   PrivacySettings,
 } from '../shared/types';
-import { AgentPairingState, DiscoveredAdmin } from './services/agent';
+import { AgentPairingState } from './services/agent';
 import { DEFAULT_PRIVACY_APPS } from './services/privacy-constants';
 
 export class IPCHandlers {
@@ -321,10 +321,8 @@ export class IPCHandlers {
       // Agent (Admin Console)
       'agent:getState',
       'agent:getPairingState',
-      'agent:getDiscoveredAdmins',
-      'agent:startPairing',
+      'agent:startCloudPairing',
       'agent:unpair',
-      'agent:addManualAdmin',
       'agent:getEffectivePolicy',
       'agent:isManaged',
     ];
@@ -607,11 +605,8 @@ export class IPCHandlers {
     // Agent (Admin Console) handlers
     ipcMain.handle('agent:getState', this.handleAgentGetState.bind(this));
     ipcMain.handle('agent:getPairingState', this.handleAgentGetPairingState.bind(this));
-    ipcMain.handle('agent:getDiscoveredAdmins', this.handleAgentGetDiscoveredAdmins.bind(this));
-    ipcMain.handle('agent:startPairing', this.handleAgentStartPairing.bind(this));
     ipcMain.handle('agent:startCloudPairing', this.handleAgentStartCloudPairing.bind(this));
     ipcMain.handle('agent:unpair', this.handleAgentUnpair.bind(this));
-    ipcMain.handle('agent:addManualAdmin', this.handleAgentAddManualAdmin.bind(this));
     ipcMain.handle('agent:getEffectivePolicy', this.handleAgentGetEffectivePolicy.bind(this));
     ipcMain.handle('agent:isManaged', this.handleAgentIsManaged.bind(this));
 
@@ -1680,11 +1675,8 @@ export class IPCHandlers {
       'privacy:setMode',
       'agent:getState',
       'agent:getPairingState',
-      'agent:getDiscoveredAdmins',
-      'agent:startPairing',
       'agent:startCloudPairing',
       'agent:unpair',
-      'agent:addManualAdmin',
       'agent:getEffectivePolicy',
       'agent:isManaged',
     ];
@@ -2246,28 +2238,14 @@ export class IPCHandlers {
     }
   }
 
-  private async handleAgentGetDiscoveredAdmins(event: IpcMainInvokeEvent): Promise<IPCResponse<DiscoveredAdmin[]>> {
-    try {
-      if (!this.agentService) return { success: true, data: [] };
-      return { success: true, data: this.agentService.getDiscoveredAdmins() };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  private async handleAgentStartPairing(event: IpcMainInvokeEvent, request: { adminHost: string; pairCode: string }): Promise<IPCResponse<{ success: boolean; error?: string }>> {
+  private async handleAgentStartCloudPairing(_event: IpcMainInvokeEvent, request: { cloudApiUrl: string; pairCode: string }): Promise<IPCResponse<{ success: boolean; error?: string }>> {
     try {
       if (!this.agentService) return { success: false, error: 'Agent service not initialized' };
-      const result = await this.agentService.startPairing(request.adminHost, request.pairCode);
+      const result = await this.agentService.startCloudPairing(request.cloudApiUrl, request.pairCode);
       return { success: true, data: result };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
-  }
-
-  // Freeware: cloud pairing disabled — local LAN only
-  private async handleAgentStartCloudPairing(_event: IpcMainInvokeEvent, _request: { cloudApiUrl: string; pairCode: string }): Promise<IPCResponse<{ success: boolean; error?: string }>> {
-    return { success: false, error: 'Cloud pairing is not available in the free local-only edition' };
   }
 
   private async handleAgentUnpair(event: IpcMainInvokeEvent): Promise<IPCResponse<void>> {
@@ -2275,16 +2253,6 @@ export class IPCHandlers {
       if (!this.agentService) return { success: false, error: 'Agent service not initialized' };
       await this.agentService.unpair();
       return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  }
-
-  private async handleAgentAddManualAdmin(event: IpcMainInvokeEvent, request: { host: string; port?: number }): Promise<IPCResponse<DiscoveredAdmin>> {
-    try {
-      if (!this.agentService) return { success: false, error: 'Agent service not initialized' };
-      const admin = this.agentService.addManualAdmin(request.host, request.port);
-      return { success: true, data: admin };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
