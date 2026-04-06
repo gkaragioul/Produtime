@@ -6,7 +6,7 @@
  */
 
 import { autoUpdater, UpdateInfo as ElectronUpdateInfo } from 'electron-updater';
-import { BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 import {
   UpdateStatus,
   UpdateState,
@@ -21,6 +21,7 @@ export class AutoUpdaterManager {
   private checkTimer: NodeJS.Timeout | null = null;
   private autoDownloadTimer: NodeJS.Timeout | null = null;
   private currentState: UpdateState = { status: UpdateStatus.NOT_AVAILABLE };
+  private isManualCheck: boolean = false;
 
   constructor(mainWindow: BrowserWindow) {
     this.mainWindow = mainWindow;
@@ -60,6 +61,15 @@ export class AutoUpdaterManager {
 
     autoUpdater.on('update-not-available', () => {
       this.broadcastState({ status: UpdateStatus.NOT_AVAILABLE });
+      if (this.isManualCheck) {
+        this.isManualCheck = false;
+        dialog.showMessageBox({
+          type: 'info',
+          title: 'No Updates Available',
+          message: `You're up to date! Current version: ${app.getVersion()}`,
+          buttons: ['OK'],
+        });
+      }
     });
 
     autoUpdater.on('download-progress', (progress) => {
@@ -89,6 +99,7 @@ export class AutoUpdaterManager {
 
     autoUpdater.on('error', (err) => {
       console.error('[AUTO-UPDATER] Error:', err.message);
+      this.isManualCheck = false;
       this.broadcastState({
         status: UpdateStatus.ERROR,
         error: err.message,
@@ -99,9 +110,11 @@ export class AutoUpdaterManager {
   private registerIPC(): void {
     ipcMain.handle('updater:checkForUpdates', async () => {
       try {
+        this.isManualCheck = true;
         await autoUpdater.checkForUpdates();
         return { success: true };
       } catch (error: any) {
+        this.isManualCheck = false;
         return { success: false, error: error.message };
       }
     });
@@ -153,6 +166,7 @@ export class AutoUpdaterManager {
   }
 
   public async checkForUpdates(): Promise<void> {
+    this.isManualCheck = true;
     await autoUpdater.checkForUpdates();
   }
 
