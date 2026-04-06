@@ -172,7 +172,7 @@
           ]
         }
       ],
-      "artifactName": "WOT Produtime.${ext}",
+      "artifactName": "WOT-Produtime.${ext}",
       "icon": "assets/icon.ico",
       "forceCodeSigning": false
     },
