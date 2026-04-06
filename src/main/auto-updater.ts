@@ -7,6 +7,8 @@
 
 import { autoUpdater, UpdateInfo as ElectronUpdateInfo } from 'electron-updater';
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   UpdateStatus,
   UpdateState,
@@ -97,13 +99,14 @@ export class AutoUpdaterManager {
         },
       });
 
-      // Auto-install immediately — close all windows and quit
-      setTimeout(() => {
+      // Auto-install immediately — strip SmartScreen mark, close all windows, silent install
+      setTimeout(async () => {
+        await this.removeMarkOfTheWeb();
         app.removeAllListeners('window-all-closed');
         const windows = BrowserWindow.getAllWindows();
         windows.forEach(w => w.removeAllListeners('close'));
         windows.forEach(w => w.close());
-        autoUpdater.quitAndInstall(false, true);
+        autoUpdater.quitAndInstall(true, true); // silent=true to bypass SmartScreen
       }, 1500); // Brief delay so user sees "ready to install" before restart
     });
 
@@ -143,12 +146,13 @@ export class AutoUpdaterManager {
     });
 
     ipcMain.handle('updater:installUpdate', async () => {
-      setImmediate(() => {
+      setImmediate(async () => {
+        await this.removeMarkOfTheWeb();
         app.removeAllListeners('window-all-closed');
         const windows = BrowserWindow.getAllWindows();
         windows.forEach(w => w.removeAllListeners('close'));
         windows.forEach(w => w.close());
-        autoUpdater.quitAndInstall(false, true);
+        autoUpdater.quitAndInstall(true, true); // silent=true to bypass SmartScreen
       });
       return { success: true };
     });
@@ -184,6 +188,25 @@ export class AutoUpdaterManager {
 
   public getCurrentState(): UpdateState {
     return this.currentState;
+  }
+
+  private async removeMarkOfTheWeb(): Promise<void> {
+    try {
+      const pendingDir = path.join(app.getPath('userData'), 'pending');
+      if (!fs.existsSync(pendingDir)) return;
+      const files = fs.readdirSync(pendingDir).filter(f => f.endsWith('.exe'));
+      for (const file of files) {
+        const adsPath = path.join(pendingDir, file) + ':Zone.Identifier';
+        try {
+          fs.unlinkSync(adsPath);
+          console.log('[AUTO-UPDATER] Removed Mark of the Web from', file);
+        } catch {
+          // ADS may not exist, that's fine
+        }
+      }
+    } catch (err) {
+      console.warn('[AUTO-UPDATER] Failed to remove MOTW:', err);
+    }
   }
 
   public cleanup(): void {
