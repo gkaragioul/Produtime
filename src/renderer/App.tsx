@@ -99,8 +99,11 @@ const App: React.FC = () => {
 
     checkManagedStatus();
 
-    // Listen for agent state changes
+    // Listen for agent state changes — only update on meaningful changes
+    let lastStatus = '';
     const unsubscribeState = window.electronAPI.onAgentStateChanged?.((state: any) => {
+      if (state.status === lastStatus) return; // skip connecting/disconnected oscillation
+      lastStatus = state.status;
       setIsManaged(state.status === 'paired');
       setAdminName(state.adminName);
       setIsLocked(state.isLocked || false);
