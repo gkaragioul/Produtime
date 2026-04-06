@@ -1,6 +1,6 @@
 {
   "name": "produtime",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "description": "ProduTime - Free local-only time tracking application",
   "main": "dist/main/main.js",
   "homepage": "https://github.com/georgekgr12/timeport",
