@@ -1,21 +1,17 @@
 /**
- * Today Status Component - Command Center (Final Form)
- * 
- * The hero element of the Daily Performance Console.
- * Shows at a glance: Where am I? On track or behind? Why?
- * 
- * COMPLIANCE: This is NOT spyware.
- * - Only aggregated stats are displayed
- * - No raw window titles or content
- * - All data is privacy-respecting
+ * Today Status Component
+ *
+ * Single consolidated view: expected window, progress bar,
+ * active/idle/focus stats. No duplicate information.
  */
 
 import React from 'react';
-import { 
-  DailyInsight, 
-  ExpectedWindow, 
+import {
+  DailyInsight,
+  ExpectedWindow,
   formatDurationShort,
   isDataSufficientForJudgement,
+  isDataSufficientForProductivity,
 } from '../services/daily-insight-engine';
 
 interface TodayStatusProps {
@@ -35,34 +31,41 @@ export const TodayStatus: React.FC<TodayStatusProps> = ({
   untrackedSeconds,
   isTracking,
 }) => {
-  const { userState, sentence, statusEmoji, statusLabel, statusColor } = insight;
+  const { userState, statusColor } = insight;
   const progressPct = Math.round(userState.progressPct * 100);
   const totalTracked = activeSeconds + idleSeconds + untrackedSeconds;
   const hasEnoughData = isDataSufficientForJudgement(totalTracked);
-  
+  const hasProductivityData = isDataSufficientForProductivity(totalTracked);
+  const focusPct = hasProductivityData ? Math.round(userState.focusRatio * 100) : null;
+
   return (
     <div className="today-status">
-      {!isTracking && (
-        <div className="today-status-header">
-          <div className="tracking-off-badge">
+      {/* Expected Window */}
+      <div className="expected-window">
+        <span className="expected-icon">🎯</span>
+        <span className="expected-text">
+          {expected.workStart}–{expected.workEnd} ({formatDurationShort(expected.expectedTotalSeconds)})
+        </span>
+        {!isTracking && (
+          <span className="tracking-off-badge" style={{ marginLeft: 'auto' }}>
             Tracking Off
-          </div>
-        </div>
-      )}
+          </span>
+        )}
+      </div>
 
-      {/* Progress Bar - Only show when meaningful */}
+      {/* Progress Bar */}
       {expected.isWithinWorkWindow && expected.expectedSoFarSeconds > 0 && (
         <div className="progress-section">
           <div className="progress-header">
-            <span className="progress-label">Progress vs Expected</span>
+            <span className="progress-label">Progress</span>
             <span className="progress-value" style={{ color: statusColor }}>
               {progressPct}%
             </span>
           </div>
           <div className="progress-bar-container">
-            <div 
+            <div
               className="progress-bar-fill"
-              style={{ 
+              style={{
                 width: `${Math.min(100, progressPct)}%`,
                 backgroundColor: statusColor,
               }}
@@ -73,16 +76,8 @@ export const TodayStatus: React.FC<TodayStatusProps> = ({
           </div>
         </div>
       )}
-      
-      {/* Expected Window */}
-      <div className="expected-window">
-        <span className="expected-icon">🎯</span>
-        <span className="expected-text">
-          Expected today: {expected.workStart}–{expected.workEnd} ({formatDurationShort(expected.expectedTotalSeconds)})
-        </span>
-      </div>
-      
-      {/* Live Stats - Simplified */}
+
+      {/* Stats Row — Active, Idle, Focus (no duplicates) */}
       <div className="live-indicators">
         <div className="indicator">
           <span className="indicator-value" style={{ color: '#28a745' }}>
@@ -96,17 +91,19 @@ export const TodayStatus: React.FC<TodayStatusProps> = ({
           </span>
           <span className="indicator-label">Idle</span>
         </div>
-        {untrackedSeconds > 0 && (
+        {focusPct !== null && (
           <div className="indicator">
-            <span className="indicator-value" style={{ color: '#dc3545' }}>
-              {formatDurationShort(untrackedSeconds)}
+            <span className="indicator-value" style={{
+              color: focusPct >= 70 ? '#28a745' : focusPct >= 50 ? '#ff9800' : '#dc3545'
+            }}>
+              {focusPct}%
             </span>
-            <span className="indicator-label">Untracked</span>
+            <span className="indicator-label">Focus</span>
           </div>
         )}
       </div>
-      
-      {/* Early Day Notice - Truth enforcement */}
+
+      {/* Early Day Notice */}
       {!hasEnoughData && expected.isWithinWorkWindow && totalTracked > 0 && (
         <div className="early-notice">
           Too early to evaluate your day. Keep working!
