@@ -79,7 +79,10 @@ Write-Host "      SHA256: $Hash" -ForegroundColor Green
 # ── Step 4: GitHub Release ────────────────────────────────────────────────────
 $Tag         = "v$Version"
 $RepoRelease = "wotbyalice/WOT-Produtime-Releases"
-$ReleaseNotes = "ProduTime v$Version`n`nSHA256: $Hash"
+$GitHubReleaseNotes = "ProduTime v$Version`n`nSHA256: $Hash"
+if ($ReleaseNotes) {
+    $GitHubReleaseNotes = "$ReleaseNotes`n`nSHA256: $Hash"
+}
 
 Write-Host "[4/5] Creating GitHub release $Tag on $RepoRelease..." -ForegroundColor Yellow
 
@@ -90,7 +93,7 @@ if ($DryRun) {
     gh release create $Tag `
         --repo $RepoRelease `
         --title "ProduTime v$Version" `
-        --notes $ReleaseNotes `
+        --notes $GitHubReleaseNotes `
         $ExeFile.FullName
 
     if ($LASTEXITCODE -ne 0) { Write-Error "gh release create failed"; exit 1 }
