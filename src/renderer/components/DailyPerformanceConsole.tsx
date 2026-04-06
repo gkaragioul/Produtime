@@ -19,7 +19,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityLog } from '../../shared/types';
 import { TodayStatus } from './TodayStatus';
 import { FocusSummary } from './FocusSummary';
-import { PerformanceMetrics } from './PerformanceMetrics';
 import { TrackingControls } from './TrackingControls';
 import {
   computeExpectedWindow,
@@ -425,15 +424,6 @@ export const DailyPerformanceConsole: React.FC = () => {
             idleSeconds={metrics.idle}
             untrackedSeconds={0}
             isTracking={isTracking}
-          />
-          
-          {/* C) PERFORMANCE METRICS - Simplified */}
-          <PerformanceMetrics
-            activeSeconds={metrics.active}
-            idleSeconds={metrics.idle}
-            untrackedSeconds={0}
-            insight={dailyInsight}
-            expected={expectedWindow}
           />
           
           {/* D) CONTROLS - De-emphasized */}
