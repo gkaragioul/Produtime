@@ -1,25 +1,17 @@
-﻿# =============================================================================
+# =============================================================================
 # ProduTime Release Script
 # Usage: .\scripts\release.ps1 -Version 0.5.2
 #
 # What it does:
 #   1. Builds main + renderer
-#   2. Packages portable x64 EXE via electron-builder
-#   3. Computes SHA256 of the installer
-#   4. Creates a GitHub release on wotbyalice/WOT-Produtime-Releases
-#   5. Uploads the EXE to the release
-#   6. Publishes the update manifest to Railway (wot-produtime-production.up.railway.app)
+#   2. Packages NSIS installer via electron-builder
+#   3. Creates a GitHub release on wotbyalice/WOT-Produtime-Releases
+#   4. Uploads installer EXE + latest.yml (required by electron-updater)
 # =============================================================================
 
 param(
     [Parameter(Mandatory = $true)]
     [string]$Version,
-
-    [string]$AdminUrl = "https://wot-produtime-production.up.railway.app",
-
-    [string]$AdminPassword = $env:PRODUTIME_ADMIN_PASSWORD,
-
-    [string]$ReleaseNotes = "",
 
     [switch]$SkipBuild,
     [switch]$DryRun
@@ -41,9 +33,9 @@ Write-Host "  ProduTime Release Script v$Version" -ForegroundColor Cyan
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 
-# ── Step 1: Build ──────────────────────────────────────────────────────────────
+# -- Step 1: Build ---------------------------------------------------------------
 if (-not $SkipBuild) {
-    Write-Host "[1/5] Building..." -ForegroundColor Yellow
+    Write-Host "[1/4] Building..." -ForegroundColor Yellow
     Push-Location $RootDir
     npm run build:main
     if ($LASTEXITCODE -ne 0) { Write-Error "build:main failed"; exit 1 }
@@ -52,110 +44,60 @@ if (-not $SkipBuild) {
     Pop-Location
     Write-Host "      Build complete." -ForegroundColor Green
 } else {
-    Write-Host "[1/5] Build skipped (-SkipBuild)" -ForegroundColor DarkGray
+    Write-Host "[1/4] Build skipped (-SkipBuild)" -ForegroundColor DarkGray
 }
 
-# ── Step 2: Package ────────────────────────────────────────────────────────────
-Write-Host "[2/5] Packaging portable x64 EXE..." -ForegroundColor Yellow
+# -- Step 2: Package NSIS installer ----------------------------------------------
+Write-Host "[2/4] Packaging NSIS installer..." -ForegroundColor Yellow
 Push-Location $RootDir
-npx electron-builder --win portable --x64
+npx electron-builder --win nsis --x64
 if ($LASTEXITCODE -ne 0) { Write-Error "electron-builder failed"; exit 1 }
 Pop-Location
 
-# Find the output EXE
+# Find the output EXE and latest.yml
 $OutDir = Join-Path $RootDir "build-output"
 $ExeFile = Get-ChildItem -Path $OutDir -Filter "*.exe" -Recurse | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+$YmlFile = Join-Path $OutDir "latest.yml"
+
 if (-not $ExeFile) {
     Write-Error "No EXE found in $OutDir after packaging"
     exit 1
 }
-Write-Host "      Packaged: $($ExeFile.FullName)" -ForegroundColor Green
+if (-not (Test-Path $YmlFile)) {
+    Write-Error "latest.yml not found in $OutDir -- electron-updater requires this file"
+    exit 1
+}
+Write-Host "      Installer: $($ExeFile.FullName)" -ForegroundColor Green
+Write-Host "      Manifest:  $YmlFile" -ForegroundColor Green
 
-# ── Step 3: SHA256 ─────────────────────────────────────────────────────────────
-Write-Host "[3/5] Computing SHA256..." -ForegroundColor Yellow
+# -- Step 3: SHA256 ---------------------------------------------------------------
+Write-Host "[3/4] Computing SHA256..." -ForegroundColor Yellow
 $Hash = (Get-FileHash -Path $ExeFile.FullName -Algorithm SHA256).Hash.ToLower()
 Write-Host "      SHA256: $Hash" -ForegroundColor Green
 
-# ── Step 4: GitHub Release ────────────────────────────────────────────────────
+# -- Step 4: GitHub Release -------------------------------------------------------
 $Tag         = "v$Version"
 $RepoRelease = "wotbyalice/WOT-Produtime-Releases"
-$GitHubReleaseNotes = "ProduTime v$Version`n`nSHA256: $Hash"
-if ($ReleaseNotes) {
-    $GitHubReleaseNotes = "$ReleaseNotes`n`nSHA256: $Hash"
-}
+$ReleaseNotes = "ProduTime v$Version`n`nSHA256: $Hash"
 
-Write-Host "[4/5] Creating GitHub release $Tag on $RepoRelease..." -ForegroundColor Yellow
+Write-Host "[4/4] Creating GitHub release $Tag on $RepoRelease..." -ForegroundColor Yellow
 
 if ($DryRun) {
-    Write-Host "      DRY RUN — skipping GitHub release creation" -ForegroundColor DarkGray
+    Write-Host "      DRY RUN -- skipping GitHub release creation" -ForegroundColor DarkGray
 } else {
-    # Create the release and upload EXE
+    # Create the release and upload BOTH the installer EXE and latest.yml
     gh release create $Tag `
         --repo $RepoRelease `
         --title "ProduTime v$Version" `
-        --notes $GitHubReleaseNotes `
-        $ExeFile.FullName
+        --notes $ReleaseNotes `
+        $ExeFile.FullName `
+        $YmlFile
 
     if ($LASTEXITCODE -ne 0) { Write-Error "gh release create failed"; exit 1 }
     Write-Host "      Release published: https://github.com/$RepoRelease/releases/tag/$Tag" -ForegroundColor Green
 }
 
-# Build download URL
-$ExeName    = $ExeFile.Name
-$DownloadUrl = "https://github.com/$RepoRelease/releases/download/$Tag/$ExeName"
-$ReleaseNotesUrl = "https://github.com/$RepoRelease/releases/tag/$Tag"
-
-# ── Step 5: Publish manifest to Railway ───────────────────────────────────────
-Write-Host "[5/5] Publishing update manifest to Railway..." -ForegroundColor Yellow
-
-if (-not $AdminPassword) {
-    Write-Warning "PRODUTIME_ADMIN_PASSWORD not set — prompting..."
-    $SecurePass = Read-Host "Admin password" -AsSecureString
-    $AdminPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto(
-        [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecurePass)
-    )
-}
-
-if ($DryRun) {
-    Write-Host "      DRY RUN — skipping manifest publish" -ForegroundColor DarkGray
-    Write-Host "      Would POST to: $AdminUrl/api/updates/publish" -ForegroundColor DarkGray
-    Write-Host "      Payload: version=$Version, url=$DownloadUrl" -ForegroundColor DarkGray
-} else {
-    # Authenticate
-    $LoginBody = @{ password = $AdminPassword } | ConvertTo-Json
-    $LoginResp = Invoke-RestMethod -Uri "$AdminUrl/api/auth/login" `
-        -Method POST -ContentType "application/json" -Body $LoginBody
-    if (-not $LoginResp.success) {
-        Write-Error "Admin login failed: $($LoginResp.error)"
-        exit 1
-    }
-    $Token = $LoginResp.token
-
-    # Publish manifest
-    $publishData = @{
-        version        = $Version
-        url            = $DownloadUrl
-        releaseNotesUrl = $ReleaseNotesUrl
-        sha256         = $Hash
-        mandatory      = $false
-    }
-    if ($ReleaseNotes) {
-        $publishData.releaseNotes = $ReleaseNotes
-    }
-    $PublishBody = $publishData | ConvertTo-Json
-
-    $PublishResp = Invoke-RestMethod -Uri "$AdminUrl/api/updates/publish" `
-        -Method POST -ContentType "application/json" -Body $PublishBody `
-        -Headers @{ Authorization = "Bearer $Token" }
-
-    if (-not $PublishResp.success) {
-        Write-Error "Manifest publish failed"
-        exit 1
-    }
-    Write-Host "      Manifest live at: $AdminUrl/updates/latest.json" -ForegroundColor Green
-}
-
-# ── Summary ───────────────────────────────────────────────────────────────────
+# -- Summary ----------------------------------------------------------------------
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "  Release v$Version complete!" -ForegroundColor Green
@@ -163,5 +105,4 @@ Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "  Installer : $($ExeFile.Name)" -ForegroundColor White
 Write-Host "  SHA256    : $Hash" -ForegroundColor White
 Write-Host "  GitHub    : https://github.com/$RepoRelease/releases/tag/$Tag" -ForegroundColor White
-Write-Host "  Manifest  : $AdminUrl/updates/latest.json" -ForegroundColor White
 Write-Host ""

@@ -1,6 +1,6 @@
 import { app, ipcMain, IpcMainInvokeEvent } from 'electron';
 import { DatabaseManager } from './database';
-// auto-updater.ts no longer used — assisted-updater registers its own IPC in main.ts
+// Auto-updater IPC is registered directly in auto-updater.ts via AutoUpdaterManager
 import { PDFGenerator } from './pdf-generator';
 import { SystemTrayManager } from './system-tray';
 import { EmailService } from './services/email-service';
@@ -45,7 +45,7 @@ import { DEFAULT_PRIVACY_APPS } from './services/privacy-constants';
 
 export class IPCHandlers {
   private database: DatabaseManager;
-  // autoUpdater field removed — assisted updater handles updates via main.ts
+  // Auto-updater IPC handled directly in AutoUpdaterManager
   private pdfGenerator: PDFGenerator | null = null;
   private systemTray: SystemTrayManager | null = null;
   private autoExportScheduler: any | null = null;
@@ -85,7 +85,7 @@ export class IPCHandlers {
 
   constructor(
     database: DatabaseManager,
-    _autoUpdater?: unknown, // kept for call-site compat — assisted updater handles updates via main.ts
+    _autoUpdater?: unknown, // kept for call-site compat — updates handled in AutoUpdaterManager
     pdfGenerator?: PDFGenerator,
     systemTray?: SystemTrayManager,
     autoExportScheduler?: any,

@@ -65,7 +65,14 @@ const App: React.FC = () => {
     getVersion();
   }, []);
 
-  // Auto-updater listener removed — assisted updater shows its own dialogs
+  // Auto-updater listener
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.onUpdateStatusChanged?.((state: UpdateState) => {
+      setUpdateState(state);
+      setUpdateDismissed(false);
+    });
+    return () => unsubscribe?.();
+  }, []);
 
   // Check if device is managed by Admin Console
   useEffect(() => {
@@ -450,7 +457,8 @@ const App: React.FC = () => {
       {!updateDismissed && (
         <UpdateProgressBar
           updateState={updateState}
-          onDownload={() => window.electronAPI.checkForUpdates()}
+          onDownload={() => window.electronAPI.downloadUpdate()}
+          onInstall={() => window.electronAPI.installUpdate()}
           onDismiss={() => setUpdateDismissed(true)}
         />
       )}
