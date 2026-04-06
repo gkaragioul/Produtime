@@ -42,32 +42,14 @@ export const TodayStatus: React.FC<TodayStatusProps> = ({
   
   return (
     <div className="today-status">
-      {/* Status Badge */}
-      <div className="today-status-header">
-        <div 
-          className="status-badge"
-          style={{ 
-            backgroundColor: `${statusColor}15`,
-            borderColor: statusColor,
-            color: statusColor,
-          }}
-        >
-          <span className="status-emoji">{statusEmoji}</span>
-          <span className="status-label">{statusLabel}</span>
-        </div>
-        
-        {!isTracking && (
+      {!isTracking && (
+        <div className="today-status-header">
           <div className="tracking-off-badge">
             Tracking Off
           </div>
-        )}
-      </div>
-      
-      {/* Main Sentence - The dominant element */}
-      <div className="today-sentence" style={{ color: statusColor }}>
-        {sentence}
-      </div>
-      
+        </div>
+      )}
+
       {/* Progress Bar - Only show when meaningful */}
       {expected.isWithinWorkWindow && expected.expectedSoFarSeconds > 0 && (
         <div className="progress-section">
