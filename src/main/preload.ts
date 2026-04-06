@@ -13,7 +13,6 @@ import type {
   ActivityLog,
   Setting,
   Analytics,
-  UpdateState,
   GenerateReportRequest,
   GenerateReportResponse,
   ReportOptions,
@@ -186,35 +185,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getDbHealth: (): Promise<IPCResponse<boolean>> =>
     ipcRenderer.invoke(IPCChannels.GET_DB_HEALTH),
 
-  // Auto-updater API
+  // Assisted updater API
   checkForUpdates: (): Promise<IPCResponse<void>> =>
     ipcRenderer.invoke(IPCChannels.CHECK_FOR_UPDATES),
-
-  downloadUpdate: (): Promise<IPCResponse<void>> =>
-    ipcRenderer.invoke(IPCChannels.DOWNLOAD_UPDATE),
-
-  installUpdate: (): Promise<IPCResponse<void>> =>
-    ipcRenderer.invoke(IPCChannels.INSTALL_UPDATE),
-
-  getUpdateStatus: (): Promise<IPCResponse<UpdateState>> =>
-    ipcRenderer.invoke(IPCChannels.GET_UPDATE_STATUS),
-
-  getLastUpdateCheckTime: (): Promise<IPCResponse<string | null>> =>
-    ipcRenderer.invoke(IPCChannels.GET_LAST_UPDATE_CHECK_TIME),
-
-  openUpdateLogs: (): Promise<IPCResponse<void>> =>
-    ipcRenderer.invoke(IPCChannels.OPEN_UPDATE_LOGS),
-
-  // Event listeners for auto-updater
-  onUpdateStatusChanged: (callback: (status: UpdateState) => void) => {
-    const listener = (_event: any, status: UpdateState) => callback(status);
-    ipcRenderer.on(IPCChannels.UPDATE_STATUS_CHANGED, listener);
-
-    // Return cleanup function
-    return () => {
-      ipcRenderer.removeListener(IPCChannels.UPDATE_STATUS_CHANGED, listener);
-    };
-  },
 
   // Activity events (main -> renderer)
   onActivityChanged: (callback: (activity: any) => void) => {

@@ -1,6 +1,6 @@
 import { app, ipcMain, IpcMainInvokeEvent } from 'electron';
 import { DatabaseManager } from './database';
-import type { AutoUpdaterManager } from './auto-updater';
+// auto-updater.ts no longer used — assisted-updater registers its own IPC in main.ts
 import { PDFGenerator } from './pdf-generator';
 import { SystemTrayManager } from './system-tray';
 import { EmailService } from './services/email-service';
@@ -45,7 +45,7 @@ import { DEFAULT_PRIVACY_APPS } from './services/privacy-constants';
 
 export class IPCHandlers {
   private database: DatabaseManager;
-  private autoUpdater: AutoUpdaterManager | null = null;
+  // autoUpdater field removed — assisted updater handles updates via main.ts
   private pdfGenerator: PDFGenerator | null = null;
   private systemTray: SystemTrayManager | null = null;
   private autoExportScheduler: any | null = null;
@@ -85,7 +85,7 @@ export class IPCHandlers {
 
   constructor(
     database: DatabaseManager,
-    autoUpdater?: AutoUpdaterManager,
+    _autoUpdater?: unknown, // kept for call-site compat — assisted updater handles updates via main.ts
     pdfGenerator?: PDFGenerator,
     systemTray?: SystemTrayManager,
     autoExportScheduler?: any,
@@ -94,7 +94,6 @@ export class IPCHandlers {
     onMenuRebuildNeeded?: () => void
   ) {
     this.database = database;
-    this.autoUpdater = autoUpdater || null;
     this.pdfGenerator = pdfGenerator || null;
     this.systemTray = systemTray || null;
     this.autoExportScheduler = autoExportScheduler || null;
@@ -379,33 +378,7 @@ export class IPCHandlers {
       this.handleGetDbHealth.bind(this)
     );
 
-    // Auto-updater handlers
-    if (this.autoUpdater) {
-      ipcMain.handle(
-        IPCChannels.CHECK_FOR_UPDATES,
-        this.handleCheckForUpdates.bind(this)
-      );
-      ipcMain.handle(
-        IPCChannels.DOWNLOAD_UPDATE,
-        this.handleDownloadUpdate.bind(this)
-      );
-      ipcMain.handle(
-        IPCChannels.INSTALL_UPDATE,
-        this.handleInstallUpdate.bind(this)
-      );
-      ipcMain.handle(
-        IPCChannels.GET_UPDATE_STATUS,
-        this.handleGetUpdateStatus.bind(this)
-      );
-      ipcMain.handle(
-        IPCChannels.GET_LAST_UPDATE_CHECK_TIME,
-        this.handleGetLastUpdateCheckTime.bind(this)
-      );
-      ipcMain.handle(
-        IPCChannels.OPEN_UPDATE_LOGS,
-        this.handleOpenUpdateLogs.bind(this)
-      );
-    }
+    // Auto-updater handlers removed — assisted updater registers its own IPC in main.ts
 
     // PDF report handlers
     if (this.pdfGenerator) {
@@ -974,103 +947,6 @@ export class IPCHandlers {
         success: false,
         error: `Failed to check database health: ${error}`,
       };
-    }
-  }
-
-  // Auto-updater handlers
-  private async handleCheckForUpdates(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<void>> {
-    try {
-      if (!this.autoUpdater) {
-        throw new Error('Auto-updater not available');
-      }
-      await this.autoUpdater.checkForUpdates();
-      return { success: true };
-    } catch (error) {
-      console.error('Error checking for updates:', error);
-      return { success: false, error: `Failed to check for updates: ${error}` };
-    }
-  }
-
-  private async handleDownloadUpdate(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<void>> {
-    try {
-      if (!this.autoUpdater) {
-        throw new Error('Auto-updater not available');
-      }
-      await this.autoUpdater.downloadUpdate();
-      return { success: true };
-    } catch (error) {
-      console.error('Error downloading update:', error);
-      return { success: false, error: `Failed to download update: ${error}` };
-    }
-  }
-
-  private async handleInstallUpdate(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<void>> {
-    try {
-      if (!this.autoUpdater) {
-        throw new Error('Auto-updater not available');
-      }
-      await this.autoUpdater.installUpdate();
-      return { success: true };
-    } catch (error) {
-      console.error('Error installing update:', error);
-      return { success: false, error: `Failed to install update: ${error}` };
-    }
-  }
-
-  private async handleGetUpdateStatus(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<UpdateState>> {
-    try {
-      if (!this.autoUpdater) {
-        throw new Error('Auto-updater not available');
-      }
-      const status = this.autoUpdater.getCurrentState();
-      return { success: true, data: status };
-    } catch (error) {
-      console.error('Error getting update status:', error);
-      return { success: false, error: `Failed to get update status: ${error}` };
-    }
-  }
-
-  private async handleGetLastUpdateCheckTime(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<string | null>> {
-    try {
-      if (!this.autoUpdater) {
-        throw new Error('Auto-updater not available');
-      }
-      const lastCheckTime = this.autoUpdater.getLastCheckTime();
-      return {
-        success: true,
-        data: lastCheckTime ? lastCheckTime.toISOString() : null,
-      };
-    } catch (error) {
-      console.error('Error getting last update check time:', error);
-      return {
-        success: false,
-        error: `Failed to get last update check time: ${error}`,
-      };
-    }
-  }
-
-  private async handleOpenUpdateLogs(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<void>> {
-    try {
-      if (!this.autoUpdater) {
-        throw new Error('Auto-updater not available');
-      }
-      await this.autoUpdater.openLogDirectory();
-      return { success: true };
-    } catch (error) {
-      console.error('Error opening update logs:', error);
-      return { success: false, error: `Failed to open update logs: ${error}` };
     }
   }
 

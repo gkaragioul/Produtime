@@ -65,14 +65,7 @@ const App: React.FC = () => {
     getVersion();
   }, []);
 
-  // Auto-updater listener
-  useEffect(() => {
-    const unsubscribe = window.electronAPI.onUpdateStatusChanged?.((state: UpdateState) => {
-      setUpdateState(state);
-      setUpdateDismissed(false); // reset dismiss on new state
-    });
-    return () => unsubscribe?.();
-  }, []);
+  // Auto-updater listener removed — assisted updater shows its own dialogs
 
   // Check if device is managed by Admin Console
   useEffect(() => {
@@ -457,7 +450,7 @@ const App: React.FC = () => {
       {!updateDismissed && (
         <UpdateProgressBar
           updateState={updateState}
-          onDownload={() => window.electronAPI.downloadUpdate()}
+          onDownload={() => window.electronAPI.checkForUpdates()}
           onDismiss={() => setUpdateDismissed(true)}
         />
       )}

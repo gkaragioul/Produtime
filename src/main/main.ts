@@ -41,8 +41,8 @@ startupLogger.info("DatabaseManager type imported");
 import { IPCHandlers } from "./ipc-handlers";
 startupLogger.info("IPCHandlers imported");
 
-import type { AutoUpdaterManager } from "./auto-updater";
-startupLogger.info("AutoUpdaterManager type imported");
+import type { AssistedUpdater } from "./assisted-updater";
+startupLogger.info("AssistedUpdater type imported");
 
 
 import type { PDFGenerator } from "./pdf-generator";
@@ -71,7 +71,7 @@ class TimePortApp {
   private mainWindow: BrowserWindow | null = null;
   private database: DatabaseManager | null = null;
   private ipcHandlers: IPCHandlers | null = null;
-  private autoUpdater: AutoUpdaterManager | null = null;
+  private updater: AssistedUpdater | null = null;
 
   private pdfGenerator: PDFGenerator | null = null;
   private systemTray: SystemTrayManager | null = null;
@@ -676,12 +676,27 @@ class TimePortApp {
 
   private async initializeAutoUpdater(): Promise<void> {
     if (!this.mainWindow) {
-      startupLogger.warn("AutoUpdater: no main window, skipping");
+      startupLogger.warn("AssistedUpdater: no main window, skipping");
       return;
     }
-    const { AutoUpdaterManager } = await import("./auto-updater");
-    this.autoUpdater = new AutoUpdaterManager(this.mainWindow, this.database || undefined);
-    startupLogger.info("AutoUpdater initialized");
+    const { AssistedUpdater } = await import("./assisted-updater");
+    this.updater = new AssistedUpdater(this.mainWindow, {
+      manifestUrl: "https://wot-produtime-production.up.railway.app/updates/latest.json",
+    });
+    this.updater.startBackgroundChecks();
+
+    // Register IPC handler for renderer "Check for Updates" button
+    const { ipcMain } = await import("electron");
+    ipcMain.handle("updater:checkForUpdates", async () => {
+      try {
+        await this.updater?.checkForUpdates(true);
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: String(error) };
+      }
+    });
+
+    startupLogger.info("AssistedUpdater initialized with background checks");
   }
 
   private async initializePDFGenerator(): Promise<void> {
@@ -813,7 +828,7 @@ class TimePortApp {
   private initializeApplicationMenu(): void {
     logger.section("APPLICATION MENU INITIALIZATION");
     logger.info("MENU", "Starting menu initialization");
-    logger.debug("MENU", "Auto-updater exists", { exists: !!this.autoUpdater });
+    logger.debug("MENU", "Updater exists", { exists: !!this.updater });
     try {
       // Check if license is active to determine menu items
       let isLicenseActive = false;
@@ -1008,28 +1023,20 @@ class TimePortApp {
     logger.section("CHECK FOR UPDATES");
     logger.info("UPDATE", "handleCheckForUpdatesMenuClick called");
     try {
-      if (!this.autoUpdater) {
-        logger.error("UPDATE", "Auto-updater is not initialized");
+      if (!this.updater) {
+        logger.error("UPDATE", "Updater is not initialized");
         await dialog.showMessageBox(this.mainWindow!, {
           type: "error",
           title: "Error",
-          message: "Auto-updater is not initialized",
+          message: "Updater is not initialized",
           buttons: ["OK"],
         });
         return;
       }
-      logger.info("UPDATE", "Auto-updater exists, calling checkForUpdates");
-      await this.autoUpdater.checkForUpdates();
+      await this.updater.checkForUpdates(true);
       logger.info("UPDATE", "checkForUpdates completed successfully");
     } catch (e) {
       logger.error("UPDATE", "Check for updates failed", e);
-      await dialog.showMessageBox(this.mainWindow!, {
-        type: "error",
-        title: "Error",
-        message: "Failed to check for updates",
-        detail: String(e),
-        buttons: ["OK"],
-      });
     }
   }
 
@@ -1086,7 +1093,7 @@ class TimePortApp {
 
       this.ipcHandlers = new IPCHandlers(
         this.database,
-        this.autoUpdater || undefined,
+        undefined, // auto-updater removed — assisted updater handles updates directly
         this.pdfGenerator || undefined,
         this.systemTray || undefined,
         this.autoExportScheduler || undefined,
@@ -1136,31 +1143,14 @@ class TimePortApp {
 
   private async testAutoUpdaterFunctionality(): Promise<void> {
     try {
-      console.log("🔍 TESTING AUTO-UPDATER FUNCTIONALITY...");
+      console.log("🔍 TESTING UPDATER FUNCTIONALITY...");
 
-      if (!this.autoUpdater) {
-        throw new Error("Auto-updater not initialized");
+      if (!this.updater) {
+        throw new Error("Updater not initialized");
       }
 
-      // Test 1: Check if auto-updater is configured
-      console.log("✅ Auto-updater instance exists");
-
-      // Test 2: Auto-updater methods available
-      console.log("✅ Auto-updater methods accessible");
-
-      // Test 3: Test update check (will likely show no updates available)
-      console.log("🔍 Testing update check...");
-      try {
-        await this.autoUpdater.checkForUpdates();
-        console.log("✅ Update check completed successfully");
-      } catch (updateError: any) {
-        console.log(
-          "ℹ️ Update check result:",
-          updateError?.message || updateError
-        );
-      }
-
-      console.log("✅ AUTO-UPDATER FUNCTIONALITY TEST COMPLETED");
+      console.log("✅ Updater instance exists");
+      console.log("✅ UPDATER FUNCTIONALITY TEST COMPLETED");
     } catch (error) {
       console.error("❌ AUTO-UPDATER FUNCTIONALITY TEST FAILED:", error);
     }
@@ -1272,15 +1262,15 @@ class TimePortApp {
       }
     }
 
-    // 4. Stop auto-updater (clears background check timer)
-    if (this.autoUpdater) {
+    // 4. Stop assisted updater (clears background check timer)
+    if (this.updater) {
       try {
-        console.log("  → Stopping auto-updater...");
-        this.autoUpdater.cleanup();
-        this.autoUpdater = null;
-        console.log("  ✅ Auto-updater stopped");
+        console.log("  → Stopping updater...");
+        this.updater.cleanup();
+        this.updater = null;
+        console.log("  ✅ Updater stopped");
       } catch (error) {
-        console.error("  ❌ Error stopping auto-updater:", error);
+        console.error("  ❌ Error stopping updater:", error);
       }
     }
 
