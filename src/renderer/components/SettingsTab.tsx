@@ -380,12 +380,7 @@ export const SettingsTab: React.FC = () => {
   };
 
   const loadLastCheckTime = async () => {
-    try {
-      const time = await autoUpdaterService.getLastCheckTime();
-      setLastCheckTime(time);
-    } catch (error) {
-      console.error('Error loading last check time:', error);
-    }
+    // Assisted updater tracks check times internally
   };
 
   const handleCheckForUpdates = async () => {
@@ -394,12 +389,6 @@ export const SettingsTab: React.FC = () => {
       setErrors((prev) => ({ ...prev, general: '' }));
 
       await autoUpdaterService.checkForUpdates();
-
-      // Reload last check time
-      await loadLastCheckTime();
-
-      setSuccessMessage('Update check completed');
-      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
       console.error('Error checking for updates:', error);
       setErrors((prev) => ({
@@ -442,15 +431,7 @@ export const SettingsTab: React.FC = () => {
   };
 
   const handleOpenUpdateLogs = async () => {
-    try {
-      await autoUpdaterService.openUpdateLogs();
-    } catch (error) {
-      console.error('Error opening update logs:', error);
-      setErrors((prev) => ({
-        ...prev,
-        general: `Failed to open update logs: ${error instanceof Error ? error.message : String(error)}`,
-      }));
-    }
+    // Update logs not available with assisted updater
   };
 
   const loadSettings = async () => {

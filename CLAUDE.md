@@ -126,6 +126,6 @@ unset ELECTRON_RUN_AS_NODE && "node_modules/electron/dist/electron.exe" .
 
 ## Remaining Known Issues
 - Local network pairing removed — cloud-only via Railway (`wot-produtime-production.up.railway.app`)
-- Auto-updater is disabled (no update server)
+- Assisted updater checks Railway manifest every 24h, opens download in browser (no silent install)
 - Licensing is stubbed (always activated)
 - Daily insight engine assumes 100% active time (no break allowance)
