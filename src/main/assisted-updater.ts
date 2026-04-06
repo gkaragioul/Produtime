@@ -23,6 +23,7 @@ interface UpdateManifest {
     version: string;
     url: string;
     releaseNotesUrl?: string;
+    releaseNotes?: string;
     mandatory?: boolean;
     minSupportedVersion?: string;
     sha256?: string; // Future: download verification
@@ -409,20 +410,20 @@ export class AssistedUpdater {
     });
 
     // Build dialog message
-    const message = `Produtime ${latest.version} is available (you have ${currentVersion}).`;
-    const detail = latest.mandatory
+    const message = `ProduTime ${latest.version} is available (you have ${currentVersion}).`;
+
+    // Show release notes inline if available
+    let detail = '';
+    if (latest.releaseNotes) {
+      detail += `What's new:\n${latest.releaseNotes}\n\n`;
+    }
+    detail += latest.mandatory
       ? 'This update is mandatory. Please download and install it.'
       : 'Would you like to download the update?';
 
-    // Build buttons based on available actions
-    const buttons: string[] = [];
-    buttons.push('Download Update');
-    if (latest.releaseNotesUrl) {
-      buttons.push('Release Notes');
-    }
-    if (!latest.mandatory) {
-      buttons.push('Later');
-    }
+    const buttons = latest.mandatory
+      ? ['Download Update']
+      : ['Download Update', 'Later'];
 
     const response = await this.showDialog({
       type: 'info',
@@ -434,16 +435,9 @@ export class AssistedUpdater {
       cancelId: buttons.length - 1,
     });
 
-    // Handle button clicks
-    const buttonIndex = response.response;
-    const buttonText = buttons[buttonIndex];
-
-    if (buttonText === 'Download Update') {
+    if (response.response === 0) {
       logger.info('ASSISTED_UPDATER', 'Opening download URL', { url: latest.url });
       await shell.openExternal(latest.url);
-    } else if (buttonText === 'Release Notes' && latest.releaseNotesUrl) {
-      logger.info('ASSISTED_UPDATER', 'Opening release notes', { url: latest.releaseNotesUrl });
-      await shell.openExternal(latest.releaseNotesUrl);
     } else {
       logger.info('ASSISTED_UPDATER', 'User dismissed update dialog');
     }

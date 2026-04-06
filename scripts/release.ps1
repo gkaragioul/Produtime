@@ -19,6 +19,8 @@ param(
 
     [string]$AdminPassword = $env:PRODUTIME_ADMIN_PASSWORD,
 
+    [string]$ReleaseNotes = "",
+
     [switch]$SkipBuild,
     [switch]$DryRun
 )
@@ -127,13 +129,17 @@ if ($DryRun) {
     $Token = $LoginResp.token
 
     # Publish manifest
-    $PublishBody = @{
+    $publishData = @{
         version        = $Version
         url            = $DownloadUrl
         releaseNotesUrl = $ReleaseNotesUrl
         sha256         = $Hash
         mandatory      = $false
-    } | ConvertTo-Json
+    }
+    if ($ReleaseNotes) {
+        $publishData.releaseNotes = $ReleaseNotes
+    }
+    $PublishBody = $publishData | ConvertTo-Json
 
     $PublishResp = Invoke-RestMethod -Uri "$AdminUrl/api/updates/publish" `
         -Method POST -ContentType "application/json" -Body $PublishBody `

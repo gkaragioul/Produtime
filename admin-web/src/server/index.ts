@@ -508,7 +508,7 @@ app.get('/api/updates/manifest', (_req, res) => {
 });
 
 app.post('/api/updates/publish', (req, res) => {
-  const { version, url, releaseNotesUrl, sha256, mandatory } = req.body;
+  const { version, url, releaseNotesUrl, releaseNotes, sha256, mandatory } = req.body;
   if (!version || !url) {
     res.status(400).json({ error: 'version and url are required' });
     return;
@@ -529,6 +529,7 @@ app.post('/api/updates/publish', (req, res) => {
       version,
       url,
       ...(releaseNotesUrl && { releaseNotesUrl }),
+      ...(releaseNotes && { releaseNotes }),
       ...(sha256 && { sha256 }),
       ...(mandatory !== undefined && { mandatory: Boolean(mandatory) }),
     },
