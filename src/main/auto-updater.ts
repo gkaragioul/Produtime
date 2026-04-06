@@ -133,12 +133,14 @@ export class AutoUpdaterManager {
     });
 
     ipcMain.handle('updater:installUpdate', async () => {
-      try {
+      setImmediate(() => {
+        app.removeAllListeners('window-all-closed');
+        const windows = BrowserWindow.getAllWindows();
+        windows.forEach(w => w.removeAllListeners('close'));
+        windows.forEach(w => w.close());
         autoUpdater.quitAndInstall(false, true);
-        return { success: true };
-      } catch (error: any) {
-        return { success: false, error: error.message };
-      }
+      });
+      return { success: true };
     });
 
     ipcMain.handle('updater:getStatus', async () => {

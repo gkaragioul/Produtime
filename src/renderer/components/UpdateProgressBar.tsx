@@ -15,6 +15,7 @@ export const UpdateProgressBar: React.FC<Props> = ({
   onDismiss,
 }) => {
   const [visible, setVisible] = useState(false);
+  const [isStartingDownload, setIsStartingDownload] = useState(false);
 
   useEffect(() => {
     if (!updateState) {
@@ -28,6 +29,9 @@ export const UpdateProgressBar: React.FC<Props> = ({
         status === UpdateStatus.DOWNLOADED ||
         status === UpdateStatus.ERROR
     );
+    if (status === UpdateStatus.DOWNLOADING || status === UpdateStatus.ERROR) {
+      setIsStartingDownload(false);
+    }
   }, [updateState]);
 
   if (!visible || !updateState) return null;
@@ -52,8 +56,12 @@ export const UpdateProgressBar: React.FC<Props> = ({
               ProduTime {info?.version} available
             </span>
           </div>
-          <button style={styles.downloadBtn} onClick={onDownload}>
-            Download &amp; Install
+          <button
+            style={{ ...styles.downloadBtn, ...(isStartingDownload ? { opacity: 0.7, cursor: 'wait' } : {}) }}
+            disabled={isStartingDownload}
+            onClick={() => { setIsStartingDownload(true); onDownload(); }}
+          >
+            {isStartingDownload ? 'Starting...' : 'Download & Install'}
           </button>
           <button style={styles.dismissBtn} onClick={onDismiss} title="Dismiss">
             ✕
