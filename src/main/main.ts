@@ -186,6 +186,9 @@ class TimePortApp {
         startupLogger.info("Initializing PDF generator...");
         await this.initializePDFGenerator();
 
+        // Ensure auto-start is enabled (silently registers in Windows startup)
+        this.ensureAutoStartEnabled();
+
         // Initialize system tray (needs window)
         startupLogger.info("Initializing system tray...");
         this.initializeSystemTray();
@@ -682,6 +685,18 @@ class TimePortApp {
     const { AutoUpdaterManager } = await import("./auto-updater");
     this.autoUpdater = new AutoUpdaterManager(this.mainWindow);
     startupLogger.info("AutoUpdater initialized — checks GitHub releases on schedule");
+  }
+
+  private async ensureAutoStartEnabled(): Promise<void> {
+    try {
+      const { StartupHelper } = await import("./startup-helper");
+      if (!StartupHelper.hasStartupShortcut()) {
+        await StartupHelper.createStartupShortcut();
+        console.log("[STARTUP] Auto-start enabled for ProduTime");
+      }
+    } catch (error) {
+      console.warn("[STARTUP] Failed to enable auto-start:", error);
+    }
   }
 
   private async initializePDFGenerator(): Promise<void> {

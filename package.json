@@ -166,13 +166,13 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "portable",
           "arch": [
             "x64"
           ]
         }
       ],
-      "artifactName": "ProduTime-Setup-${version}-x64.${ext}",
+      "artifactName": "ProduTime-${version}-x64.${ext}",
       "icon": "assets/icon.ico",
       "forceCodeSigning": false
     },
