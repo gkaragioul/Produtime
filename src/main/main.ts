@@ -138,6 +138,21 @@ class TimePortApp {
       console.log("[APP] ready event fired");
     });
 
+    // Single-instance lock — prevent multiple copies from running
+    const gotTheLock = app.requestSingleInstanceLock();
+    if (!gotTheLock) {
+      console.log('[APP] Another instance is already running — quitting');
+      app.quit();
+      return;
+    }
+    app.on('second-instance', () => {
+      // Focus existing window when user tries to launch a second instance
+      if (this.mainWindow) {
+        if (this.mainWindow.isMinimized()) this.mainWindow.restore();
+        this.mainWindow.focus();
+      }
+    });
+
     // Add a watchdog in case app.whenReady() never fires
     const readyWatchdog = setTimeout(() => {
       try {
