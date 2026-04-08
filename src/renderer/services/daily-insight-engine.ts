@@ -145,32 +145,35 @@ export function isDataSufficientForProductivity(totalTracked: number): boolean {
 
 export function computeExpectedWindow(
   workStart: string = '09:00',
-  workEnd: string = '17:00'
+  workEnd: string = '17:00',
+  breakDurationMinutes: number = 0
 ): ExpectedWindow {
   const startMinutes = parseTimeToMinutes(workStart);
   const endMinutes = parseTimeToMinutes(workEnd);
   const currentMinutes = getCurrentMinutes();
-  
-  // Total expected seconds for the day
-  const totalMinutes = endMinutes > startMinutes 
-    ? endMinutes - startMinutes 
+
+  // Total window minutes (clock time) and effective active minutes (minus break)
+  const totalWindowMinutes = endMinutes > startMinutes
+    ? endMinutes - startMinutes
     : (24 * 60 - startMinutes) + endMinutes; // overnight shift
-  const expectedTotalSeconds = totalMinutes * 60;
-  
+  const effectiveMinutes = Math.max(0, totalWindowMinutes - breakDurationMinutes);
+  const expectedTotalSeconds = effectiveMinutes * 60;
+
   // Determine position relative to work window
   const isBeforeWorkWindow = currentMinutes < startMinutes;
   const isAfterWorkWindow = currentMinutes >= endMinutes;
   const isWithinWorkWindow = !isBeforeWorkWindow && !isAfterWorkWindow;
-  
-  // Expected seconds so far (only if within work window)
+
+  // Expected active seconds so far — break allowance distributed proportionally
   let expectedSoFarSeconds = 0;
   if (isWithinWorkWindow) {
     const minutesWorked = currentMinutes - startMinutes;
-    expectedSoFarSeconds = minutesWorked * 60;
+    const progressRatio = minutesWorked / totalWindowMinutes;
+    expectedSoFarSeconds = Math.round(progressRatio * effectiveMinutes * 60);
   } else if (isAfterWorkWindow) {
     expectedSoFarSeconds = expectedTotalSeconds;
   }
-  
+
   return {
     workStart,
     workEnd,
