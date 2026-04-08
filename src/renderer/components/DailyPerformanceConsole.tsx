@@ -105,14 +105,30 @@ export const DailyPerformanceConsole: React.FC = () => {
         const api = (window as any).electronAPI;
         if (api?.getSetting) {
           const res = await api.getSetting({ key: 'break_duration' });
-          if (res?.success && res.value != null) {
-            const mins = parseInt(res.value, 10);
+          if (res?.success && res.data != null) {
+            const mins = parseInt(res.data, 10);
             if (!isNaN(mins) && mins > 0) setBreakDurationMinutes(mins);
           }
         }
       } catch { /* keep default 0 */ }
     };
     loadBreakDuration();
+
+    // Re-fetch schedule and break duration when admin pushes a policy update
+    const api = (window as any).electronAPI;
+    const unsubscribe = api?.onAgentPolicyUpdated?.((newPolicy: any) => {
+      if (newPolicy?.workScheduleStart && newPolicy?.workScheduleEnd) {
+        setWorkSchedule({ start: newPolicy.workScheduleStart, end: newPolicy.workScheduleEnd });
+      }
+      if (newPolicy?.breakDuration != null) {
+        const mins = typeof newPolicy.breakDuration === 'number'
+          ? newPolicy.breakDuration
+          : parseInt(newPolicy.breakDuration, 10);
+        if (!isNaN(mins) && mins > 0) setBreakDurationMinutes(mins);
+      }
+    });
+
+    return () => { unsubscribe?.(); };
   }, []);
 
   // Fetch today's logs

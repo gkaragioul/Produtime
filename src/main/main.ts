@@ -815,6 +815,22 @@ class TimePortApp {
             }
           });
 
+          // Live-update activity tracker when admin pushes new idle threshold
+          agentService.on('policyUpdated', (policy: any) => {
+            if (policy?.idleThreshold != null) {
+              const tracker = (global as any).activityTracker;
+              if (tracker && typeof tracker.updateIdleThreshold === 'function') {
+                const val = typeof policy.idleThreshold === 'number'
+                  ? policy.idleThreshold
+                  : parseInt(policy.idleThreshold, 10);
+                if (!isNaN(val) && val > 0) {
+                  tracker.updateIdleThreshold(val);
+                  console.log(`[AGENT] Updated idle threshold to ${val}s from policy push`);
+                }
+              }
+            }
+          });
+
           console.log("[AGENT] Connected agent service to system tray for managed status updates");
         } catch (err) {
           console.warn("[AGENT] Could not get agent service instance for system tray:", err);
