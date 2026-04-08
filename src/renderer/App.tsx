@@ -99,13 +99,24 @@ const App: React.FC = () => {
 
     checkManagedStatus();
 
-    // Listen for agent state changes — only update on meaningful changes
-    let lastStatus = '';
+    // Listen for agent state changes.
+    // Once managed, stay managed — brief WebSocket disconnects/reconnects should NOT
+    // toggle the entire UI between managed and unmanaged mode. Only clear managed
+    // when the device is genuinely unpaired (confirmed via agentIsManaged IPC).
     const unsubscribeState = window.electronAPI.onAgentStateChanged?.((state: any) => {
-      if (state.status === lastStatus) return; // skip connecting/disconnected oscillation
-      lastStatus = state.status;
-      setIsManaged(state.status === 'paired');
-      setAdminName(state.adminName);
+      if (state.status === 'paired') {
+        setIsManaged(true);
+        if (state.adminName) setAdminName(state.adminName);
+      } else {
+        // Non-paired status — could be transient disconnect or real unpair.
+        // Verify with the authoritative source before clearing managed state.
+        window.electronAPI.agentIsManaged().then((res) => {
+          if (res.success && !res.data) {
+            setIsManaged(false);
+            setAdminName(null);
+          }
+        }).catch(() => {});
+      }
       setIsLocked(state.isLocked || false);
       setLockMessage(state.lockMessage || "");
     });

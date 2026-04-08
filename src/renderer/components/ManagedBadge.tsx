@@ -45,18 +45,17 @@ export const ManagedBadge: React.FC<ManagedBadgeProps> = ({ adminName, tenantNam
 
     checkManaged();
 
-    // Listen for state changes — only update managed status when it actually changes.
-    // The WebSocket can oscillate between disconnected/connecting/paired, which would
-    // cause the badge to flash without this guard. A paired device stays managed even
-    // during brief disconnects.
+    // Listen for state changes. Stay managed during transient disconnects;
+    // only clear when the device is genuinely unpaired (confirmed via IPC).
     const unsubscribe = window.electronAPI.onAgentStateChanged?.((state) => {
-      setIsManaged((prev) => {
-        const nowManaged = state.status === 'paired';
-        // Once managed, stay managed — brief disconnects shouldn't hide the badge
-        if (prev && !nowManaged) return prev;
-        return nowManaged;
-      });
-      // Prefer tenant name (company name) over admin name
+      if (state.status === 'paired') {
+        setIsManaged(true);
+      } else {
+        // Verify with authoritative source before hiding badge
+        window.electronAPI.agentIsManaged().then((res) => {
+          if (res.success && !res.data) setIsManaged(false);
+        }).catch(() => {});
+      }
       if (state.tenantName || state.adminName) {
         setDisplayName(state.tenantName || state.adminName);
       }
