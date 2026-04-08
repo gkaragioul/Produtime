@@ -100,13 +100,17 @@ const App: React.FC = () => {
     checkManagedStatus();
 
     // Listen for agent state changes.
-    // The agent service deduplicates emissions so we only receive actual status transitions.
-    // We set managed=true on 'paired' and clear it on 'disconnected' (only fires on real
-    // status changes, not transient reconnect cycles).
+    // IMPORTANT: Do NOT derive isManaged from connection status (paired/connecting/disconnected).
+    // "Managed" means the device is paired — that's a persisted fact, not a live connection state.
+    // Only update isManaged by re-checking the authoritative agentIsManaged() IPC.
     const unsubscribeState = window.electronAPI.onAgentStateChanged?.((state: any) => {
-      const paired = state.status === 'paired';
-      setIsManaged(paired);
-      if (paired && state.adminName) setAdminName(state.adminName);
+      // Re-check persisted pairing state — not the volatile connection status
+      window.electronAPI.agentIsManaged().then((res) => {
+        if (res.success) {
+          setIsManaged(res.data || false);
+        }
+      }).catch(() => {});
+      if (state.adminName) setAdminName(state.adminName);
       setIsLocked(state.isLocked || false);
       setLockMessage(state.lockMessage || "");
     });
