@@ -206,7 +206,12 @@ app.post('/api/policies', (req, res) => {
 });
 
 app.put('/api/policies/:id', (req, res) => {
-  db.updatePolicy(req.params.id, req.body.name, JSON.stringify(req.body.data));
+  const policyId = req.params.id;
+  db.updatePolicy(policyId, req.body.name, JSON.stringify(req.body.data));
+
+  // Push updated policy to all assigned online devices
+  pushPolicyToAssignedDevices(policyId);
+
   res.json({ success: true });
 });
 
@@ -554,6 +559,34 @@ app.get('*', (_req, res) => {
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/**
+ * Push a specific policy to all devices assigned to it that are currently online.
+ * Called after policy edits so changes reach devices immediately.
+ */
+function pushPolicyToAssignedDevices(policyId: string): void {
+  const policyRecord = db.getPolicy(policyId);
+  if (!policyRecord) return;
+
+  const allDevices = db.getAllDevices();
+  const connectedIds = deviceServer.getConnectedDevices();
+
+  let pushed = 0;
+  for (const device of allDevices) {
+    if (device.policy_id !== policyId || !connectedIds.includes(device.device_id)) continue;
+
+    try {
+      const policyData = JSON.parse(policyRecord.policy_json);
+      policyData.version = policyData.version || policyRecord.policy_id;
+      policyData.updatedAt = policyData.updatedAt || policyRecord.updated_at;
+      deviceServer.pushPolicy(device.device_id, policyData);
+      pushed++;
+    } catch (err) {
+      console.error(`Failed to push updated policy to device ${device.device_id}:`, err);
+    }
+  }
+  console.log(`[POLICY] Pushed policy ${policyId} to ${pushed} online device(s)`);
+}
 
 function pushCategoriesToAllDevices(): void {
   const allDevices = db.getAllDevices();
