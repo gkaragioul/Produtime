@@ -57,6 +57,7 @@ export const DailyPerformanceConsole: React.FC = () => {
   
   // Work schedule state
   const [workSchedule, setWorkSchedule] = useState<{ start: string; end: string } | null>(null);
+  const [breakDurationMinutes, setBreakDurationMinutes] = useState<number>(0);
   
   // Session start (start of day)
   const [sessionStart] = useState<Date>(() => {
@@ -97,6 +98,21 @@ export const DailyPerformanceConsole: React.FC = () => {
     };
     
     loadSchedule();
+
+    // Load break duration from settings
+    const loadBreakDuration = async () => {
+      try {
+        const api = (window as any).electronAPI;
+        if (api?.getSetting) {
+          const res = await api.getSetting({ key: 'break_duration' });
+          if (res?.success && res.value != null) {
+            const mins = parseInt(res.value, 10);
+            if (!isNaN(mins) && mins > 0) setBreakDurationMinutes(mins);
+          }
+        }
+      } catch { /* keep default 0 */ }
+    };
+    loadBreakDuration();
   }, []);
 
   // Fetch today's logs
@@ -293,13 +309,13 @@ export const DailyPerformanceConsole: React.FC = () => {
     return currentMetrics;
   }, [recent, current, now, sessionStart, isPaused, stoppedAt, isTracking]);
 
-  // Compute expected window
+  // Compute expected window (deducting break allowance from expected active time)
   const expectedWindow = useMemo<ExpectedWindow>(() => {
     if (!workSchedule) {
-      return computeExpectedWindow('09:00', '18:00');
+      return computeExpectedWindow('09:00', '18:00', breakDurationMinutes);
     }
-    return computeExpectedWindow(workSchedule.start, workSchedule.end);
-  }, [workSchedule, now]);
+    return computeExpectedWindow(workSchedule.start, workSchedule.end, breakDurationMinutes);
+  }, [workSchedule, breakDurationMinutes, now]);
 
   // Compute daily metrics for insight engine
   const dailyMetrics = useMemo<DailyMetrics>(() => {

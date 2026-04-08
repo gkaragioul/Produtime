@@ -56,6 +56,11 @@ export class ActivityTracker {
   // Cooldown to prevent rapid idle/active switching
   private lastIdleEndTime: number = 0;
   private resumeCheckTimer: NodeJS.Timeout | null = null;
+  // Bound handlers for powerMonitor events (so we can remove them on stop)
+  private boundHandleSuspend: (() => void) | null = null;
+  private boundHandleResume: (() => void) | null = null;
+  private boundHandleLockScreen: (() => void) | null = null;
+  private boundHandleUnlockScreen: (() => void) | null = null;
 
   constructor(
     private database: DatabaseManager,
@@ -103,6 +108,17 @@ export class ActivityTracker {
       this.checkIdleStatus(); // Always run idle check, it handles paused state internally
     }, 1000);
 
+    // Register power/lock event handlers so sleep and lock-screen periods are
+    // captured as idle time even when the 5-minute threshold hasn't been reached.
+    this.boundHandleSuspend = () => this.handlePowerSuspend();
+    this.boundHandleResume = () => this.handlePowerResume();
+    this.boundHandleLockScreen = () => this.handlePowerSuspend(); // same logic as suspend
+    this.boundHandleUnlockScreen = () => this.handlePowerResume(); // same logic as resume
+    powerMonitor.on('suspend', this.boundHandleSuspend);
+    powerMonitor.on('resume', this.boundHandleResume);
+    powerMonitor.on('lock-screen', this.boundHandleLockScreen);
+    powerMonitor.on('unlock-screen', this.boundHandleUnlockScreen);
+
     await this.checkCurrentActivity();
     console.log('✅ Activity tracking started successfully');
   }
@@ -118,6 +134,16 @@ export class ActivityTracker {
     this.trackingInterval = null;
     this.idleCheckInterval = null;
     this.resumeCheckTimer = null;
+
+    // Remove power/lock event handlers
+    if (this.boundHandleSuspend) powerMonitor.removeListener('suspend', this.boundHandleSuspend);
+    if (this.boundHandleResume) powerMonitor.removeListener('resume', this.boundHandleResume);
+    if (this.boundHandleLockScreen) powerMonitor.removeListener('lock-screen', this.boundHandleLockScreen);
+    if (this.boundHandleUnlockScreen) powerMonitor.removeListener('unlock-screen', this.boundHandleUnlockScreen);
+    this.boundHandleSuspend = null;
+    this.boundHandleResume = null;
+    this.boundHandleLockScreen = null;
+    this.boundHandleUnlockScreen = null;
 
     if (this.currentActivity) {
       await this.logCurrentActivity();
@@ -617,6 +643,30 @@ export class ActivityTracker {
         }
       }, 500); // Reduced from 2 seconds to 500ms
     }
+  }
+
+  /**
+   * Called on system suspend or screen lock.
+   * Forces immediate idle start (bypassing the threshold) so that
+   * sleep/lock periods are recorded as idle time.
+   */
+  private handlePowerSuspend(): void {
+    if (!this.isTracking || this.isPaused) return;
+    if (this.currentActivity?.isIdle) return; // already idle, nothing to do
+    console.log('⏸️ System suspend/lock detected — forcing idle start');
+    this.handleIdleStart();
+  }
+
+  /**
+   * Called on system resume or screen unlock.
+   * Triggers an immediate idle-status check so the idle period is
+   * ended promptly instead of waiting up to 1 second for the next tick.
+   */
+  private handlePowerResume(): void {
+    if (!this.isTracking) return;
+    console.log('▶️ System resume/unlock detected — checking idle status');
+    // Small delay to let the OS settle and report accurate idle time
+    setTimeout(() => this.checkIdleStatus(), 500);
   }
 
   private notifyActivityChange(): void {
