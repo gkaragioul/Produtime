@@ -1142,7 +1142,12 @@ export class AdminServer {
     const policyWithCategories = { ...policy, appCategories };
 
     const message = this.signMessage('POLICY_PUSH', deviceId, { policy: policyWithCategories, force: false });
-    device.ws.send(JSON.stringify(message));
+    try {
+      device.ws.send(JSON.stringify(message));
+    } catch (err) {
+      this.log(`[SERVER] Failed to send POLICY_PUSH to ${deviceId}: ${err}`);
+      return false;
+    }
 
     this.db.insertAuditLog({
       action: 'POLICY_PUSH',
@@ -1163,7 +1168,12 @@ export class AdminServer {
     if (!device) return false;
 
     const message = this.signMessage('EXPORT_REQUEST', deviceId, options);
-    device.ws.send(JSON.stringify(message));
+    try {
+      device.ws.send(JSON.stringify(message));
+    } catch (err) {
+      this.log(`[SERVER] Failed to send EXPORT_REQUEST to ${deviceId}: ${err}`);
+      return false;
+    }
     return true;
   }
 
@@ -1175,7 +1185,12 @@ export class AdminServer {
     if (!device) return false;
 
     const msg = this.signMessage('LOCK', deviceId, { reason, message });
-    device.ws.send(JSON.stringify(msg));
+    try {
+      device.ws.send(JSON.stringify(msg));
+    } catch (err) {
+      this.log(`[SERVER] Failed to send LOCK to ${deviceId}: ${err}`);
+      return false;
+    }
 
     this.db.insertAuditLog({
       action: 'DEVICE_LOCKED',
@@ -1196,7 +1211,12 @@ export class AdminServer {
     if (!device) return false;
 
     const message = this.signMessage('UNLOCK', deviceId, {});
-    device.ws.send(JSON.stringify(message));
+    try {
+      device.ws.send(JSON.stringify(message));
+    } catch (err) {
+      this.log(`[SERVER] Failed to send UNLOCK to ${deviceId}: ${err}`);
+      return false;
+    }
 
     this.db.insertAuditLog({
       action: 'DEVICE_UNLOCKED',

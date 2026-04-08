@@ -110,7 +110,7 @@ export class AgentService extends EventEmitter {
   private emitStateChanged(): void {
     if (this.state.status !== this.lastEmittedStatus) {
       this.lastEmittedStatus = this.state.status;
-      this.emitStateChanged();
+      this.emit('stateChanged', this.state);
     }
   }
 
