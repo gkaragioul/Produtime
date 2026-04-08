@@ -86,6 +86,9 @@ const OFF_SCHEDULE_THRESHOLD_SECONDS = 3600; // 60 minutes
 const STRONG_FOCUS_THRESHOLD = 0.65;
 const MODERATE_FOCUS_THRESHOLD = 0.35;
 const MIN_FOCUS_STREAK_GOOD = 900; // 15 minutes
+// Realistic active ratio — nobody is 100% active.  Allow ~15% natural idle
+// (micro-breaks, water, context switches) before marking user as behind.
+const REALISTIC_ACTIVE_RATIO = 0.85;
 
 // ============================================================================
 // Helper Functions
@@ -212,13 +215,15 @@ export function computeUserState(
     mode = 'NORMAL';
   }
   
-  // Compute progress
-  const progressPct = expectedSoFarSeconds > 0 
-    ? Math.min(1, activeSeconds / expectedSoFarSeconds) 
+  // Compute progress — compare against a realistic expectation, not 100%.
+  // Nobody is active every second; natural idle (micro-breaks, water, etc.) is normal.
+  const realisticExpected = expectedSoFarSeconds * REALISTIC_ACTIVE_RATIO;
+  const progressPct = realisticExpected > 0
+    ? Math.min(1, activeSeconds / realisticExpected)
     : 0;
-  
-  // Compute behind by
-  const behindBySeconds = Math.max(0, expectedSoFarSeconds - activeSeconds);
+
+  // Compute behind by — only count as behind when under the realistic bar
+  const behindBySeconds = Math.max(0, realisticExpected - activeSeconds);
   
   // Compute focus ratio
   const focusRatio = totalTracked > 0 
