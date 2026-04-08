@@ -45,17 +45,10 @@ export const ManagedBadge: React.FC<ManagedBadgeProps> = ({ adminName, tenantNam
 
     checkManaged();
 
-    // Listen for state changes. Stay managed during transient disconnects;
-    // only clear when the device is genuinely unpaired (confirmed via IPC).
+    // Listen for state changes. The agent service deduplicates emissions so we
+    // only receive actual status transitions (no rapid oscillation).
     const unsubscribe = window.electronAPI.onAgentStateChanged?.((state) => {
-      if (state.status === 'paired') {
-        setIsManaged(true);
-      } else {
-        // Verify with authoritative source before hiding badge
-        window.electronAPI.agentIsManaged().then((res) => {
-          if (res.success && !res.data) setIsManaged(false);
-        }).catch(() => {});
-      }
+      setIsManaged(state.status === 'paired');
       if (state.tenantName || state.adminName) {
         setDisplayName(state.tenantName || state.adminName);
       }

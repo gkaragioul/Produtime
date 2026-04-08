@@ -92,12 +92,26 @@ export class AgentService extends EventEmitter {
   private cloudReconnectAttempts: number = 0;
   private isCloudMode: boolean = false;
 
+  // Deduplication: only emit stateChanged when status actually changes
+  private lastEmittedStatus: string = 'disconnected';
+
   private constructor(database: DatabaseManager) {
     super();
     this.database = database;
     this.crypto = AgentCryptoService.getInstance();
     this.metricsComputer = new MetricsComputer(database);
     this.deviceIdService = DeviceIdService.getInstance();
+  }
+
+  /**
+   * Emit stateChanged only when the status field actually changes.
+   * Prevents UI flashing from rapid WebSocket reconnect cycles.
+   */
+  private emitStateChanged(): void {
+    if (this.state.status !== this.lastEmittedStatus) {
+      this.lastEmittedStatus = this.state.status;
+      this.emitStateChanged();
+    }
   }
 
   public static getInstance(database?: DatabaseManager): AgentService {
@@ -241,7 +255,7 @@ export class AgentService extends EventEmitter {
       this.state.status = 'pairing';
       this.state.isCloudConnection = true;
       this.isCloudMode = true;
-      this.emit('stateChanged', this.state);
+      this.emitStateChanged();
 
       // Send pairing request to cloud API
       const response = await this.sendCloudPairRequest(cloudApiUrl, pairCode);
@@ -259,14 +273,14 @@ export class AgentService extends EventEmitter {
         this.state.status = 'disconnected';
         this.state.isCloudConnection = false;
         this.isCloudMode = false;
-        this.emit('stateChanged', this.state);
+        this.emitStateChanged();
         return { success: false, error: response.error || 'Failed to submit pairing request' };
       }
     } catch (error) {
       this.state.status = 'disconnected';
       this.state.isCloudConnection = false;
       this.isCloudMode = false;
-      this.emit('stateChanged', this.state);
+      this.emitStateChanged();
       return { success: false, error: String(error) };
     }
   }
@@ -354,7 +368,7 @@ export class AgentService extends EventEmitter {
           this.state.status = 'disconnected';
           this.state.isCloudConnection = false;
           this.isCloudMode = false;
-          this.emit('stateChanged', this.state);
+          this.emitStateChanged();
           this.emit('pairDenied', { reason: 'Pairing request timed out' });
         }
         return;
@@ -375,7 +389,7 @@ export class AgentService extends EventEmitter {
           this.state.status = 'disconnected';
           this.state.isCloudConnection = false;
           this.isCloudMode = false;
-          this.emit('stateChanged', this.state);
+          this.emitStateChanged();
           this.emit('pairDenied', { reason: status.reason || 'Pairing request denied' });
         } else {
           // Still pending - continue polling
@@ -469,7 +483,7 @@ export class AgentService extends EventEmitter {
     this.state.adminName = this.pairingState.adminName;
     this.state.tenantName = this.pairingState.tenantName;
     this.state.isCloudConnection = true;
-    this.emit('stateChanged', this.state);
+    this.emitStateChanged();
     this.emit('paired', { 
       adminName: this.pairingState.adminName,
       tenantName: this.pairingState.tenantName,
@@ -497,7 +511,7 @@ export class AgentService extends EventEmitter {
     console.log(`[AGENT] Connecting to Cloud Admin Console: ${cloudWsEndpoint}`);
     this.state.status = 'connecting';
     this.state.isCloudConnection = true;
-    this.emit('stateChanged', this.state);
+    this.emitStateChanged();
 
     try {
       const ws = new WebSocket(cloudWsEndpoint);
@@ -509,7 +523,7 @@ export class AgentService extends EventEmitter {
         this.state.status = this.pairingState?.paired ? 'paired' : 'pairing';
         this.state.lastConnected = Date.now();
         this.state.cloudConnectionFailed = false;
-        this.emit('stateChanged', this.state);
+        this.emitStateChanged();
 
         // Send identification message for cloud connection
         const identifyMsg = this.crypto.createSignedMessage(
@@ -561,7 +575,7 @@ export class AgentService extends EventEmitter {
     this.stopHeartbeat();
     this.ws = null;
     this.state.status = 'disconnected';
-    this.emit('stateChanged', this.state);
+    this.emitStateChanged();
 
     // Always reconnect to cloud — never give up
     const cloudEndpoint = this.pairingState?.cloudWsEndpoint || CLOUD_ADMIN_WSS_URL;
@@ -669,7 +683,7 @@ export class AgentService extends EventEmitter {
       this.state.status = 'paired';
       this.state.adminName = payload.adminName;
       this.state.lastConnected = Date.now();
-      this.emit('stateChanged', this.state);
+      this.emitStateChanged();
       this.emit('paired', {
         adminName: payload.adminName,
         tenantName: payload.tenantName || payload.adminName,
@@ -692,7 +706,7 @@ export class AgentService extends EventEmitter {
     const payload = (message as any).payload;
     
     this.state.status = 'disconnected';
-    this.emit('stateChanged', this.state);
+    this.emitStateChanged();
     this.emit('pairDenied', { reason: payload.reason });
     
     console.log('Pairing denied:', payload.reason);
@@ -749,7 +763,7 @@ export class AgentService extends EventEmitter {
       }
     }
 
-    this.emit('stateChanged', this.state);
+    this.emitStateChanged();
   }
 
   /**
@@ -816,7 +830,7 @@ export class AgentService extends EventEmitter {
     
     this.state.isLocked = true;
     this.state.lockMessage = payload.message;
-    this.emit('stateChanged', this.state);
+    this.emitStateChanged();
     this.emit('locked', { reason: payload.reason, message: payload.message });
     
     console.log('App locked by admin:', payload.reason);
@@ -828,7 +842,7 @@ export class AgentService extends EventEmitter {
   private handleUnlock(message: AdminProtocolMessage): void {
     this.state.isLocked = false;
     this.state.lockMessage = null;
-    this.emit('stateChanged', this.state);
+    this.emitStateChanged();
     this.emit('unlocked');
     
     console.log('App unlocked by admin');
@@ -891,7 +905,7 @@ export class AgentService extends EventEmitter {
     };
 
     this.effectivePolicy = null;
-    this.emit('stateChanged', this.state);
+    this.emitStateChanged();
     
     console.log('Unpaired from Admin Console');
   }
