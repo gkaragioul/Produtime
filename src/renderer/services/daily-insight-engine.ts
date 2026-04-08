@@ -168,7 +168,7 @@ export function computeExpectedWindow(
   let expectedSoFarSeconds = 0;
   if (isWithinWorkWindow) {
     const minutesWorked = currentMinutes - startMinutes;
-    const progressRatio = minutesWorked / totalWindowMinutes;
+    const progressRatio = totalWindowMinutes > 0 ? minutesWorked / totalWindowMinutes : 0;
     expectedSoFarSeconds = Math.round(progressRatio * effectiveMinutes * 60);
   } else if (isAfterWorkWindow) {
     expectedSoFarSeconds = expectedTotalSeconds;
