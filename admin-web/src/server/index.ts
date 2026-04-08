@@ -460,7 +460,9 @@ app.get('/api/analytics/metrics', (req, res) => {
           for (const a of apps) {
             dayMap.set(a.app, (dayMap.get(a.app) || 0) + (a.seconds || 0));
           }
-        } catch {}
+        } catch (err) {
+          console.warn(`[ANALYTICS] Failed to parse top_apps_json for device ${device.device_id} on ${m.date_ymd}:`, err);
+        }
       }
       if (m.detailed_apps_json) {
         try {
@@ -470,7 +472,9 @@ app.get('/api/analytics/metrics', (req, res) => {
           for (const a of apps) {
             dayMap.set(a.app, (dayMap.get(a.app) || 0) + (a.seconds || 0));
           }
-        } catch {}
+        } catch (err) {
+          console.warn(`[ANALYTICS] Failed to parse detailed_apps_json for device ${device.device_id} on ${m.date_ymd}:`, err);
+        }
       }
     }
   }
@@ -605,7 +609,9 @@ function generateWeeklyReport(): { success: boolean; weekEnd?: string; message?:
       try {
         const apps = JSON.parse(m.top_apps_json || '[]');
         for (const a of apps) appTotals.set(a.app, (appTotals.get(a.app) || 0) + a.seconds);
-      } catch {}
+      } catch (err) {
+        console.warn(`[REPORT] Failed to parse top_apps_json for device ${device.device_id}:`, err);
+      }
     }
 
     perDeviceData.push({
