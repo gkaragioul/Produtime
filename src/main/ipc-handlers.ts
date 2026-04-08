@@ -2171,7 +2171,11 @@ export class IPCHandlers {
     }
   }
 
+  private lastBroadcastStatus: string = '';
   private broadcastAgentStateChange(state: AgentState): void {
+    // Skip broadcast if status hasn't changed (belt-and-suspenders with agent-service dedup)
+    if (state.status === this.lastBroadcastStatus) return;
+    this.lastBroadcastStatus = state.status;
     try {
       const electron = require('electron');
       const windows = electron.BrowserWindow.getAllWindows();
