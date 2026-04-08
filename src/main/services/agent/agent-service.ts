@@ -1240,19 +1240,38 @@ export class AgentService extends EventEmitter {
    * Load effective policy from database
    */
   private async loadEffectivePolicy(): Promise<void> {
-    const rows = this.database.get<any[]>(
+    const rows = this.database.all<{ key: string; value: string }>(
       'SELECT * FROM effective_policy WHERE source = ?',
       ['admin']
     );
 
-    if (rows && Array.isArray(rows) && rows.length > 0) {
-      // Reconstruct policy from rows
+    if (rows && rows.length > 0) {
+      // Reverse mapping: DB snake_case keys → camelCase policy keys
+      const settingKeyToPolicyKey: Record<string, string> = {
+        work_schedule_start: 'workScheduleStart',
+        work_schedule_end: 'workScheduleEnd',
+        work_schedule_weekly: 'workScheduleWeekly',
+        idle_threshold: 'idleThreshold',
+        break_duration: 'breakDuration',
+        privacy_mode_enabled: 'privacyModeEnabled',
+        privacy_apps: 'privacyApps',
+        title_sharing_enabled: 'titleSharingEnabled',
+        auto_export_enabled: 'autoExportEnabled',
+        auto_export_time: 'autoExportTime',
+        export_folder: 'exportFolder',
+        report_retention_days: 'reportRetentionDays',
+        employee_name: 'employeeName',
+        app_categories: 'appCategories',
+      };
+
+      // Reconstruct policy from rows using camelCase keys
       const policy: any = {};
       for (const row of rows) {
+        const policyKey = settingKeyToPolicyKey[row.key] || row.key;
         try {
-          policy[row.key] = JSON.parse(row.value);
+          policy[policyKey] = JSON.parse(row.value);
         } catch {
-          policy[row.key] = row.value;
+          policy[policyKey] = row.value;
         }
       }
       this.effectivePolicy = policy as PolicyData;
