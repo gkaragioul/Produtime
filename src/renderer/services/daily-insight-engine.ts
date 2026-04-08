@@ -465,13 +465,14 @@ export function computeDailyInsight(
 
 export function computeFocusStats(
   logs: Array<{ app_name: string; window_title: string; duration: number; timestamp: string }>,
-  sessionStart: Date
+  sessionStart: Date,
+  currentActivity?: { appName: string; windowTitle: string; startTime: string; isIdle: boolean } | null
 ): FocusStats {
   const sessionStartTs = sessionStart.getTime();
-  
+
   // Filter logs to session
   const relevantLogs = logs.filter(log => new Date(log.timestamp).getTime() >= sessionStartTs);
-  
+
   // Compute totals
   let activeTotal = 0;
   let idleTotal = 0;
@@ -480,13 +481,13 @@ export function computeFocusStats(
   let longestIdlePeriod = 0;
   let currentFocusStreak = 0;
   let currentIdlePeriod = 0;
-  
+
   const appTotals = new Map<string, number>();
-  
+
   for (const log of relevantLogs) {
-    const isIdle = log.app_name === 'System' && 
+    const isIdle = log.app_name === 'System' &&
       (log.window_title === 'Idle' || log.window_title === 'Paused');
-    
+
     if (isIdle) {
       idleTotal += log.duration;
       currentIdlePeriod += log.duration;
@@ -501,23 +502,47 @@ export function computeFocusStats(
       // Reset idle period
       longestIdlePeriod = Math.max(longestIdlePeriod, currentIdlePeriod);
       currentIdlePeriod = 0;
-      
+
       // Track app usage
       const existing = appTotals.get(log.app_name) || 0;
       appTotals.set(log.app_name, existing + log.duration);
     }
   }
-  
+
+  // Include the live current activity so the display updates in real-time
+  if (currentActivity && currentActivity.startTime) {
+    const elapsed = Math.max(0, Math.floor((Date.now() - new Date(currentActivity.startTime).getTime()) / 1000));
+    if (elapsed > 0) {
+      const isIdle = currentActivity.isIdle;
+      if (isIdle) {
+        idleTotal += elapsed;
+        currentIdlePeriod += elapsed;
+        longestIdlePeriod = Math.max(longestIdlePeriod, currentIdlePeriod);
+        longestFocusStreak = Math.max(longestFocusStreak, currentFocusStreak);
+        currentFocusStreak = 0;
+      } else {
+        activeTotal += elapsed;
+        currentFocusStreak += elapsed;
+        longestFocusStreak = Math.max(longestFocusStreak, currentFocusStreak);
+        longestIdlePeriod = Math.max(longestIdlePeriod, currentIdlePeriod);
+        currentIdlePeriod = 0;
+
+        const existing = appTotals.get(currentActivity.appName) || 0;
+        appTotals.set(currentActivity.appName, existing + elapsed);
+      }
+    }
+  }
+
   // Finalize streaks
   longestFocusStreak = Math.max(longestFocusStreak, currentFocusStreak);
   longestIdlePeriod = Math.max(longestIdlePeriod, currentIdlePeriod);
-  
+
   // Get top apps
   const topApps = Array.from(appTotals.entries())
     .map(([app, seconds]) => ({ app, seconds }))
     .sort((a, b) => b.seconds - a.seconds)
     .slice(0, 5);
-  
+
   return {
     longestFocusStreak,
     longestIdlePeriod,

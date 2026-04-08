@@ -331,10 +331,10 @@ export const DailyPerformanceConsole: React.FC = () => {
     };
   }, [metrics, recent]);
 
-  // Compute focus stats
+  // Compute focus stats (include live current activity for real-time display)
   const focusStats = useMemo<FocusStats>(() => {
-    return computeFocusStats(recent, sessionStart);
-  }, [recent, sessionStart]);
+    return computeFocusStats(recent, sessionStart, current);
+  }, [recent, sessionStart, current, now]);
 
   // Compute daily insight (with focus stats for guidance)
   const dailyInsight = useMemo(() => {
