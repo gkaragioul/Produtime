@@ -881,6 +881,18 @@ export class DatabaseManager {
     }
   }
 
+  /**
+   * Generic query method — returns all matching rows.
+   */
+  public all<T = any>(sql: string, params?: any[]): T[] {
+    const stmt = this.db.prepare(sql);
+    if (params) {
+      return stmt.all(...params) as T[];
+    } else {
+      return stmt.all() as T[];
+    }
+  }
+
   public close(): void {
     // BUG FIX #4: Add explicit null check and set db to null after close
     // This prevents null pointer errors when close() is called multiple times
