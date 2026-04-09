@@ -919,30 +919,16 @@ export class AgentService extends EventEmitter {
    * Start heartbeat interval
    */
   private startHeartbeat(): void {
-    console.log('[AGENT] ========================================');
-    console.log('[AGENT] startHeartbeat() called');
-    console.log('[AGENT] WebSocket exists:', !!this.ws);
-    console.log('[AGENT] WebSocket readyState:', this.ws?.readyState, '(1=OPEN)');
-    
     this.stopHeartbeat();
-    
-    // Send initial heartbeat
-    console.log('[AGENT] Sending initial heartbeat...');
     this.sendHeartbeat();
-    
-    // Set up intervals
+
     this.heartbeatInterval = setInterval(() => {
-      console.log('[AGENT] Heartbeat interval tick, ws state:', this.ws?.readyState);
       this.sendHeartbeat();
     }, HEARTBEAT_INTERVAL_MS);
 
     this.statsInterval = setInterval(() => {
       this.sendStatsSummary();
     }, STATS_SUMMARY_INTERVAL_MS);
-    
-    console.log('[AGENT] Heartbeat intervals configured');
-    console.log('[AGENT] HEARTBEAT_INTERVAL_MS:', HEARTBEAT_INTERVAL_MS);
-    console.log('[AGENT] ========================================');
   }
 
   /**
@@ -963,12 +949,7 @@ export class AgentService extends EventEmitter {
    * Send heartbeat to admin
    */
   private sendHeartbeat(): void {
-    console.log('[AGENT] sendHeartbeat() called');
-    console.log('[AGENT] WebSocket exists:', !!this.ws);
-    console.log('[AGENT] WebSocket readyState:', this.ws?.readyState, '(1=OPEN, 0=CONNECTING, 2=CLOSING, 3=CLOSED)');
-    
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.log('[AGENT] Cannot send heartbeat - WebSocket not open');
       return;
     }
 
@@ -1012,8 +993,6 @@ export class AgentService extends EventEmitter {
       enhanced: enhancedPayload,
     };
 
-    console.log('[AGENT] Creating enhanced heartbeat message');
-
     const message = this.crypto.createSignedMessage(
       'HEARTBEAT',
       this.deviceId,
@@ -1021,10 +1000,8 @@ export class AgentService extends EventEmitter {
       this.getPrivateKey()
     );
 
-    console.log('[AGENT] Sending heartbeat message...');
     this.send(message);
     this.state.lastHeartbeat = Date.now();
-    console.log('[AGENT] Heartbeat sent successfully');
   }
 
   /**
@@ -1147,11 +1124,7 @@ export class AgentService extends EventEmitter {
    */
   private send(message: any): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const msgStr = JSON.stringify(message);
-      console.log('[AGENT] Sending message:', msgStr.substring(0, 100));
-      this.ws.send(msgStr);
-    } else {
-      console.log('[AGENT] Cannot send - WebSocket not open. State:', this.ws?.readyState);
+      this.ws.send(JSON.stringify(message));
     }
   }
 

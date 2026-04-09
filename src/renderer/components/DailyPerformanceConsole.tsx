@@ -217,7 +217,7 @@ export const DailyPerformanceConsole: React.FC = () => {
       if (logs.length > 0) setRecent(sortLogsDesc(logs));
     }).catch(() => {});
 
-    const tick = setInterval(() => setNow(new Date()), 1000);
+    const tick = setInterval(() => setNow(new Date()), 5000); // 5s is enough for display updates
     
     return () => {
       cleanup?.();
@@ -335,7 +335,7 @@ export const DailyPerformanceConsole: React.FC = () => {
       return computeExpectedWindow('09:00', '18:00', breakDurationMinutes);
     }
     return computeExpectedWindow(workSchedule.start, workSchedule.end, breakDurationMinutes);
-  }, [workSchedule, breakDurationMinutes, now]);
+  }, [workSchedule, breakDurationMinutes]);
 
   // Compute daily metrics for insight engine
   const dailyMetrics = useMemo<DailyMetrics>(() => {
@@ -354,7 +354,7 @@ export const DailyPerformanceConsole: React.FC = () => {
   // Compute focus stats (include live current activity for real-time display)
   const focusStats = useMemo<FocusStats>(() => {
     return computeFocusStats(recent, sessionStart, current);
-  }, [recent, sessionStart, current, now]);
+  }, [recent, sessionStart, current]);
 
   // Compute daily insight (with focus stats for guidance)
   const dailyInsight = useMemo(() => {
