@@ -36,7 +36,11 @@ async function apiFetch(path: string, options?: RequestInit): Promise<any> {
   });
   if (res.status === 401) {
     setToken(null);
-    throw new Error('Unauthorized');
+    // Redirect to login — token expired or invalid
+    if (typeof window !== 'undefined') {
+      window.location.href = '/login';
+    }
+    throw new Error('Session expired — please log in again');
   }
   return res.json();
 }

@@ -841,10 +841,10 @@ export class AdminDatabase {
       VALUES (?, ?, ?)
     `).run(deviceId, Date.now(), payloadJson);
     
-    // Cleanup old heartbeats (keep last 1000)
+    // Cleanup old heartbeats (keep last 100 per device to reduce DB bloat)
     this.db.prepare(`
       DELETE FROM heartbeat_log WHERE id NOT IN (
-        SELECT id FROM heartbeat_log ORDER BY ts DESC LIMIT 1000
+        SELECT id FROM heartbeat_log ORDER BY ts DESC LIMIT 100
       )
     `).run();
   }

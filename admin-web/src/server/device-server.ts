@@ -866,20 +866,11 @@ export class AdminServer {
    * Handle heartbeat from device
    */
   private handleHeartbeat(deviceId: string, payload: HeartbeatPayload & { enhanced?: EnhancedHeartbeatPayload }): void {
-    this.log(`[SERVER] ========================================`);
-    this.log(`[SERVER] HEARTBEAT received from device ${deviceId}`);
-    this.log(`[SERVER] Payload: appVersion=${payload.appVersion}, trackingStatus=${payload.trackingStatus}`);
-    
     const device = this.connectedDevices.get(deviceId);
     if (device) {
       device.lastHeartbeat = Date.now();
-      this.log(`[SERVER] Updated lastHeartbeat for ${deviceId}`);
-    } else {
-      this.log(`[SERVER] WARNING: Device ${deviceId} not in connectedDevices when handling heartbeat!`);
-      this.log(`[SERVER] connectedDevices keys: [${Array.from(this.connectedDevices.keys()).join(', ')}]`);
     }
 
-    // Update device info — include device_name from enhanced heartbeat if present
     const updateInfo: any = {
       last_seen: Date.now(),
       status: 'online',
@@ -890,16 +881,11 @@ export class AdminServer {
     }
     this.db.updateDeviceInfo(deviceId, updateInfo);
 
-    // Process enhanced heartbeat if present
     if (payload.enhanced) {
-      this.log(`[SERVER] Processing enhanced heartbeat: active=${payload.enhanced.today.activeSeconds}s, idle=${payload.enhanced.today.idleSeconds}s`);
       this.dashboardService.ingestHeartbeat(payload.enhanced);
     } else {
-      // Legacy heartbeat - just update basic stats
       this.db.updateDeviceStats(deviceId, 0, 0);
     }
-
-    this.log(`[SERVER] Updated device info in database for ${deviceId}`);
   }
 
   /**
@@ -1252,9 +1238,7 @@ export class AdminServer {
    * Get connected devices
    */
   public getConnectedDevices(): string[] {
-    const keys = Array.from(this.connectedDevices.keys());
-    this.log(`[SERVER] getConnectedDevices() called, returning ${keys.length} devices: [${keys.join(', ')}]`);
-    return keys;
+    return Array.from(this.connectedDevices.keys());
   }
 
   /**
