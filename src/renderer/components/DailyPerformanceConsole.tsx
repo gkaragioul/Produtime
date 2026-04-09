@@ -54,8 +54,7 @@ export const DailyPerformanceConsole: React.FC = () => {
   const stoppedAtRef = useRef<Date | null>(null);
   const lastMetricsRef = useRef<any>(null);
   const resumeActiveCarryRef = useRef<number>(0);
-  const pendingIdleRef = useRef<number>(0); // idle seconds not yet in DB after idle→active transition
-  const prevCurrentRef = useRef<any>(null);
+  const lastKnownIdleRef = useRef<number>(0); // idle should never drop below this
   
   // Work schedule state
   const [workSchedule, setWorkSchedule] = useState<{ start: string; end: string } | null>(null);
@@ -175,42 +174,38 @@ export const DailyPerformanceConsole: React.FC = () => {
     const handler = (activity: any) => {
       if (!activity) return;
 
-      // Capture idle duration before it's lost in the transition
-      const prev = prevCurrentRef.current;
-      if (prev && prev.isIdle && !activity.isIdle) {
-        // Idle→Active transition: save the live idle seconds that won't be in DB yet
-        const idleElapsed = Math.max(0, Math.floor((Date.now() - new Date(prev.startTime).getTime()) / 1000));
-        pendingIdleRef.current = idleElapsed;
-      }
-
-      const newCurrent = {
-        appName: activity.appName,
-        windowTitle: activity.windowTitle,
-        startTime: activity.startTime ? new Date(activity.startTime).toISOString() : new Date().toISOString(),
-        isIdle: !!activity.isIdle,
-      };
-
       if (isPausedRef.current) {
         if (activity.isIdle && activity.windowTitle === 'Paused') {
-          newCurrent.isIdle = true;
+          setCurrent({
+            appName: activity.appName,
+            windowTitle: activity.windowTitle,
+            startTime: activity.startTime ? new Date(activity.startTime).toISOString() : new Date().toISOString(),
+            isIdle: true,
+          });
         } else {
           setIsPaused(false);
+          setCurrent({
+            appName: activity.appName,
+            windowTitle: activity.windowTitle,
+            startTime: activity.startTime ? new Date(activity.startTime).toISOString() : new Date().toISOString(),
+            isIdle: !!activity.isIdle,
+          });
         }
+      } else {
+        setCurrent({
+          appName: activity.appName,
+          windowTitle: activity.windowTitle,
+          startTime: activity.startTime ? new Date(activity.startTime).toISOString() : new Date().toISOString(),
+          isIdle: !!activity.isIdle,
+        });
       }
 
-      prevCurrentRef.current = newCurrent;
-      setCurrent(newCurrent);
-
-      // Fetch logs after delay, then clear pending idle once DB has the record
+      // Refetch logs from DB (idle record is already persisted by main process)
       setTimeout(() => {
         fetchTodaysLogs(api).then((logs) => {
-          if (logs.length > 0) {
-            setRecent(sortLogsDesc(logs));
-            // DB now has the idle record — clear the pending carry
-            pendingIdleRef.current = 0;
-          }
+          if (logs.length > 0) setRecent(sortLogsDesc(logs));
         }).catch(() => {});
-      }, 500);
+      }, 300);
     };
 
     const cleanup = typeof api.onActivityChanged === 'function'
@@ -327,10 +322,11 @@ export const DailyPerformanceConsole: React.FC = () => {
       active += resumeActiveCarryRef.current;
     }
 
-    // Add pending idle from idle→active transition (not yet in DB)
-    if (pendingIdleRef.current > 0) {
-      idle += pendingIdleRef.current;
+    // Idle should never drop below previously known value (handles DB fetch lag during idle→active transition)
+    if (idle < lastKnownIdleRef.current) {
+      idle = lastKnownIdleRef.current;
     }
+    lastKnownIdleRef.current = idle;
 
     const total = active + idle;
     const currentMetrics = { active, idle, total, perApp };
