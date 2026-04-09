@@ -363,6 +363,11 @@ export class ActivityTracker {
       }
     }
 
+    // For System/Idle and System/Paused: preserve window title so idle detection works
+    if (appName === 'System' && (windowTitle === 'Idle' || windowTitle === 'Paused')) {
+      return { appName, windowTitle, wasSanitized: false };
+    }
+
     // For non-browser apps or when site can't be extracted: strip window title
     return { appName, windowTitle: appName, wasSanitized: true };
   }
