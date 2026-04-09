@@ -525,8 +525,8 @@ export class MetricsComputer {
    * Check if a log entry represents idle time
    */
   private isIdleLog(log: any): boolean {
-    return log.app_name === 'System' && 
-           (log.window_title === 'Idle' || log.window_title === 'Paused');
+    return log.app_name === 'System' &&
+           (log.window_title === 'Idle' || log.window_title === 'Paused' || log.window_title === 'System');
   }
 
   /**

@@ -10,7 +10,8 @@ export function computePerAppAndTop(
   let idle = 0;
 
   for (const log of logs) {
-    const isIdle = log.app_name === 'System' && log.window_title === 'Idle';
+    const isIdle = log.app_name === 'System' &&
+      (log.window_title === 'Idle' || log.window_title === 'Paused' || log.window_title === 'System');
     if (isIdle) idle += log.duration;
     else {
       active += log.duration;

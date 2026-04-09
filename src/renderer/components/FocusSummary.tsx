@@ -198,8 +198,8 @@ export const FocusSummary: React.FC<FocusSummaryProps> = ({
           {showRecentActivity && (
             <div className="recent-activity-list">
               {recentLogs.slice(0, 8).map((log, i) => {
-                const isIdle = log.app_name === 'System' && 
-                  (log.window_title === 'Idle' || log.window_title === 'Paused');
+                const isIdle = log.app_name === 'System' &&
+                  (log.window_title === 'Idle' || log.window_title === 'Paused' || log.window_title === 'System');
                 return (
                   <div key={log.id || i} className={`recent-item ${isIdle ? 'idle' : ''}`}>
                     <span className="recent-time">{formatTime(log.timestamp)}</span>
