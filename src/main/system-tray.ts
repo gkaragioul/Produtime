@@ -263,6 +263,7 @@ export class SystemTrayManager {
       });
 
       electronNotification.on('close', () => {
+        electronNotification.removeAllListeners();
         this.notifications.delete(notificationId);
       });
 
@@ -390,7 +391,10 @@ export class SystemTrayManager {
 
   private quitApplication(): void {
     // Clean up notifications
-    this.notifications.forEach((notification) => notification.close());
+    this.notifications.forEach((notification) => {
+      notification.removeAllListeners();
+      notification.close();
+    });
     this.notifications.clear();
 
     // Quit the application
@@ -399,7 +403,10 @@ export class SystemTrayManager {
 
   public cleanup(): void {
     // Clean up notifications
-    this.notifications.forEach((notification) => notification.close());
+    this.notifications.forEach((notification) => {
+      notification.removeAllListeners();
+      notification.close();
+    });
     this.notifications.clear();
 
     // Destroy tray

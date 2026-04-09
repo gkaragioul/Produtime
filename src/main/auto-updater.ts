@@ -154,12 +154,30 @@ export class AutoUpdaterManager {
       progress: { bytesPerSecond: 0, percent: 0, transferred: 0, total: 0 },
     });
 
-    await this.downloadFile(this.latestDownloadUrl, tempPath);
+    try {
+      await this.downloadFile(this.latestDownloadUrl, tempPath);
+    } catch (err: any) {
+      // Clean up partial download
+      try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+      this.broadcastState({ status: UpdateStatus.ERROR, error: `Download failed: ${err.message}` });
+      return;
+    }
+
+    // Verify downloaded file is valid (at least 10MB for an Electron app)
+    try {
+      const stat = fs.statSync(tempPath);
+      if (stat.size < 10 * 1024 * 1024) {
+        fs.unlinkSync(tempPath);
+        this.broadcastState({ status: UpdateStatus.ERROR, error: 'Downloaded file too small — incomplete download' });
+        return;
+      }
+    } catch {
+      this.broadcastState({ status: UpdateStatus.ERROR, error: 'Could not verify downloaded file' });
+      return;
+    }
 
     // Strip Mark of the Web so SmartScreen won't block it
-    try {
-      fs.unlinkSync(tempPath + ':Zone.Identifier');
-    } catch { /* ADS may not exist */ }
+    try { fs.unlinkSync(tempPath + ':Zone.Identifier'); } catch {}
 
     this.broadcastState({
       status: UpdateStatus.DOWNLOADED,
@@ -171,16 +189,31 @@ export class AutoUpdaterManager {
   }
 
   private downloadFile(url: string, dest: string): Promise<void> {
+    const DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes max
+
     return new Promise((resolve, reject) => {
-      const follow = (url: string) => {
-        https.get(url, { headers: { 'User-Agent': `ProduTime/${app.getVersion()}` } }, (res) => {
-          // Follow redirects (GitHub returns 302)
+      let settled = false;
+      const timeout = setTimeout(() => {
+        if (!settled) { settled = true; reject(new Error('Download timed out (5 minutes)')); }
+      }, DOWNLOAD_TIMEOUT_MS);
+
+      const done = (err?: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        err ? reject(err) : resolve();
+      };
+
+      const follow = (url: string, redirects = 0) => {
+        if (redirects > 5) { done(new Error('Too many redirects')); return; }
+
+        const req = https.get(url, { headers: { 'User-Agent': `ProduTime/${app.getVersion()}` } }, (res) => {
           if (res.statusCode === 301 || res.statusCode === 302) {
             const location = res.headers.location;
-            if (location) { follow(location); return; }
+            if (location) { res.resume(); follow(location, redirects + 1); return; }
           }
           if (res.statusCode !== 200) {
-            reject(new Error(`Download failed: HTTP ${res.statusCode}`));
+            done(new Error(`HTTP ${res.statusCode}`));
             return;
           }
 
@@ -194,7 +227,7 @@ export class AutoUpdaterManager {
             file.write(chunk);
 
             const now = Date.now();
-            if (now - lastBroadcast > 300) { // throttle to ~3 updates/sec
+            if (now - lastBroadcast > 300) {
               lastBroadcast = now;
               this.broadcastState({
                 status: UpdateStatus.DOWNLOADING,
@@ -209,9 +242,10 @@ export class AutoUpdaterManager {
             }
           });
 
-          res.on('end', () => { file.end(); resolve(); });
-          res.on('error', (err) => { file.destroy(); reject(err); });
-        }).on('error', reject);
+          res.on('end', () => { file.end(() => done()); });
+          res.on('error', (err) => { file.destroy(); done(err); });
+        });
+        req.on('error', (err) => done(err));
       };
       follow(url);
     });
@@ -224,28 +258,39 @@ export class AutoUpdaterManager {
     const backupName = currentName + '.old';
     const backupPath = path.join(currentDir, backupName);
 
-    // Write a batch script that:
-    // 1. Waits for current process to exit
-    // 2. Deletes old backup if exists
-    // 3. Renames current EXE to .old
-    // 4. Copies new EXE to current location
-    // 5. Launches the new EXE
-    // 6. Deletes itself
+    // Batch script: wait for exit, swap EXE, relaunch. If swap fails, restore backup.
     const batPath = path.join(os.tmpdir(), 'produtime-update.bat');
     const bat = `@echo off
 timeout /t 2 /nobreak >nul
 if exist "${backupPath}" del /f "${backupPath}"
 ren "${currentExe}" "${backupName}"
+if errorlevel 1 (
+  echo Failed to rename current EXE — aborting update
+  start "" "${currentExe}"
+  goto cleanup
+)
 copy /y "${newExePath}" "${currentExe}"
+if errorlevel 1 (
+  echo Failed to copy new EXE — restoring backup
+  ren "${backupPath}" "${currentName}"
+  start "" "${currentExe}"
+  goto cleanup
+)
 start "" "${currentExe}"
-del /f "${newExePath}"
+:cleanup
+del /f "${newExePath}" 2>nul
 del /f "%~f0"
 `;
 
-    fs.writeFileSync(batPath, bat);
+    try {
+      fs.writeFileSync(batPath, bat);
+    } catch (err) {
+      console.error('[UPDATER] Failed to write update batch script:', err);
+      this.broadcastState({ status: UpdateStatus.ERROR, error: 'Failed to prepare update script' });
+      return;
+    }
 
-    // Strip MOTW from the batch file too
-    try { fs.unlinkSync(batPath + ':Zone.Identifier'); } catch { }
+    try { fs.unlinkSync(batPath + ':Zone.Identifier'); } catch {}
 
     const { spawn } = require('child_process');
     spawn('cmd.exe', ['/c', batPath], {
@@ -254,7 +299,6 @@ del /f "%~f0"
       windowsHide: true,
     }).unref();
 
-    // Force quit the app
     app.removeAllListeners('window-all-closed');
     const windows = BrowserWindow.getAllWindows();
     windows.forEach(w => w.removeAllListeners('close'));
