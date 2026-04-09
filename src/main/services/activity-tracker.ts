@@ -500,7 +500,6 @@ export class ActivityTracker {
           };
           this.lastActivityTime = now;
           this.notifyActivityChange();
-          console.log(`📱 Activity changed: ${appName} - ${windowTitle}`);
         }
         // Reset confirmation so the next change must confirm again
         this.pendingDetection = null;
