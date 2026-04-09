@@ -69,7 +69,7 @@ export class ActivityTracker {
     this.options = {
       pollInterval: 500,
       idleThreshold: 300,
-      enableLogging: true,
+      enableLogging: false,
       selfLogSuppressMs: 900,
       selfAppNames: ['Electron', 'ProduTime', 'TimePort'],
       stabilizationSamples: 3,
