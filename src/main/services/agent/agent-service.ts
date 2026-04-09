@@ -794,7 +794,10 @@ export class AgentService extends EventEmitter {
    */
   private async handleExportRequest(message: AdminProtocolMessage): Promise<void> {
     const payload = (message as any).payload;
-    
+
+    // ACK immediately so admin knows request was received
+    this.sendAck(message.nonce);
+
     // Emit event for main process to handle PDF generation
     this.emit('exportRequested', {
       requestId: message.nonce,
@@ -827,12 +830,13 @@ export class AgentService extends EventEmitter {
    */
   private handleLock(message: AdminProtocolMessage): void {
     const payload = (message as any).payload;
-    
+
     this.state.isLocked = true;
     this.state.lockMessage = payload.message;
     this.emitStateChanged();
     this.emit('locked', { reason: payload.reason, message: payload.message });
-    
+    this.sendAck(message.nonce);
+
     console.log('App locked by admin:', payload.reason);
   }
 
@@ -844,7 +848,8 @@ export class AgentService extends EventEmitter {
     this.state.lockMessage = null;
     this.emitStateChanged();
     this.emit('unlocked');
-    
+    this.sendAck(message.nonce);
+
     console.log('App unlocked by admin');
   }
 
