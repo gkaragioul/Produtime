@@ -293,8 +293,8 @@ export const DailyPerformanceConsole: React.FC = () => {
     );
 
     for (const log of relevantLogs) {
-      const isIdle = log.app_name === 'System' && 
-        (log.window_title === 'Idle' || log.window_title === 'Paused');
+      const isIdle = log.app_name === 'System' &&
+        (log.window_title === 'Idle' || log.window_title === 'Paused' || log.window_title === 'System');
       if (isIdle) {
         idle += log.duration;
       } else {

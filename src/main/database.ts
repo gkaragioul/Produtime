@@ -469,9 +469,9 @@ export class DatabaseManager {
     const result = this.db
       .prepare(
         `SELECT
-          SUM(CASE WHEN app_name = 'System' AND (window_title = 'Idle' OR window_title = 'Paused')
+          SUM(CASE WHEN app_name = 'System' AND (window_title = 'Idle' OR window_title = 'Paused' OR window_title = 'System')
               THEN duration ELSE 0 END) as total_idle_seconds,
-          SUM(CASE WHEN NOT (app_name = 'System' AND (window_title = 'Idle' OR window_title = 'Paused'))
+          SUM(CASE WHEN NOT (app_name = 'System' AND (window_title = 'Idle' OR window_title = 'Paused' OR window_title = 'System'))
               THEN duration ELSE 0 END) as total_active_seconds,
           COUNT(*) as total_entries
         FROM activity_logs

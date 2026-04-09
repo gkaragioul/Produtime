@@ -491,7 +491,7 @@ export function computeFocusStats(
 
   for (const log of relevantLogs) {
     const isIdle = log.app_name === 'System' &&
-      (log.window_title === 'Idle' || log.window_title === 'Paused');
+      (log.window_title === 'Idle' || log.window_title === 'Paused' || log.window_title === 'System');
 
     if (isIdle) {
       idleTotal += log.duration;

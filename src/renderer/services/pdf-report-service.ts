@@ -147,7 +147,7 @@ export class PDFReportService {
     for (const log of relevant) {
       const isIdle =
         log.app_name === 'System' &&
-        (log.window_title === 'Idle' || log.window_title === 'Paused');
+        (log.window_title === 'Idle' || log.window_title === 'Paused' || log.window_title === 'System');
       if (isIdle) idle += log.duration || 0;
       else active += log.duration || 0;
     }
