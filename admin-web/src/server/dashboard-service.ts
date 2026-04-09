@@ -121,10 +121,7 @@ export class DashboardService {
       heartbeat.today.idleSeconds
     );
 
-    // Log heartbeat for debugging
     this.db.insertHeartbeatLog(heartbeat.deviceId, JSON.stringify(heartbeat));
-
-    console.log(`[DashboardService] Ingested heartbeat from ${heartbeat.deviceId}: status=${status}, active=${heartbeat.today.activeSeconds}s`);
   }
 
   /**

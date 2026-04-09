@@ -705,6 +705,9 @@ function broadcastAdminEvent(event: string, data: any): void {
   for (const ws of adminEventClients) {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(message);
+    } else {
+      // Clean up dead sockets
+      adminEventClients.delete(ws);
     }
   }
 }
