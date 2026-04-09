@@ -3,18 +3,44 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './styles.css';
 
-console.log('🚀 Renderer process starting...');
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: string }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: '' };
+  }
 
-const container = document.getElementById('root');
-if (!container) {
-  console.error('❌ Root element not found');
-  throw new Error('Root element not found');
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.message };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 40, fontFamily: 'sans-serif' }}>
+          <h2>Something went wrong</h2>
+          <p style={{ color: '#666' }}>{this.state.error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ padding: '8px 16px', marginTop: 16, cursor: 'pointer' }}
+          >
+            Reload
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
-console.log('✅ Root element found, creating React root...');
+const container = document.getElementById('root');
+if (!container) throw new Error('Root element not found');
+
 const root = createRoot(container);
-
-console.log('✅ Rendering App component...');
-root.render(<App />);
-
-console.log('✅ App rendered successfully!');
+root.render(
+  <ErrorBoundary>
+    <App />
+  </ErrorBoundary>
+);
