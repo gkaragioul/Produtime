@@ -199,9 +199,13 @@ export const DailyPerformanceConsole: React.FC = () => {
         });
       }
 
-      fetchTodaysLogs(api).then((logs) => {
-        if (logs.length > 0) setRecent(sortLogsDesc(logs));
-      }).catch(() => {});
+      // Small delay before fetching logs — gives the DB write from the
+      // idle→active transition time to complete (prevents idle time vanishing)
+      setTimeout(() => {
+        fetchTodaysLogs(api).then((logs) => {
+          if (logs.length > 0) setRecent(sortLogsDesc(logs));
+        }).catch(() => {});
+      }, 500);
     };
 
     const cleanup = typeof api.onActivityChanged === 'function'
