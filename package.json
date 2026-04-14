@@ -173,7 +173,6 @@
         }
       ],
       "icon": "assets/icon.ico",
-      "publisherName": "George Karagioules",
       "forceCodeSigning": false
     },
     "mac": {
