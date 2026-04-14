@@ -174,10 +174,7 @@
       ],
       "icon": "assets/icon.ico",
       "publisherName": "George Karagioules",
-      "forceCodeSigning": false,
-      "signingHashAlgorithms": [
-        "sha256"
-      ]
+      "forceCodeSigning": false
     },
     "mac": {
       "target": [
