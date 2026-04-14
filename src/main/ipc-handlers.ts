@@ -255,6 +255,7 @@ export class IPCHandlers {
       // Activity logs
       IPCChannels.GET_ACTIVITY_LOGS,
       IPCChannels.GET_ACTIVITY_LOGS_BY_DATE,
+      'activity:getDailySummary',
       IPCChannels.INSERT_ACTIVITY_LOG,
       // Settings
       IPCChannels.GET_SETTING,
@@ -1563,6 +1564,7 @@ export class IPCHandlers {
 
     // Remove additional handlers not in IPCChannels
     const additionalHandlers = [
+      'activity:getDailySummary',
       'startup:hasShortcut',
       'startup:configure',
       'startup:openFolder',
