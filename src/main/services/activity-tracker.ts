@@ -43,6 +43,7 @@ export class ActivityTracker {
   private trackingInterval: NodeJS.Timeout | null = null;
   private idleCheckInterval: NodeJS.Timeout | null = null;
   private lastActivityTime: Date = new Date();
+  private readonly appStartTime: Date = new Date(); // When this tracker instance was created
   // Confirmation window to reduce mis-commits on fast switches
   private pendingDetection: { appName: string; windowTitle: string } | null =
     null;
@@ -603,9 +604,11 @@ export class ActivityTracker {
       await this.logCurrentActivity();
     }
 
-    // Calculate when idle actually started based on system idle time
+    // Calculate when idle actually started based on system idle time.
+    // Cap to app start time so overnight/shutdown idle doesn't bleed in.
     const idleSeconds = powerMonitor.getSystemIdleTime();
-    const idleStartTime = new Date(Date.now() - idleSeconds * 1000);
+    const rawIdleStart = Date.now() - idleSeconds * 1000;
+    const idleStartTime = new Date(Math.max(rawIdleStart, this.appStartTime.getTime()));
 
     this.currentActivity = {
       appName: 'System',
