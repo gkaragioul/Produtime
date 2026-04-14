@@ -1,5 +1,10 @@
 /* Mobile-responsive overrides — only affects screens ≤ 768px */
 /* Desktop is completely unaffected by these rules */
+/*
+ * NOTE: React serializes inline styles as kebab-case with no surrounding quotes,
+ *   e.g. style={{ justifyContent: 'space-between' }}  →  style="justify-content:space-between"
+ * So [style*="..."] selectors MUST use kebab-case and unquoted values to match.
+ */
 
 /* Hamburger button — hidden on desktop */
 .mobile-menu-btn {
@@ -66,7 +71,7 @@
     display: block !important;
   }
 
-  /* Main content — full width with top padding for hamburger */
+  /* Main content — full width */
   .app-main {
     width: 100% !important;
     min-width: 0 !important;
@@ -76,10 +81,16 @@
     padding-top: 8px !important;
   }
 
-  /* Page headers — indent past hamburger button */
+  /* Page headers — indent past hamburger button, never break mid-word */
   .app-main h1 {
     padding-left: 52px !important;
     font-size: 22px !important;
+  }
+  .app-main h1,
+  .app-main h2 {
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    white-space: normal;
   }
 
   /* Dashboard two-column → single column stack */
@@ -87,13 +98,11 @@
     flex-direction: column !important;
     overflow: auto !important;
   }
-
   .dashboard-main {
     flex: none !important;
     min-height: auto !important;
     overflow: visible !important;
   }
-
   .dashboard-sidebar {
     flex: none !important;
     min-width: 0 !important;
@@ -102,8 +111,8 @@
     overflow: visible !important;
   }
 
-  /* KPI cards — 2 columns on mobile */
-  .app-main [style*="flexWrap"] {
+  /* Flex rows tighter gaps */
+  .app-main [style*="flex-wrap"] {
     gap: 8px !important;
   }
 
@@ -113,14 +122,11 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-
   thead, tbody, tfoot, tr {
     display: table;
     width: 100%;
     table-layout: auto;
   }
-
-  /* Table cells — tighter padding */
   th, td {
     padding: 8px 6px !important;
     font-size: 13px !important;
@@ -131,9 +137,9 @@
     min-height: 40px;
   }
 
-  /* Cards — tighter padding on mobile */
-  .app-main [style*="borderRadius: '12px'"],
-  .app-main [style*="borderRadius: 12px"] {
+  /* Cards — tighter border radius on mobile */
+  .app-main [style*="border-radius:12px"],
+  .app-main [style*="border-radius: 12px"] {
     border-radius: 8px !important;
   }
 
@@ -143,40 +149,33 @@
   }
 
   /* Summary card values — smaller on mobile */
-  .app-main [style*="fontSize: '32px'"],
-  .app-main [style*="fontSize: 32px"] {
+  .app-main [style*="font-size:32px"],
+  .app-main [style*="font-size: 32px"] {
     font-size: 24px !important;
   }
 
-  /* Flex wrap for filter rows */
-  .app-main [style*="flexWrap: 'wrap'"] {
-    gap: 8px !important;
-  }
-
   /* Pre-shift / story cards — better text flow */
-  .app-main [style*="fontSize: 'clamp("] {
+  .app-main [style*="font-size:clamp("],
+  .app-main [style*="font-size: clamp("] {
     font-size: 14px !important;
     line-height: 1.4 !important;
   }
 
-  /* Progress bar containers — full width */
-  .app-main [style*="minWidth: '280px'"] {
+  /* Progress bar / panel containers — remove min-widths that cause overflow */
+  .app-main [style*="min-width:160px"],
+  .app-main [style*="min-width: 160px"],
+  .app-main [style*="min-width:260px"],
+  .app-main [style*="min-width: 260px"],
+  .app-main [style*="min-width:280px"],
+  .app-main [style*="min-width: 280px"],
+  .app-main [style*="min-width:300px"],
+  .app-main [style*="min-width: 300px"],
+  .app-main [style*="min-width:400px"],
+  .app-main [style*="min-width: 400px"] {
     min-width: 0 !important;
   }
 
-  /* Device list items — stack on mobile */
-  .app-main [style*="minWidth: '400px'"] {
-    min-width: 0 !important;
-  }
-
-  /* Analytics panels — remove min-widths that cause overflow */
-  .app-main [style*="minWidth: '260px'"],
-  .app-main [style*="minWidth: '300px'"],
-  .app-main [style*="minWidth: '160px'"] {
-    min-width: 0 !important;
-  }
-
-  /* Force 5-column and 6-column grids to wrap sensibly */
+  /* Force multi-column grids to wrap sensibly */
   .app-main [style*="repeat(5, 1fr)"] {
     grid-template-columns: repeat(2, 1fr) !important;
   }
@@ -191,21 +190,16 @@
   }
 
   /* Two-column form grids → stack */
-  .app-main [style*="gridTemplateColumns: '1fr 1fr'"],
+  .app-main [style*="grid-template-columns:1fr 1fr"],
   .app-main [style*="grid-template-columns: 1fr 1fr"] {
     grid-template-columns: 1fr !important;
   }
 
   /* Two-column layouts (like PolicyManager) → stack */
-  .app-main [style*="width: '300px'"] {
+  .app-main [style*="width:300px"],
+  .app-main [style*="width: 300px"] {
     width: 100% !important;
     margin-bottom: 16px !important;
-  }
-
-  /* Header button rows — tighter spacing, smaller font */
-  .app-main h1,
-  .app-main h2 {
-    word-break: break-word;
   }
 
   /* Select inputs — don't force wide minWidth */
@@ -215,25 +209,45 @@
   }
 
   /* Top nav / header row — wrap to multiple lines cleanly */
-  .app-main [style*="justifyContent: 'space-between'"] {
+  .app-main [style*="justify-content:space-between"],
+  .app-main [style*="justify-content: space-between"] {
     flex-wrap: wrap !important;
     gap: 8px !important;
+  }
+
+  /* Page header h1/h2 inside a space-between flex row — claim the full row
+     so sibling controls (period buttons, search, etc.) wrap onto the next
+     line instead of squeezing the heading into a 1-character column. */
+  .app-main [style*="justify-content:space-between"] > h1,
+  .app-main [style*="justify-content: space-between"] > h1,
+  .app-main [style*="justify-content:space-between"] > h2,
+  .app-main [style*="justify-content: space-between"] > h2 {
+    flex: 1 0 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* "Today so far" story card — stack text + Team Progress vertically on
+     phones instead of cramming them side-by-side. */
+  .today-story-panel {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 16px !important;
+  }
+  .today-story-progress {
+    min-width: 0 !important;
+    width: 100%;
   }
 }
 
 /* Tablet / medium screens (769px - 1024px) — layout starts breaking at 280px minWidths */
 @media (max-width: 1024px) and (min-width: 769px) {
-  /* Dashboard sidebar min-width would push overflow on narrow tablets */
   .dashboard-sidebar {
     min-width: 220px !important;
   }
-
-  /* Analytics chart container — soften 400px min */
-  .app-main [style*="minWidth: '400px'"] {
+  .app-main [style*="min-width:400px"],
+  .app-main [style*="min-width: 400px"] {
     min-width: 260px !important;
   }
-
-  /* Stack multi-column form grids on portrait tablets */
   .app-main [style*="repeat(5, 1fr)"] {
     grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
   }
@@ -247,7 +261,6 @@
   .app-sidebar {
     width: 220px !important;
   }
-
   .mobile-menu-btn {
     top: 8px;
     left: 8px;
@@ -255,42 +268,34 @@
     height: 40px;
     font-size: 20px;
   }
-
   .app-main h1 {
     padding-left: 48px !important;
     font-size: 20px !important;
   }
-
   th, td {
     padding: 6px 4px !important;
     font-size: 12px !important;
   }
-
-  /* On tiny phones, 2-column grids go single-column */
   .app-main [style*="repeat(5, 1fr)"],
   .app-main [style*="repeat(4, 1fr)"],
-  .app-main [style*="repeat(3, 1fr)"] {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
+  .app-main [style*="repeat(3, 1fr)"],
   .app-main [style*="repeat(6, 1fr)"] {
     grid-template-columns: repeat(2, 1fr) !important;
   }
-
-  /* Card paddings even tighter */
-  .app-main [style*="padding: '20px'"],
+  .app-main [style*="padding:20px"],
   .app-main [style*="padding: 20px"] {
     padding: 12px !important;
   }
-  .app-main [style*="padding: '24px'"],
+  .app-main [style*="padding:24px"],
   .app-main [style*="padding: 24px"] {
     padding: 14px !important;
   }
-
-  /* Large numbers (KPI values) smaller */
-  .app-main [style*="fontSize: '24px'"] {
+  .app-main [style*="font-size:24px"],
+  .app-main [style*="font-size: 24px"] {
     font-size: 20px !important;
   }
-  .app-main [style*="fontSize: '28px'"] {
+  .app-main [style*="font-size:28px"],
+  .app-main [style*="font-size: 28px"] {
     font-size: 22px !important;
   }
 }

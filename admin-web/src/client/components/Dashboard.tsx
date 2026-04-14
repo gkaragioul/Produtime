@@ -222,7 +222,7 @@ const TodayStoryPanel: React.FC<{ story: DashboardStory; onViewIssues: () => voi
     : '—';
 
   return (
-    <div style={{
+    <div className="today-story-panel" style={{
       backgroundColor: 'white',
       borderRadius: '12px',
       padding: 'clamp(16px, 2vw, 24px) clamp(20px, 2.5vw, 28px)',
@@ -235,7 +235,7 @@ const TodayStoryPanel: React.FC<{ story: DashboardStory; onViewIssues: () => voi
       flexWrap: 'wrap',
     }}>
       {/* Summary */}
-      <div style={{ flex: 1 }}>
+      <div className="today-story-summary" style={{ flex: 1 }}>
         {story.expected && (
           <div style={{ fontSize: '14px', color: '#888', marginBottom: '10px' }}>
             Work window: {story.expected.workStart}–{story.expected.workEnd} ({Math.round(story.expected.expectedTotalSeconds / 3600)}h)
@@ -250,7 +250,7 @@ const TodayStoryPanel: React.FC<{ story: DashboardStory; onViewIssues: () => voi
       </div>
 
       {/* Progress */}
-      <div style={{ textAlign: 'center', minWidth: '140px' }}>
+      <div className="today-story-progress" style={{ textAlign: 'center', minWidth: '140px' }}>
         <div style={{ fontSize: '16px', color: '#666', marginBottom: '8px', fontWeight: 500 }}>Team Progress</div>
         <div style={{ fontSize: '44px', fontWeight: 700, color: '#1976d2', lineHeight: 1 }}>
           {progressDisplay}
