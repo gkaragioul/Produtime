@@ -341,7 +341,10 @@ export const DailyPerformanceConsole: React.FC = () => {
     lastMetricsRef.current = currentMetrics;
 
     return currentMetrics;
-  }, [recent, current, now, sessionStart, isPaused, stoppedAt, isTracking]);
+  // Intentionally exclude `now` — current elapsed is added separately at render time
+  // to avoid re-running the expensive 100-row loop every 5 seconds.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recent, current, sessionStart, isPaused, stoppedAt, isTracking]);
 
   // Compute expected window (deducting break allowance from expected active time)
   const expectedWindow = useMemo<ExpectedWindow>(() => {

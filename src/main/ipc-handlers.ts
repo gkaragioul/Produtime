@@ -626,7 +626,7 @@ export class IPCHandlers {
       const logs = this.database.getActivityLogsByDateRange(
         request.startDate,
         request.endDate,
-        500 // Limit to 500 most recent logs to prevent renderer OOM
+        100 // Limit to 100 most recent logs to prevent renderer OOM
       );
       // Apply privacy sanitization when reading logs
       const sanitizedLogs = this.sanitizeActivityLogs(logs);

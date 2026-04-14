@@ -68,7 +68,7 @@ export class ActivityTracker {
     private options: ActivityTrackerOptions = {}
   ) {
     this.options = {
-      pollInterval: 2000,
+      pollInterval: 5000,
       idleThreshold: 300,
       enableLogging: false,
       selfLogSuppressMs: 900,
