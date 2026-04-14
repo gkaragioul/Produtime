@@ -50,8 +50,8 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess }) => {
       <div style={{
         backgroundColor: '#16213e',
         borderRadius: '8px',
-        padding: '40px',
-        width: '360px',
+        padding: 'clamp(24px, 5vw, 40px)',
+        width: 'min(360px, calc(100vw - 32px))',
         boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3)',
       }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
