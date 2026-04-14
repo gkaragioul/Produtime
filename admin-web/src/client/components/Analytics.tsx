@@ -286,6 +286,7 @@ export const Analytics: React.FC = () => {
   const [metrics, setMetrics] = useState<DailyMetric[]>([]);
   const [liveDevices, setLiveDevices] = useState<LiveDevice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ x: number; y: number; metric: DailyMetric } | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
 
@@ -354,6 +355,18 @@ export const Analytics: React.FC = () => {
     const interval = setInterval(loadLiveStatus, 10_000);
     return () => clearInterval(interval);
   }, [loadLiveStatus]);
+
+  // Metrics auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(loadMetrics, 30_000);
+    return () => clearInterval(interval);
+  }, [loadMetrics]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([loadDevices(), loadMetrics(), loadLiveStatus()]);
+    setRefreshing(false);
+  };
 
   // -----------------------------------------------------------------------
   // Computed values
@@ -462,6 +475,24 @@ export const Analytics: React.FC = () => {
               <option key={d.device_id} value={d.device_id}>{d.device_name}</option>
             ))}
           </select>
+
+          {/* Refresh button */}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            title="Refresh data now"
+            style={{
+              padding: '10px 14px',
+              borderRadius: '8px',
+              border: '1px solid #ddd',
+              backgroundColor: 'white',
+              color: refreshing ? '#999' : '#333',
+              cursor: refreshing ? 'not-allowed' : 'pointer',
+              fontSize: '16px',
+            }}
+          >
+            {refreshing ? '⏳' : '🔄'}
+          </button>
 
           {/* Export button */}
           <button
