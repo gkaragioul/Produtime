@@ -342,6 +342,10 @@ export class IPCHandlers {
       this.handleGetActivityLogsByDate.bind(this)
     );
     ipcMain.handle(
+      'activity:getDailySummary',
+      this.handleGetDailySummary.bind(this)
+    );
+    ipcMain.handle(
       IPCChannels.INSERT_ACTIVITY_LOG,
       this.handleInsertActivityLog.bind(this)
     );
@@ -615,6 +619,24 @@ export class IPCHandlers {
     } catch (error) {
       console.error('Error getting activity logs:', error);
       return { success: false, error: `Failed to get activity logs: ${error}` };
+    }
+  }
+
+  private async handleGetDailySummary(
+    event: IpcMainInvokeEvent,
+    request: { startDate: string; endDate: string }
+  ): Promise<IPCResponse<{ active: number; idle: number }>> {
+    try {
+      const summary = this.database.getActivitySummaryByDateRange(request.startDate, request.endDate);
+      return {
+        success: true,
+        data: {
+          active: summary.total_active_seconds || 0,
+          idle: summary.total_idle_seconds || 0,
+        },
+      };
+    } catch (error) {
+      return { success: false, error: `Failed to get daily summary: ${error}` };
     }
   }
 

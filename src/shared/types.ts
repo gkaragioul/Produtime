@@ -53,6 +53,8 @@ export interface ElectronAPI {
   startTracking: () => Promise<IPCResponse<void>>;
   stopTracking: () => Promise<IPCResponse<void>>;
 
+  getActivityDailySummary: (request: { startDate: string; endDate: string }) => Promise<IPCResponse<{ active: number; idle: number }>>;
+
   // PDF Reports API
   generateReport: (
     request: GenerateReportRequest
