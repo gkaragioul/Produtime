@@ -1,0 +1,24 @@
+{
+  "name": "ProduTime Admin Console",
+  "short_name": "ProduTime",
+  "description": "ProduTime administration dashboard",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f5f5f5",
+  "theme_color": "#1a1a2e",
+  "icons": [
+    {
+      "src": "assets/PTAdminIcon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/PTAdminIcon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
