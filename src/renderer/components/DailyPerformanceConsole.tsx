@@ -41,7 +41,7 @@ export const DailyPerformanceConsole: React.FC = () => {
   // Core state
   const [current, setCurrent] = useState<CurrentActivityUI | null>(null);
   const [recent, setRecent] = useState<ActivityLog[]>([]);
-  const [now, setNow] = useState<Date>(new Date());
+  // `now` removed — caused a full re-render every 5s. Metrics update via `current` changes from activity poll instead.
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isTracking, setIsTracking] = useState<boolean>(true);
   const [isPaused, setIsPaused] = useState<boolean>(false);
@@ -218,11 +218,8 @@ export const DailyPerformanceConsole: React.FC = () => {
       if (logs.length > 0) setRecent(sortLogsDesc(logs));
     }).catch(() => {});
 
-    const tick = setInterval(() => setNow(new Date()), 5000); // 5s is enough for display updates
-    
     return () => {
       cleanup?.();
-      clearInterval(tick);
     };
   }, []);
 
@@ -258,7 +255,6 @@ export const DailyPerformanceConsole: React.FC = () => {
                   setTotalStoppedDuration((p) => p + dur);
                   setStoppedAt(null);
                   stoppedAtRef.current = null;
-                  setNow(new Date());
                 }
               }
             }
@@ -430,7 +426,6 @@ export const DailyPerformanceConsole: React.FC = () => {
       startTime: new Date().toISOString(),
       isIdle: true,
     });
-    setNow(new Date());
     try {
       await api.pauseTracking();
     } catch (error) {
@@ -452,7 +447,6 @@ export const DailyPerformanceConsole: React.FC = () => {
       setTimeout(async () => {
         const logs = await fetchTodaysLogs(api);
         if (logs.length > 0) setRecent(sortLogsDesc(logs));
-        setNow(new Date());
       }, 100);
     } catch (error) {
       console.error('Error resuming tracking:', error);
