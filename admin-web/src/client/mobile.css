@@ -168,6 +168,78 @@
   .app-main [style*="minWidth: '400px'"] {
     min-width: 0 !important;
   }
+
+  /* Analytics panels — remove min-widths that cause overflow */
+  .app-main [style*="minWidth: '260px'"],
+  .app-main [style*="minWidth: '300px'"],
+  .app-main [style*="minWidth: '160px'"] {
+    min-width: 0 !important;
+  }
+
+  /* Force 5-column and 6-column grids to wrap sensibly */
+  .app-main [style*="repeat(5, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .app-main [style*="repeat(6, 1fr)"] {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+  .app-main [style*="repeat(4, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .app-main [style*="repeat(3, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Two-column form grids → stack */
+  .app-main [style*="gridTemplateColumns: '1fr 1fr'"],
+  .app-main [style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Two-column layouts (like PolicyManager) → stack */
+  .app-main [style*="width: '300px'"] {
+    width: 100% !important;
+    margin-bottom: 16px !important;
+  }
+
+  /* Header button rows — tighter spacing, smaller font */
+  .app-main h1,
+  .app-main h2 {
+    word-break: break-word;
+  }
+
+  /* Select inputs — don't force wide minWidth */
+  .app-main select {
+    min-width: 0 !important;
+    max-width: 100%;
+  }
+
+  /* Top nav / header row — wrap to multiple lines cleanly */
+  .app-main [style*="justifyContent: 'space-between'"] {
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+}
+
+/* Tablet / medium screens (769px - 1024px) — layout starts breaking at 280px minWidths */
+@media (max-width: 1024px) and (min-width: 769px) {
+  /* Dashboard sidebar min-width would push overflow on narrow tablets */
+  .dashboard-sidebar {
+    min-width: 220px !important;
+  }
+
+  /* Analytics chart container — soften 400px min */
+  .app-main [style*="minWidth: '400px'"] {
+    min-width: 260px !important;
+  }
+
+  /* Stack multi-column form grids on portrait tablets */
+  .app-main [style*="repeat(5, 1fr)"] {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)) !important;
+  }
+  .app-main [style*="repeat(6, 1fr)"] {
+    grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)) !important;
+  }
 }
 
 /* Small phones */
@@ -192,5 +264,33 @@
   th, td {
     padding: 6px 4px !important;
     font-size: 12px !important;
+  }
+
+  /* On tiny phones, 2-column grids go single-column */
+  .app-main [style*="repeat(5, 1fr)"],
+  .app-main [style*="repeat(4, 1fr)"],
+  .app-main [style*="repeat(3, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .app-main [style*="repeat(6, 1fr)"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Card paddings even tighter */
+  .app-main [style*="padding: '20px'"],
+  .app-main [style*="padding: 20px"] {
+    padding: 12px !important;
+  }
+  .app-main [style*="padding: '24px'"],
+  .app-main [style*="padding: 24px"] {
+    padding: 14px !important;
+  }
+
+  /* Large numbers (KPI values) smaller */
+  .app-main [style*="fontSize: '24px'"] {
+    font-size: 20px !important;
+  }
+  .app-main [style*="fontSize: '28px'"] {
+    font-size: 22px !important;
   }
 }
