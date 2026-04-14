@@ -58,7 +58,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onDeviceClick }) => {
 
       // Only update state if data changed (prevents UI flashing)
       if (summaryData) setSummary(prev => JSON.stringify(prev) === JSON.stringify(summaryData) ? prev : summaryData);
-      if (devicesData) setDevices(prev => JSON.stringify(prev) === JSON.stringify(devicesData) ? prev : devicesData);
+      if (devicesData) {
+        const sorted = [...devicesData].sort((a: any, b: any) => (a.device_name || '').localeCompare(b.device_name || ''));
+        setDevices(prev => JSON.stringify(prev) === JSON.stringify(sorted) ? prev : sorted);
+      }
       if (trendsData) setTrends(prev => JSON.stringify(prev) === JSON.stringify(trendsData) ? prev : trendsData);
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
