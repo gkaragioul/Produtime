@@ -205,6 +205,7 @@
     },
     "nsis": {
       "oneClick": false,
+      "artifactName": "WOT-Produtime-Setup.${ext}",
       "allowToChangeInstallationDirectory": true,
       "license": "LICENSE_EULA.txt",
       "createDesktopShortcut": true,
