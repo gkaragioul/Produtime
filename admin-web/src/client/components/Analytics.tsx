@@ -280,8 +280,12 @@ function exportPDF(
 // ---------------------------------------------------------------------------
 
 export const Analytics: React.FC = () => {
-  const [period, setPeriod] = useState<PeriodType>('daily');
-  const [deviceFilter, setDeviceFilter] = useState<string>('all');
+  const [period, setPeriod] = useState<PeriodType>(
+    () => (localStorage.getItem('analytics_period') as PeriodType) || 'daily'
+  );
+  const [deviceFilter, setDeviceFilter] = useState<string>(
+    () => localStorage.getItem('analytics_device') || 'all'
+  );
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [metrics, setMetrics] = useState<DailyMetric[]>([]);
   const [liveDevices, setLiveDevices] = useState<LiveDevice[]>([]);
@@ -450,7 +454,7 @@ export const Analytics: React.FC = () => {
           {(['daily', 'weekly', 'monthly'] as PeriodType[]).map((p) => (
             <button
               key={p}
-              onClick={() => setPeriod(p)}
+              onClick={() => { setPeriod(p); localStorage.setItem('analytics_period', p); }}
               style={periodButtonStyle(period === p)}
             >
               {p.charAt(0).toUpperCase() + p.slice(1)}
@@ -460,7 +464,7 @@ export const Analytics: React.FC = () => {
           {/* Person / device filter */}
           <select
             value={deviceFilter}
-            onChange={(e) => setDeviceFilter(e.target.value)}
+            onChange={(e) => { setDeviceFilter(e.target.value); localStorage.setItem('analytics_device', e.target.value); }}
             style={{
               padding: '10px 14px',
               borderRadius: '8px',
