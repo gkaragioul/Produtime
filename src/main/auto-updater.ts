@@ -4,8 +4,6 @@
  * Checks GitHub releases for updates, downloads the new portable EXE
  * with progress, strips Mark of the Web, and uses a batch script to
  * swap the old EXE for the new one and relaunch.
- *
- * No NSIS installer, no SmartScreen issues.
  */
 
 import { app, BrowserWindow, dialog, ipcMain } from 'electron';
@@ -17,9 +15,11 @@ import { UpdateStatus, UpdateState } from '../shared/types';
 
 const GITHUB_OWNER = 'wotbyalice';
 const GITHUB_REPO = 'WOT-Produtime-Releases';
+const ASSET_NAME = 'WOT-Produtime.exe';
 const STARTUP_CHECK_DELAY_MS = 30_000;
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const AUTO_DOWNLOAD_DELAY_MS = 30_000;
+const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes (100MB on slow connections)
 
 export class AutoUpdaterManager {
   private mainWindow: BrowserWindow | null = null;
@@ -99,11 +99,10 @@ export class AutoUpdaterManager {
         return;
       }
 
-      // Find the portable EXE asset
-      const asset = release.assets?.find((a: any) =>
-        a.name.endsWith('.exe') && !a.name.includes('blockmap')
-      );
+      // Match exact asset name — no ambiguity
+      const asset = release.assets?.find((a: any) => a.name === ASSET_NAME);
       if (!asset) {
+        console.warn(`[UPDATER] Asset "${ASSET_NAME}" not found in release ${latest}`);
         this.broadcastNotAvailable();
         return;
       }
@@ -140,13 +139,16 @@ export class AutoUpdaterManager {
   }
 
   private async downloadUpdate(): Promise<void> {
-    if (!this.latestDownloadUrl || !this.latestVersion) return;
+    if (!this.latestDownloadUrl || !this.latestVersion) {
+      // Always broadcast error so UI button resets
+      this.broadcastState({ status: UpdateStatus.ERROR, error: 'Download URL not available — try checking for updates again' });
+      return;
+    }
 
     const tempDir = path.join(os.tmpdir(), 'produtime-update');
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-    const fileName = 'WOT-Produtime.exe';
-    const tempPath = path.join(tempDir, fileName);
+    const tempPath = path.join(tempDir, ASSET_NAME);
 
     this.broadcastState({
       status: UpdateStatus.DOWNLOADING,
@@ -157,13 +159,12 @@ export class AutoUpdaterManager {
     try {
       await this.downloadFile(this.latestDownloadUrl, tempPath);
     } catch (err: any) {
-      // Clean up partial download
       try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
       this.broadcastState({ status: UpdateStatus.ERROR, error: `Download failed: ${err.message}` });
       return;
     }
 
-    // Verify downloaded file is valid (at least 10MB for an Electron app)
+    // Verify file is a valid Electron app (at least 10MB)
     try {
       const stat = fs.statSync(tempPath);
       if (stat.size < 10 * 1024 * 1024) {
@@ -189,19 +190,28 @@ export class AutoUpdaterManager {
   }
 
   private downloadFile(url: string, dest: string): Promise<void> {
-    const DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes max
-
     return new Promise((resolve, reject) => {
       let settled = false;
+      let fileStream: fs.WriteStream | null = null;
+
       const timeout = setTimeout(() => {
-        if (!settled) { settled = true; reject(new Error('Download timed out (5 minutes)')); }
+        if (!settled) {
+          settled = true;
+          fileStream?.destroy();
+          reject(new Error(`Download timed out (${DOWNLOAD_TIMEOUT_MS / 60000} minutes)`));
+        }
       }, DOWNLOAD_TIMEOUT_MS);
 
       const done = (err?: Error) => {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
-        err ? reject(err) : resolve();
+        if (err) {
+          fileStream?.destroy();
+          reject(err);
+        } else {
+          resolve();
+        }
       };
 
       const follow = (url: string, redirects = 0) => {
@@ -220,11 +230,11 @@ export class AutoUpdaterManager {
           const total = parseInt(res.headers['content-length'] || '0', 10);
           let transferred = 0;
           let lastBroadcast = 0;
-          const file = fs.createWriteStream(dest);
+          fileStream = fs.createWriteStream(dest);
 
           res.on('data', (chunk: Buffer) => {
             transferred += chunk.length;
-            file.write(chunk);
+            fileStream!.write(chunk);
 
             const now = Date.now();
             if (now - lastBroadcast > 300) {
@@ -242,11 +252,14 @@ export class AutoUpdaterManager {
             }
           });
 
-          res.on('end', () => { file.end(() => done()); });
-          res.on('error', (err) => { file.destroy(); done(err); });
+          res.on('end', () => { fileStream!.end(() => done()); });
+          res.on('error', (err) => done(err));
         });
-        req.on('error', (err) => done(err));
+
+        // Fix: destroy fileStream on request-level errors too
+        req.on('error', (err) => { fileStream?.destroy(); done(err); });
       };
+
       follow(url);
     });
   }
@@ -258,52 +271,67 @@ export class AutoUpdaterManager {
     const backupName = currentName + '.old';
     const backupPath = path.join(currentDir, backupName);
 
-    // Batch script: wait for exit, swap EXE, relaunch. If swap fails, restore backup.
-    const batPath = path.join(os.tmpdir(), 'produtime-update.bat');
+    // Quote all paths for batch to handle spaces correctly
+    const q = (p: string) => `"${p}"`;
+
     const bat = `@echo off
 timeout /t 2 /nobreak >nul
-if exist "${backupPath}" del /f "${backupPath}"
-ren "${currentExe}" "${backupName}"
+if exist ${q(backupPath)} del /f ${q(backupPath)}
+ren ${q(currentExe)} "${backupName}"
 if errorlevel 1 (
-  echo Failed to rename current EXE — aborting update
-  start "" "${currentExe}"
+  echo [UPDATER] ERROR: Failed to rename current EXE
+  if exist ${q(currentExe)} start "" ${q(currentExe)}
   goto cleanup
 )
-copy /y "${newExePath}" "${currentExe}"
+copy /y ${q(newExePath)} ${q(currentExe)}
 if errorlevel 1 (
-  echo Failed to copy new EXE — restoring backup
-  ren "${backupPath}" "${currentName}"
-  start "" "${currentExe}"
+  echo [UPDATER] ERROR: Failed to copy new EXE - restoring backup
+  ren ${q(backupPath)} "${currentName}"
+  if exist ${q(currentExe)} start "" ${q(currentExe)}
   goto cleanup
 )
-start "" "${currentExe}"
+if not exist ${q(currentExe)} (
+  echo [UPDATER] ERROR: EXE missing after copy - restoring backup
+  ren ${q(backupPath)} "${currentName}"
+  if exist ${q(currentExe)} start "" ${q(currentExe)}
+  goto cleanup
+)
+start "" ${q(currentExe)}
 :cleanup
-del /f "${newExePath}" 2>nul
+del /f ${q(newExePath)} 2>nul
 del /f "%~f0"
 `;
 
     try {
-      fs.writeFileSync(batPath, bat);
+      fs.writeFileSync(batPath(), bat, 'utf8');
     } catch (err) {
-      console.error('[UPDATER] Failed to write update batch script:', err);
+      console.error('[UPDATER] Failed to write batch script:', err);
       this.broadcastState({ status: UpdateStatus.ERROR, error: 'Failed to prepare update script' });
       return;
     }
 
-    try { fs.unlinkSync(batPath + ':Zone.Identifier'); } catch {}
+    try { fs.unlinkSync(batPath() + ':Zone.Identifier'); } catch {}
 
     const { spawn } = require('child_process');
-    spawn('cmd.exe', ['/c', batPath], {
+    spawn('cmd.exe', ['/c', batPath()], {
       detached: true,
       stdio: 'ignore',
       windowsHide: true,
     }).unref();
 
+    // Force-close all windows with timeout fallback
     app.removeAllListeners('window-all-closed');
     const windows = BrowserWindow.getAllWindows();
-    windows.forEach(w => w.removeAllListeners('close'));
-    windows.forEach(w => w.close());
-    app.quit();
+    windows.forEach(w => {
+      w.removeAllListeners('close');
+      w.close();
+    });
+
+    // Force quit after 2 seconds regardless
+    setTimeout(() => {
+      BrowserWindow.getAllWindows().forEach(w => { try { w.destroy(); } catch {} });
+      app.quit();
+    }, 2000);
   }
 
   private async fetchLatestRelease(): Promise<any> {
@@ -315,26 +343,35 @@ del /f "%~f0"
         timeout: 10000,
       };
 
-      https.get(options, (res) => {
+      const req = https.get(options, (res) => {
         let data = '';
         res.on('data', (chunk) => data += chunk);
         res.on('end', () => {
           try {
-            if (res.statusCode !== 200) {
+            if (res.statusCode === 403 || res.statusCode === 429) {
+              // Rate-limited — treat as no update available (not an error)
+              console.warn('[UPDATER] GitHub API rate-limited, skipping check');
               resolve(null);
               return;
             }
+            if (res.statusCode !== 200) { resolve(null); return; }
             resolve(JSON.parse(data));
           } catch { resolve(null); }
         });
         res.on('error', reject);
-      }).on('error', reject);
+      });
+      req.on('error', reject);
+      req.on('timeout', () => { req.destroy(); reject(new Error('GitHub API timeout')); });
     });
   }
 
   private isNewer(latest: string, current: string): boolean {
-    const [lM, lm, lp] = latest.split('.').map(Number);
-    const [cM, cm, cp] = current.split('.').map(Number);
+    const parse = (v: string) => {
+      const m = v.match(/^v?(\d+)\.(\d+)\.(\d+)/);
+      return m ? [parseInt(m[1]), parseInt(m[2]), parseInt(m[3])] : [0, 0, 0];
+    };
+    const [lM, lm, lp] = parse(latest);
+    const [cM, cm, cp] = parse(current);
     if (lM !== cM) return lM > cM;
     if (lm !== cm) return lm > cm;
     return lp > cp;
@@ -345,11 +382,13 @@ del /f "%~f0"
   public cleanup(): void {
     if (this.checkTimer) { clearInterval(this.checkTimer); this.checkTimer = null; }
     if (this.autoDownloadTimer) { clearTimeout(this.autoDownloadTimer); this.autoDownloadTimer = null; }
-
-    // Clean up old backup EXE if exists
     try {
       const oldPath = app.getPath('exe') + '.old';
       if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-    } catch { }
+    } catch {}
   }
+}
+
+function batPath(): string {
+  return path.join(os.tmpdir(), 'produtime-update.bat');
 }

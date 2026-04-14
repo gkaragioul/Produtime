@@ -29,7 +29,8 @@ export const UpdateProgressBar: React.FC<Props> = ({
         status === UpdateStatus.DOWNLOADED ||
         status === UpdateStatus.ERROR
     );
-    if (status === UpdateStatus.DOWNLOADING || status === UpdateStatus.ERROR) {
+    // Reset "Starting..." on any status change — prevents stuck button if download fails early
+    if (status !== UpdateStatus.AVAILABLE) {
       setIsStartingDownload(false);
     }
   }, [updateState]);
