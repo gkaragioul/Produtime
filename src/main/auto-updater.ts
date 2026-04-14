@@ -16,10 +16,13 @@ import { UpdateStatus, UpdateState } from '../shared/types';
 const GITHUB_OWNER = 'wotbyalice';
 const GITHUB_REPO = 'WOT-Produtime-Releases';
 const ASSET_NAME = 'WOT-Produtime.exe';
-const STARTUP_CHECK_DELAY_MS = 30_000;
+const STARTUP_CHECK_DELAY_MS = 10_000; // Reduced from 30s — faster check on startup
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const AUTO_DOWNLOAD_DELAY_MS = 30_000;
 const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes (100MB on slow connections)
+const TEMP_DIR = () => path.join(os.tmpdir(), 'produtime-update');
+const TEMP_PATH = () => path.join(TEMP_DIR(), ASSET_NAME);
+const BAT_LOG = () => path.join(os.tmpdir(), 'produtime-update.log');
 
 export class AutoUpdaterManager {
   private mainWindow: BrowserWindow | null = null;
@@ -29,11 +32,41 @@ export class AutoUpdaterManager {
   private isManualCheck = false;
   private latestDownloadUrl: string | null = null;
   private latestVersion: string | null = null;
+  private pendingUpdatePath: string | null = null; // set when download completes
 
   constructor(mainWindow: BrowserWindow) {
     this.mainWindow = mainWindow;
     this.registerIPC();
+    this.resumePendingUpdate(); // check if a previous download is waiting
     this.startSchedule();
+  }
+
+  /**
+   * On startup, check if a valid update was already downloaded
+   * and the swap failed (e.g. EXE was locked). Retry immediately.
+   */
+  private resumePendingUpdate(): void {
+    try {
+      const tempPath = TEMP_PATH();
+      if (fs.existsSync(tempPath)) {
+        const stat = fs.statSync(tempPath);
+        if (stat.size >= 10 * 1024 * 1024) {
+          console.log('[UPDATER] Found pre-downloaded update — will attempt swap in 5s');
+          this.pendingUpdatePath = tempPath;
+          setTimeout(() => {
+            if (this.pendingUpdatePath) {
+              console.log('[UPDATER] Retrying swap from previous download');
+              this.swapAndRestart(this.pendingUpdatePath);
+            }
+          }, 5000);
+        } else {
+          // Partial/corrupt file — delete it
+          fs.unlinkSync(tempPath);
+        }
+      }
+    } catch (err) {
+      console.warn('[UPDATER] resumePendingUpdate error:', err);
+    }
   }
 
   private registerIPC(): void {
@@ -73,7 +106,18 @@ export class AutoUpdaterManager {
   private broadcastState(state: UpdateState): void {
     this.currentState = state;
     if (this.mainWindow && !this.mainWindow.isDestroyed()) {
-      this.mainWindow.webContents.send('updater:statusChanged', state);
+      try {
+        this.mainWindow.webContents.send('updater:statusChanged', state);
+      } catch (err) {
+        // Renderer may be frozen — don't block the update process
+        console.warn('[UPDATER] Failed to broadcast state (renderer may be frozen):', (err as Error).message);
+        // If we were trying to signal DOWNLOADED, force the swap anyway
+        if (state.status === UpdateStatus.DOWNLOADED && this.pendingUpdatePath) {
+          console.log('[UPDATER] Forcing swap despite unresponsive renderer');
+          const p = this.pendingUpdatePath;
+          setTimeout(() => this.swapAndRestart(p), 1500);
+        }
+      }
     }
   }
 
@@ -145,10 +189,10 @@ export class AutoUpdaterManager {
       return;
     }
 
-    const tempDir = path.join(os.tmpdir(), 'produtime-update');
+    const tempDir = TEMP_DIR();
     if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-    const tempPath = path.join(tempDir, ASSET_NAME);
+    const tempPath = TEMP_PATH();
 
     this.broadcastState({
       status: UpdateStatus.DOWNLOADING,
@@ -180,13 +224,18 @@ export class AutoUpdaterManager {
     // Strip Mark of the Web so SmartScreen won't block it
     try { fs.unlinkSync(tempPath + ':Zone.Identifier'); } catch {}
 
+    this.pendingUpdatePath = tempPath;
+
     this.broadcastState({
       status: UpdateStatus.DOWNLOADED,
       info: { version: this.latestVersion, releaseDate: '' },
     });
 
     // Auto-swap after brief delay
-    setTimeout(() => this.swapAndRestart(tempPath), 1500);
+    setTimeout(() => {
+      const p = this.pendingUpdatePath;
+      if (p) this.swapAndRestart(p);
+    }, 1500);
   }
 
   private downloadFile(url: string, dest: string): Promise<void> {
@@ -312,12 +361,24 @@ del /f "%~f0"
 
     try { fs.unlinkSync(batPath() + ':Zone.Identifier'); } catch {}
 
+    this.pendingUpdatePath = null; // clear — swap is now in progress
+
     const { spawn } = require('child_process');
-    spawn('cmd.exe', ['/c', batPath()], {
+    const proc = spawn('cmd.exe', ['/c', batPath()], {
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
-    }).unref();
+    });
+
+    // Capture batch output to log file for debugging
+    const logEntry = (msg: string) => {
+      try { fs.appendFileSync(BAT_LOG(), `[${new Date().toISOString()}] ${msg}\n`); } catch {}
+    };
+    proc.stdout?.on('data', (d: Buffer) => logEntry(d.toString().trim()));
+    proc.stderr?.on('data', (d: Buffer) => logEntry(`STDERR: ${d.toString().trim()}`));
+    proc.on('error', (err: Error) => logEntry(`SPAWN_ERROR: ${err.message}`));
+
+    proc.unref();
 
     // Force-close all windows with timeout fallback
     app.removeAllListeners('window-all-closed');
