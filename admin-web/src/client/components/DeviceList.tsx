@@ -69,7 +69,7 @@ export const DeviceList: React.FC<DeviceListProps> = ({ onDeviceClick }) => {
         window.adminAPI.getConnectedDevices(),
       ]);
       console.log('[DeviceList] Loaded devices:', deviceList.length, 'connected:', connected);
-      setDevices(deviceList);
+      setDevices([...deviceList].sort((a, b) => a.device_name.localeCompare(b.device_name)));
       setConnectedIds(connected);
     } catch (error) {
       console.error('Failed to load devices:', error);
