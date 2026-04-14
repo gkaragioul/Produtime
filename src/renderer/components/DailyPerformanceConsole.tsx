@@ -55,6 +55,7 @@ export const DailyPerformanceConsole: React.FC = () => {
   const lastMetricsRef = useRef<any>(null);
   const resumeActiveCarryRef = useRef<number>(0);
   const lastKnownIdleRef = useRef<number>(0); // idle should never drop below this
+  const lastKnownDateRef = useRef<string>(new Date().toDateString()); // detect day change
   
   // Work schedule state
   const [workSchedule, setWorkSchedule] = useState<{ start: string; end: string } | null>(null);
@@ -279,6 +280,13 @@ export const DailyPerformanceConsole: React.FC = () => {
   // Compute metrics
   const metrics = useMemo(() => {
     const nowDate = new Date();
+
+    // Reset idle floor at midnight so yesterday's idle doesn't carry into today
+    const todayStr = nowDate.toDateString();
+    if (todayStr !== lastKnownDateRef.current) {
+      lastKnownIdleRef.current = 0;
+      lastKnownDateRef.current = todayStr;
+    }
 
     if (stoppedAt || !isTracking) {
       return lastMetricsRef.current || { active: 0, idle: 0, total: 0, perApp: {} };
