@@ -138,11 +138,15 @@ class TimePortApp {
       console.log("[APP] ready event fired");
     });
 
-    // Single-instance lock — prevent multiple copies from running
+    // Single-instance lock — prevent multiple copies from running.
+    // After an auto-update swap the old process may still be releasing the lock
+    // for a brief moment. We delay quit by 3s to allow the new instance through.
     const gotTheLock = app.requestSingleInstanceLock();
     if (!gotTheLock) {
       console.log('[APP] Another instance is already running — quitting');
-      app.quit();
+      // Small delay before quitting — allows an update-restart's new instance
+      // to retry acquiring the lock if we are the old instance shutting down
+      setTimeout(() => app.quit(), 3000);
       return;
     }
     app.on('second-instance', () => {

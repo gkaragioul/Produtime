@@ -16,10 +16,10 @@ import { UpdateStatus, UpdateState } from '../shared/types';
 const GITHUB_OWNER = 'wotbyalice';
 const GITHUB_REPO = 'WOT-Produtime-Releases';
 const ASSET_NAME = 'WOT-Produtime.exe';
-const STARTUP_CHECK_DELAY_MS = 10_000; // Reduced from 30s — faster check on startup
-const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
-const AUTO_DOWNLOAD_DELAY_MS = 30_000;
-const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes (100MB on slow connections)
+const STARTUP_CHECK_DELAY_MS = 10_000;
+const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000;
+const AUTO_DOWNLOAD_DELAY_MS = 2_000; // Reduced from 30s — download almost immediately
+const DOWNLOAD_TIMEOUT_MS = 15 * 60 * 1000;
 const TEMP_DIR = () => path.join(os.tmpdir(), 'produtime-update');
 const TEMP_PATH = () => path.join(TEMP_DIR(), ASSET_NAME);
 const BAT_LOG = () => path.join(os.tmpdir(), 'produtime-update.log');
@@ -30,40 +30,57 @@ export class AutoUpdaterManager {
   private autoDownloadTimer: NodeJS.Timeout | null = null;
   private currentState: UpdateState = { status: UpdateStatus.NOT_AVAILABLE };
   private isManualCheck = false;
+  private isDownloading = false; // prevents concurrent downloads
   private latestDownloadUrl: string | null = null;
   private latestVersion: string | null = null;
-  private pendingUpdatePath: string | null = null; // set when download completes
+  private pendingUpdatePath: string | null = null;
 
   constructor(mainWindow: BrowserWindow) {
     this.mainWindow = mainWindow;
     this.registerIPC();
-    this.resumePendingUpdate(); // check if a previous download is waiting
+    // Safe to call even before window is fully ready — swapAndRestart only uses app.quit()
+    this.resumePendingUpdate();
     this.startSchedule();
   }
 
   /**
    * On startup, check if a valid update was already downloaded
-   * and the swap failed (e.g. EXE was locked). Retry immediately.
+   * but the swap failed (e.g. EXE was locked). Skip if it's the same version.
    */
   private resumePendingUpdate(): void {
     try {
       const tempPath = TEMP_PATH();
-      if (fs.existsSync(tempPath)) {
-        const stat = fs.statSync(tempPath);
-        if (stat.size >= 10 * 1024 * 1024) {
-          console.log('[UPDATER] Found pre-downloaded update — will attempt swap in 5s');
-          this.pendingUpdatePath = tempPath;
-          setTimeout(() => {
-            if (this.pendingUpdatePath) {
-              console.log('[UPDATER] Retrying swap from previous download');
-              this.swapAndRestart(this.pendingUpdatePath);
-            }
-          }, 5000);
-        } else {
-          // Partial/corrupt file — delete it
-          fs.unlinkSync(tempPath);
+      const versionFile = tempPath + '.version';
+
+      if (!fs.existsSync(tempPath)) return;
+
+      const stat = fs.statSync(tempPath);
+      if (stat.size < 10 * 1024 * 1024) {
+        // Partial/corrupt — clean up
+        try { fs.unlinkSync(tempPath); } catch {}
+        try { fs.unlinkSync(versionFile); } catch {}
+        return;
+      }
+
+      // Skip if it's the same version we're already running
+      if (fs.existsSync(versionFile)) {
+        const savedVersion = fs.readFileSync(versionFile, 'utf8').trim();
+        if (savedVersion === app.getVersion()) {
+          console.log('[UPDATER] Pre-downloaded file matches current version — cleaning up');
+          try { fs.unlinkSync(tempPath); } catch {}
+          try { fs.unlinkSync(versionFile); } catch {}
+          return;
         }
       }
+
+      console.log('[UPDATER] Found pre-downloaded update — retrying swap in 5s');
+      this.pendingUpdatePath = tempPath;
+      setTimeout(() => {
+        if (this.pendingUpdatePath) {
+          console.log('[UPDATER] Retrying swap from previous download');
+          this.swapAndRestart(this.pendingUpdatePath);
+        }
+      }, 5000);
     } catch (err) {
       console.warn('[UPDATER] resumePendingUpdate error:', err);
     }
@@ -95,7 +112,7 @@ export class AutoUpdaterManager {
     });
 
     ipcMain.handle('updater:installUpdate', async () => {
-      return { success: true }; // install happens automatically after download
+      return { success: true };
     });
 
     ipcMain.handle('updater:getStatus', async () => {
@@ -109,11 +126,9 @@ export class AutoUpdaterManager {
       try {
         this.mainWindow.webContents.send('updater:statusChanged', state);
       } catch (err) {
-        // Renderer may be frozen — don't block the update process
         console.warn('[UPDATER] Failed to broadcast state (renderer may be frozen):', (err as Error).message);
-        // If we were trying to signal DOWNLOADED, force the swap anyway
+        // If we were signalling DOWNLOADED, force the swap anyway
         if (state.status === UpdateStatus.DOWNLOADED && this.pendingUpdatePath) {
-          console.log('[UPDATER] Forcing swap despite unresponsive renderer');
           const p = this.pendingUpdatePath;
           setTimeout(() => this.swapAndRestart(p), 1500);
         }
@@ -122,7 +137,21 @@ export class AutoUpdaterManager {
   }
 
   private startSchedule(): void {
-    setTimeout(() => this.checkForUpdates().catch(console.error), STARTUP_CHECK_DELAY_MS);
+    let retries = 0;
+    const scheduleCheck = (delay: number) => {
+      setTimeout(async () => {
+        try {
+          await this.checkForUpdates();
+        } catch (err: any) {
+          // Retry on failure (network may not be ready at startup)
+          if (retries < 4) {
+            retries++;
+            scheduleCheck(STARTUP_CHECK_DELAY_MS * Math.pow(2, retries - 1));
+          }
+        }
+      }, delay);
+    };
+    scheduleCheck(STARTUP_CHECK_DELAY_MS);
     this.checkTimer = setInterval(() => this.checkForUpdates().catch(console.error), CHECK_INTERVAL_MS);
   }
 
@@ -143,7 +172,6 @@ export class AutoUpdaterManager {
         return;
       }
 
-      // Match exact asset name — no ambiguity
       const asset = release.assets?.find((a: any) => a.name === ASSET_NAME);
       if (!asset) {
         console.warn(`[UPDATER] Asset "${ASSET_NAME}" not found in release ${latest}`);
@@ -153,13 +181,15 @@ export class AutoUpdaterManager {
 
       this.latestVersion = latest;
       this.latestDownloadUrl = asset.browser_download_url;
+      this.isManualCheck = false; // reset here so interval checks don't show false dialogs
 
       this.broadcastState({
         status: UpdateStatus.AVAILABLE,
         info: { version: latest, releaseDate: release.published_at || '' },
       });
 
-      // Auto-download after delay
+      // Start download quickly — don't wait 30s (app may crash before then)
+      if (this.autoDownloadTimer) clearTimeout(this.autoDownloadTimer);
       this.autoDownloadTimer = setTimeout(() => {
         this.downloadUpdate().catch(console.error);
       }, AUTO_DOWNLOAD_DELAY_MS);
@@ -183,59 +213,70 @@ export class AutoUpdaterManager {
   }
 
   private async downloadUpdate(): Promise<void> {
+    // Prevent concurrent downloads
+    if (this.isDownloading) {
+      console.warn('[UPDATER] Download already in progress');
+      return;
+    }
+
     if (!this.latestDownloadUrl || !this.latestVersion) {
-      // Always broadcast error so UI button resets
       this.broadcastState({ status: UpdateStatus.ERROR, error: 'Download URL not available — try checking for updates again' });
       return;
     }
 
-    const tempDir = TEMP_DIR();
-    if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-
-    const tempPath = TEMP_PATH();
-
-    this.broadcastState({
-      status: UpdateStatus.DOWNLOADING,
-      info: { version: this.latestVersion, releaseDate: '' },
-      progress: { bytesPerSecond: 0, percent: 0, transferred: 0, total: 0 },
-    });
-
+    this.isDownloading = true;
     try {
-      await this.downloadFile(this.latestDownloadUrl, tempPath);
-    } catch (err: any) {
-      try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
-      this.broadcastState({ status: UpdateStatus.ERROR, error: `Download failed: ${err.message}` });
-      return;
-    }
+      const tempDir = TEMP_DIR();
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+      const tempPath = TEMP_PATH();
 
-    // Verify file is a valid Electron app (at least 10MB)
-    try {
-      const stat = fs.statSync(tempPath);
-      if (stat.size < 10 * 1024 * 1024) {
-        fs.unlinkSync(tempPath);
-        this.broadcastState({ status: UpdateStatus.ERROR, error: 'Downloaded file too small — incomplete download' });
+      this.broadcastState({
+        status: UpdateStatus.DOWNLOADING,
+        info: { version: this.latestVersion, releaseDate: '' },
+        progress: { bytesPerSecond: 0, percent: 0, transferred: 0, total: 0 },
+      });
+
+      try {
+        await this.downloadFile(this.latestDownloadUrl, tempPath);
+      } catch (err: any) {
+        try { if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath); } catch {}
+        this.broadcastState({ status: UpdateStatus.ERROR, error: `Download failed: ${err.message}` });
         return;
       }
-    } catch {
-      this.broadcastState({ status: UpdateStatus.ERROR, error: 'Could not verify downloaded file' });
-      return;
+
+      // Verify file size
+      try {
+        const stat = fs.statSync(tempPath);
+        if (stat.size < 10 * 1024 * 1024) {
+          fs.unlinkSync(tempPath);
+          this.broadcastState({ status: UpdateStatus.ERROR, error: 'Downloaded file too small — incomplete download' });
+          return;
+        }
+      } catch {
+        this.broadcastState({ status: UpdateStatus.ERROR, error: 'Could not verify downloaded file' });
+        return;
+      }
+
+      // Save version marker so resumePendingUpdate can skip same-version retries
+      try { fs.writeFileSync(tempPath + '.version', this.latestVersion, 'utf8'); } catch {}
+
+      // Strip Mark of the Web
+      try { fs.unlinkSync(tempPath + ':Zone.Identifier'); } catch {}
+
+      this.pendingUpdatePath = tempPath;
+
+      this.broadcastState({
+        status: UpdateStatus.DOWNLOADED,
+        info: { version: this.latestVersion, releaseDate: '' },
+      });
+
+      setTimeout(() => {
+        const p = this.pendingUpdatePath;
+        if (p) this.swapAndRestart(p);
+      }, 1500);
+    } finally {
+      this.isDownloading = false;
     }
-
-    // Strip Mark of the Web so SmartScreen won't block it
-    try { fs.unlinkSync(tempPath + ':Zone.Identifier'); } catch {}
-
-    this.pendingUpdatePath = tempPath;
-
-    this.broadcastState({
-      status: UpdateStatus.DOWNLOADED,
-      info: { version: this.latestVersion, releaseDate: '' },
-    });
-
-    // Auto-swap after brief delay
-    setTimeout(() => {
-      const p = this.pendingUpdatePath;
-      if (p) this.swapAndRestart(p);
-    }, 1500);
   }
 
   private downloadFile(url: string, dest: string): Promise<void> {
@@ -255,12 +296,7 @@ export class AutoUpdaterManager {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
-        if (err) {
-          fileStream?.destroy();
-          reject(err);
-        } else {
-          resolve();
-        }
+        if (err) { fileStream?.destroy(); reject(err); } else { resolve(); }
       };
 
       const follow = (url: string, redirects = 0) => {
@@ -271,10 +307,7 @@ export class AutoUpdaterManager {
             const location = res.headers.location;
             if (location) { res.resume(); follow(location, redirects + 1); return; }
           }
-          if (res.statusCode !== 200) {
-            done(new Error(`HTTP ${res.statusCode}`));
-            return;
-          }
+          if (res.statusCode !== 200) { done(new Error(`HTTP ${res.statusCode}`)); return; }
 
           const total = parseInt(res.headers['content-length'] || '0', 10);
           let transferred = 0;
@@ -284,7 +317,6 @@ export class AutoUpdaterManager {
           res.on('data', (chunk: Buffer) => {
             transferred += chunk.length;
             fileStream!.write(chunk);
-
             const now = Date.now();
             if (now - lastBroadcast > 300) {
               lastBroadcast = now;
@@ -304,8 +336,6 @@ export class AutoUpdaterManager {
           res.on('end', () => { fileStream!.end(() => done()); });
           res.on('error', (err) => done(err));
         });
-
-        // Fix: destroy fileStream on request-level errors too
         req.on('error', (err) => { fileStream?.destroy(); done(err); });
       };
 
@@ -314,40 +344,44 @@ export class AutoUpdaterManager {
   }
 
   private swapAndRestart(newExePath: string): void {
+    // Stop all timers — no further checks during shutdown
+    if (this.checkTimer) { clearInterval(this.checkTimer); this.checkTimer = null; }
+    if (this.autoDownloadTimer) { clearTimeout(this.autoDownloadTimer); this.autoDownloadTimer = null; }
+
     const currentExe = app.getPath('exe');
-    const currentDir = path.dirname(currentExe);
     const currentName = path.basename(currentExe);
     const backupName = currentName + '.old';
-    const backupPath = path.join(currentDir, backupName);
-
-    // Quote all paths for batch to handle spaces correctly
+    const backupPath = path.join(path.dirname(currentExe), backupName);
     const q = (p: string) => `"${p}"`;
 
     const bat = `@echo off
-timeout /t 2 /nobreak >nul
+echo [%date% %time%] ProduTime update starting >> "${BAT_LOG()}"
+timeout /t 3 /nobreak >nul
 if exist ${q(backupPath)} del /f ${q(backupPath)}
 ren ${q(currentExe)} "${backupName}"
 if errorlevel 1 (
-  echo [UPDATER] ERROR: Failed to rename current EXE
+  echo [%date% %time%] ERROR: rename failed >> "${BAT_LOG()}"
   if exist ${q(currentExe)} start "" ${q(currentExe)}
   goto cleanup
 )
 copy /y ${q(newExePath)} ${q(currentExe)}
 if errorlevel 1 (
-  echo [UPDATER] ERROR: Failed to copy new EXE - restoring backup
+  echo [%date% %time%] ERROR: copy failed, restoring >> "${BAT_LOG()}"
   ren ${q(backupPath)} "${currentName}"
   if exist ${q(currentExe)} start "" ${q(currentExe)}
   goto cleanup
 )
 if not exist ${q(currentExe)} (
-  echo [UPDATER] ERROR: EXE missing after copy - restoring backup
+  echo [%date% %time%] ERROR: EXE missing, restoring >> "${BAT_LOG()}"
   ren ${q(backupPath)} "${currentName}"
   if exist ${q(currentExe)} start "" ${q(currentExe)}
   goto cleanup
 )
+echo [%date% %time%] Update successful, launching >> "${BAT_LOG()}"
 start "" ${q(currentExe)}
 :cleanup
 del /f ${q(newExePath)} 2>nul
+del /f "${newExePath}.version" 2>nul
 del /f "%~f0"
 `;
 
@@ -361,56 +395,46 @@ del /f "%~f0"
 
     try { fs.unlinkSync(batPath() + ':Zone.Identifier'); } catch {}
 
-    this.pendingUpdatePath = null; // clear — swap is now in progress
+    this.pendingUpdatePath = null;
 
     const { spawn } = require('child_process');
+    // Use stdio:'ignore' for proper detachment — logs are written by the batch script itself
     const proc = spawn('cmd.exe', ['/c', batPath()], {
       detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: 'ignore',
       windowsHide: true,
     });
-
-    // Capture batch output to log file for debugging
-    const logEntry = (msg: string) => {
-      try { fs.appendFileSync(BAT_LOG(), `[${new Date().toISOString()}] ${msg}\n`); } catch {}
-    };
-    proc.stdout?.on('data', (d: Buffer) => logEntry(d.toString().trim()));
-    proc.stderr?.on('data', (d: Buffer) => logEntry(`STDERR: ${d.toString().trim()}`));
-    proc.on('error', (err: Error) => logEntry(`SPAWN_ERROR: ${err.message}`));
-
+    proc.on('error', (err: Error) => {
+      try { fs.appendFileSync(BAT_LOG(), `[SPAWN_ERROR] ${err.message}\n`); } catch {}
+    });
     proc.unref();
 
-    // Force-close all windows with timeout fallback
     app.removeAllListeners('window-all-closed');
-    const windows = BrowserWindow.getAllWindows();
-    windows.forEach(w => {
+    BrowserWindow.getAllWindows().forEach(w => {
       w.removeAllListeners('close');
       w.close();
     });
 
-    // Force quit after 2 seconds regardless
+    // Force quit after 3s — batch script needs 3s to wait for process exit
     setTimeout(() => {
       BrowserWindow.getAllWindows().forEach(w => { try { w.destroy(); } catch {} });
       app.quit();
-    }, 2000);
+    }, 3000);
   }
 
   private async fetchLatestRelease(): Promise<any> {
     return new Promise((resolve, reject) => {
-      const options = {
+      const req = https.get({
         hostname: 'api.github.com',
         path: `/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
         headers: { 'User-Agent': `ProduTime/${app.getVersion()}` },
         timeout: 10000,
-      };
-
-      const req = https.get(options, (res) => {
+      }, (res) => {
         let data = '';
         res.on('data', (chunk) => data += chunk);
         res.on('end', () => {
           try {
             if (res.statusCode === 403 || res.statusCode === 429) {
-              // Rate-limited — treat as no update available (not an error)
               console.warn('[UPDATER] GitHub API rate-limited, skipping check');
               resolve(null);
               return;
