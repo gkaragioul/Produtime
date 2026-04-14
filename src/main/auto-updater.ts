@@ -62,15 +62,24 @@ export class AutoUpdaterManager {
         return;
       }
 
-      // Skip if it's the same version we're already running
+      // Check version marker
       if (fs.existsSync(versionFile)) {
         const savedVersion = fs.readFileSync(versionFile, 'utf8').trim();
         if (savedVersion === app.getVersion()) {
+          // Same version already running — clean up stale temp file
           console.log('[UPDATER] Pre-downloaded file matches current version — cleaning up');
           try { fs.unlinkSync(tempPath); } catch {}
           try { fs.unlinkSync(versionFile); } catch {}
           return;
         }
+        // savedVersion is newer — proceed with swap below
+      } else {
+        // No version file (v1.0.4 era download) — unknown version, don't swap blindly.
+        // Write current version marker so if the file is the same version, future
+        // startups will clean it up rather than swapping.
+        try { fs.writeFileSync(versionFile, app.getVersion(), 'utf8'); } catch {}
+        console.log('[UPDATER] No version marker found for temp file — skipping swap (safety)');
+        return;
       }
 
       console.log('[UPDATER] Found pre-downloaded update — retrying swap in 5s');
