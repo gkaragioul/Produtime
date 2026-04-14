@@ -40,7 +40,8 @@ interface CurrentActivityUI {
 export const DailyPerformanceConsole: React.FC = () => {
   // Core state
   const [current, setCurrent] = useState<CurrentActivityUI | null>(null);
-  const [recent, setRecent] = useState<ActivityLog[]>([]);
+  const [recent, setRecent] = useState<ActivityLog[]>([]); // limited rows — for focus stats only
+  const [dbSummary, setDbSummary] = useState<{ active: number; idle: number }>({ active: 0, idle: 0 }); // full-day totals from DB
   // `now` removed — caused a full re-render every 5s. Metrics update via `current` changes from activity poll instead.
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isTracking, setIsTracking] = useState<boolean>(true);
@@ -133,6 +134,21 @@ export const DailyPerformanceConsole: React.FC = () => {
     return () => { unsubscribe?.(); };
   }, []);
 
+  // Fetch full-day aggregate summary (no row limit — just 2 numbers)
+  const fetchDailySummary = async (api: any): Promise<void> => {
+    if (typeof api.getActivityDailySummary !== 'function') return;
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+    const res = await api.getActivityDailySummary({
+      startDate: startOfDay.toISOString(),
+      endDate: endOfDay.toISOString(),
+    });
+    if (res.success && res.data) setDbSummary(res.data);
+  };
+
   // Fetch today's logs
   const fetchTodaysLogs = async (api: any): Promise<ActivityLog[]> => {
     if (typeof api.getActivityLogsByDate !== 'function') {
@@ -201,11 +217,12 @@ export const DailyPerformanceConsole: React.FC = () => {
         });
       }
 
-      // Refetch logs from DB (idle record is already persisted by main process)
+      // Refetch logs and summary from DB
       setTimeout(() => {
         fetchTodaysLogs(api).then((logs) => {
           if (logs.length > 0) setRecent(sortLogsDesc(logs));
         }).catch(() => {});
+        fetchDailySummary(api).catch(() => {});
       }, 300);
     };
 
@@ -213,10 +230,11 @@ export const DailyPerformanceConsole: React.FC = () => {
       ? api.onActivityChanged(handler)
       : () => {};
 
-    // Initial fetch
+    // Initial fetch — summary for accurate totals, logs for focus stats
     fetchTodaysLogs(api).then((logs) => {
       if (logs.length > 0) setRecent(sortLogsDesc(logs));
     }).catch(() => {});
+    fetchDailySummary(api).catch(() => {});
 
     return () => {
       cleanup?.();
@@ -289,20 +307,19 @@ export const DailyPerformanceConsole: React.FC = () => {
     }
 
     const perApp: Record<string, number> = {};
-    let active = 0;
-    let idle = 0;
 
+    // Use full-day aggregate totals from DB — no row limit bias
+    let active = dbSummary.active;
+    let idle = dbSummary.idle;
+
+    // Build perApp map from the limited recent logs (for top apps display)
     const relevantLogs = recent.filter(
       (log) => new Date(log.timestamp).getTime() >= sessionStart.getTime()
     );
-
     for (const log of relevantLogs) {
       const isIdle = log.app_name === 'System' &&
         (log.window_title === 'Idle' || log.window_title === 'Paused' || log.window_title === 'System');
-      if (isIdle) {
-        idle += log.duration;
-      } else {
-        active += log.duration;
+      if (!isIdle) {
         perApp[log.app_name] = (perApp[log.app_name] || 0) + log.duration;
       }
     }
@@ -340,7 +357,7 @@ export const DailyPerformanceConsole: React.FC = () => {
   // Intentionally exclude `now` — current elapsed is added separately at render time
   // to avoid re-running the expensive 100-row loop every 5 seconds.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recent, current, sessionStart, isPaused, stoppedAt, isTracking]);
+  }, [dbSummary, recent, current, sessionStart, isPaused, stoppedAt, isTracking]);
 
   // Compute expected window (deducting break allowance from expected active time)
   const expectedWindow = useMemo<ExpectedWindow>(() => {

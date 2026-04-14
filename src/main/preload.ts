@@ -136,6 +136,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   ): Promise<IPCResponse<ActivityLog[]>> =>
     ipcRenderer.invoke(IPCChannels.GET_ACTIVITY_LOGS_BY_DATE, request),
 
+  // Aggregate summary — returns just active/idle totals, no row limit
+  getActivityDailySummary: (
+    request: { startDate: string; endDate: string }
+  ): Promise<IPCResponse<{ active: number; idle: number }>> =>
+    ipcRenderer.invoke('activity:getDailySummary', request),
+
   insertActivityLog: (
     request: InsertActivityLogRequest
   ): Promise<IPCResponse<number>> =>
