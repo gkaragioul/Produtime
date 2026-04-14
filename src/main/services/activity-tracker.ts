@@ -274,25 +274,75 @@ export class ActivityTracker {
    * Known site title → domain mappings for common sites
    */
   private static readonly SITE_MAPPINGS: Record<string, string> = {
+    // Social
     'facebook': 'facebook.com', 'instagram': 'instagram.com',
     'twitter': 'twitter.com', 'x': 'x.com',
-    'youtube': 'youtube.com', 'reddit': 'reddit.com',
-    'linkedin': 'linkedin.com', 'whatsapp': 'web.whatsapp.com',
-    'telegram': 'web.telegram.org', 'slack': 'slack.com',
+    'linkedin': 'linkedin.com', 'reddit': 'reddit.com',
+    'pinterest': 'pinterest.com', 'tumblr': 'tumblr.com',
+    'mastodon': 'mastodon.social', 'bluesky': 'bsky.app',
+    // Messaging
+    'whatsapp': 'whatsapp.com', 'whatsapp web': 'whatsapp.com',
+    'telegram': 'telegram.org', 'slack': 'slack.com',
+    'discord': 'discord.com', 'messenger': 'messenger.com',
+    'signal': 'signal.org', 'teams': 'teams.microsoft.com',
+    'microsoft teams': 'teams.microsoft.com',
+    'zoom': 'zoom.us',
+    // Video / audio
+    'youtube': 'youtube.com', 'netflix': 'netflix.com',
+    'spotify': 'spotify.com', 'twitch': 'twitch.tv',
+    'tiktok': 'tiktok.com', 'vimeo': 'vimeo.com',
+    'soundcloud': 'soundcloud.com', 'disney+': 'disneyplus.com',
+    'hbo max': 'hbomax.com', 'prime video': 'primevideo.com',
+    'apple music': 'music.apple.com',
+    // Email
     'gmail': 'gmail.com', 'google mail': 'gmail.com',
+    'outlook': 'outlook.com', 'outlook.com': 'outlook.com',
+    'yahoo mail': 'yahoo.com', 'proton mail': 'proton.me',
+    // Google workspace
     'google docs': 'docs.google.com', 'google sheets': 'sheets.google.com',
+    'google slides': 'slides.google.com', 'google forms': 'forms.google.com',
     'google drive': 'drive.google.com', 'google calendar': 'calendar.google.com',
     'google meet': 'meet.google.com', 'google maps': 'maps.google.com',
-    'outlook': 'outlook.com', 'github': 'github.com',
-    'stack overflow': 'stackoverflow.com', 'stackoverflow': 'stackoverflow.com',
+    'google keep': 'keep.google.com', 'google photos': 'photos.google.com',
+    'google translate': 'translate.google.com',
+    'google search': 'google.com', 'google': 'google.com',
+    // Dev / work tools
+    'github': 'github.com', 'gitlab': 'gitlab.com',
+    'bitbucket': 'bitbucket.org', 'stack overflow': 'stackoverflow.com',
+    'stackoverflow': 'stackoverflow.com',
     'notion': 'notion.so', 'figma': 'figma.com',
-    'trello': 'trello.com', 'jira': 'jira.atlassian.com',
+    'trello': 'trello.com', 'jira': 'atlassian.net',
+    'confluence': 'atlassian.net', 'asana': 'asana.com',
+    'linear': 'linear.app', 'monday.com': 'monday.com',
+    'clickup': 'clickup.com', 'airtable': 'airtable.com',
+    'miro': 'miro.com', 'canva': 'canva.com',
+    'dropbox': 'dropbox.com', 'onedrive': 'onedrive.live.com',
+    'vscode': 'vscode.dev', 'codepen': 'codepen.io',
+    'replit': 'replit.com', 'codesandbox': 'codesandbox.io',
+    'vercel': 'vercel.com', 'netlify': 'netlify.com',
+    'cloudflare': 'cloudflare.com', 'aws': 'aws.amazon.com',
+    'azure': 'azure.microsoft.com', 'gcp': 'cloud.google.com',
+    'railway': 'railway.app', 'render': 'render.com',
+    'heroku': 'heroku.com', 'docker': 'docker.com',
+    'npm': 'npmjs.com', 'pypi': 'pypi.org',
+    // AI
+    'chatgpt': 'chatgpt.com', 'openai': 'openai.com',
+    'claude': 'claude.ai', 'anthropic': 'anthropic.com',
+    'gemini': 'gemini.google.com', 'perplexity': 'perplexity.ai',
+    'copilot': 'copilot.microsoft.com', 'mistral': 'mistral.ai',
+    // Shopping
     'amazon': 'amazon.com', 'ebay': 'ebay.com',
-    'netflix': 'netflix.com', 'spotify': 'spotify.com',
-    'twitch': 'twitch.tv', 'tiktok': 'tiktok.com',
-    'pinterest': 'pinterest.com', 'tumblr': 'tumblr.com',
-    'discord': 'discord.com', 'messenger': 'messenger.com',
-    'chatgpt': 'chatgpt.com', 'claude': 'claude.ai',
+    'etsy': 'etsy.com', 'aliexpress': 'aliexpress.com',
+    'walmart': 'walmart.com', 'target': 'target.com',
+    'shopify': 'shopify.com',
+    // News
+    'bbc': 'bbc.com', 'cnn': 'cnn.com',
+    'new york times': 'nytimes.com', 'the guardian': 'theguardian.com',
+    'wsj': 'wsj.com', 'bloomberg': 'bloomberg.com',
+    'wikipedia': 'wikipedia.org',
+    // Misc
+    'chrome web store': 'chrome.google.com',
+    'new tab': 'newtab',
   };
 
   /**
@@ -318,36 +368,65 @@ export class ActivityTracker {
       title = title.replace(suffix, '');
     }
 
-    if (!title || title === windowTitle) {
-      // No suffix found — return null
-      return null;
+    // Handle new-tab / empty cases
+    if (!title || title.toLowerCase() === appName.toLowerCase() || title.trim() === '') {
+      return 'new-tab';
     }
 
     // Strip notification counts like "(1) ", "(23) " from the beginning
-    title = title.replace(/^\(\d+\)\s*/, '');
+    title = title.replace(/^\(\d+\)\s*/, '').trim();
+
+    // If the entire title is a URL or domain, extract the host
+    const urlMatch = title.match(/https?:\/\/([^\/\s]+)/);
+    if (urlMatch) return this.getParentDomain(urlMatch[1]);
 
     // Split by common separators: " - ", " — ", " | ", " · "
     const parts = title.split(/\s[-—|·]\s/);
 
-    // The last part is usually the site name (e.g. "News Feed - Facebook" → "Facebook")
-    let sitePart = (parts.length > 1 ? parts[parts.length - 1] : parts[0]).trim();
+    // Try each part from the end (site name is usually at the end)
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const candidate = parts[i].trim().replace(/^\(\d+\)\s*/, '');
+      if (!candidate) continue;
+      const key = candidate.toLowerCase();
 
-    // Also strip notification counts from the site part itself
-    sitePart = sitePart.replace(/^\(\d+\)\s*/, '');
+      // Known site match
+      if (ActivityTracker.SITE_MAPPINGS[key]) {
+        return ActivityTracker.SITE_MAPPINGS[key];
+      }
 
-    // Check if it maps to a known domain
-    const siteKey = sitePart.toLowerCase();
-    if (ActivityTracker.SITE_MAPPINGS[siteKey]) {
-      return ActivityTracker.SITE_MAPPINGS[siteKey];
+      // Fuzzy match against known sites (for titles like "X: The Everything App")
+      for (const [siteKey, domain] of Object.entries(ActivityTracker.SITE_MAPPINGS)) {
+        if (key.includes(siteKey) && siteKey.length > 3) return domain;
+      }
+
+      // Looks like a domain (contains a dot, no spaces)
+      if (candidate.includes('.') && !candidate.includes(' ')) {
+        return this.getParentDomain(candidate.toLowerCase());
+      }
     }
 
-    // If it looks like a domain already (contains a dot), use it
-    if (sitePart.includes('.') && !sitePart.includes(' ')) {
-      return sitePart.toLowerCase();
+    // Last resort: take the last segment as the site name
+    const lastPart = parts[parts.length - 1].trim().replace(/^\(\d+\)\s*/, '');
+    if (lastPart && lastPart.length < 40) {
+      // Limit length to avoid storing full article titles
+      return lastPart;
     }
 
-    // Return the site part as-is (e.g. "Facebook", "YouTube")
-    return sitePart || null;
+    return 'other';
+  }
+
+  /**
+   * Extract the parent domain from a hostname.
+   * e.g. "mail.google.com" → "google.com", "www.reddit.com" → "reddit.com"
+   */
+  private getParentDomain(hostname: string): string {
+    // Strip www. and any leading subdomains except for known multi-part TLDs
+    const clean = hostname.replace(/^www\./i, '');
+    const parts = clean.split('.');
+    if (parts.length <= 2) return clean;
+    // Keep known service subdomains (mail.google.com should become google.com for privacy)
+    // But preserve the main domain pattern
+    return parts.slice(-2).join('.');
   }
 
   public sanitizeWindowTitle(appName: string, windowTitle: string): SanitizationResult {
