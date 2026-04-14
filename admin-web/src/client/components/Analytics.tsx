@@ -280,7 +280,7 @@ function exportPDF(
 // ---------------------------------------------------------------------------
 
 export const Analytics: React.FC = () => {
-  const [period, setPeriod] = useState<PeriodType>('weekly');
+  const [period, setPeriod] = useState<PeriodType>('daily');
   const [deviceFilter, setDeviceFilter] = useState<string>('all');
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [metrics, setMetrics] = useState<DailyMetric[]>([]);
