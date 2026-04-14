@@ -64,13 +64,10 @@ Pop-Location
 
 $OutDir = Join-Path $RootDir "build-output"
 
-# Find the installer EXE (NSIS default naming)
-$InstallerFile = Get-ChildItem -Path $OutDir -Filter "*Setup*.exe" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+# Find the installer EXE — name is fixed so permanent GitHub latest link works
+$InstallerFile = Get-Item -Path (Join-Path $OutDir "WOT-Produtime-Setup.exe") -ErrorAction SilentlyContinue
 if (-not $InstallerFile) {
-    $InstallerFile = Get-ChildItem -Path $OutDir -Filter "*.exe" | Where-Object { $_.Name -notlike "*portable*" } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-}
-if (-not $InstallerFile) {
-    Write-Error "No installer EXE found in $OutDir"
+    Write-Error "WOT-Produtime-Setup.exe not found in $OutDir"
     exit 1
 }
 
