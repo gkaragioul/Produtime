@@ -166,15 +166,18 @@
     "win": {
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": [
             "x64"
           ]
         }
       ],
-      "artifactName": "WOT-Produtime.${ext}",
       "icon": "assets/icon.ico",
-      "forceCodeSigning": false
+      "publisherName": "George Karagioules",
+      "forceCodeSigning": false,
+      "signingHashAlgorithms": [
+        "sha256"
+      ]
     },
     "mac": {
       "target": [
@@ -224,7 +227,7 @@
     "@journeyapps/sqlcipher": "^5.3.1",
     "active-win": "^8.2.1",
     "better-sqlite3": "^12.2.0",
-    "electron-updater": "^6.6.2",
+    "electron-updater": "^6.8.3",
     "events": "^3.3.0",
     "html2canvas": "^1.4.1",
     "javascript-obfuscator": "^4.1.1",

@@ -1,0 +1,40 @@
+wing: wot_produtime
+rooms:
+- name: admin_console
+  description: Files from admin-console/
+  keywords:
+  - admin_console
+  - admin-console
+- name: admin_web
+  description: Files from admin-web/
+  keywords:
+  - admin_web
+  - admin-web
+- name: design
+  description: Files from assets/
+  keywords:
+  - design
+  - assets
+- name: build_output
+  description: Files from build-output/
+  keywords:
+  - build_output
+  - build-output
+- name: scripts
+  description: Files from scripts/
+  keywords:
+  - scripts
+  - scripts
+- name: src
+  description: Files from src/
+  keywords:
+  - src
+  - src
+- name: testing
+  description: Files from test/
+  keywords:
+  - testing
+  - test
+- name: general
+  description: Files that don't fit other rooms
+  keywords: []
