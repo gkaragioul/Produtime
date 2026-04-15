@@ -683,6 +683,9 @@ export class AgentService extends EventEmitter {
         case 'UNPAIR':
           this.handleUnpair(message);
           break;
+        case 'SALES_RESPONSE':
+          this.handleSalesResponse(message);
+          break;
         case 'ACK':
           // Acknowledgment received
           break;
@@ -1193,6 +1196,52 @@ export class AgentService extends EventEmitter {
       this.getPrivateKey()
     );
     this.send(message);
+  }
+
+  // Slack sales proxy — request/response over the pairing WS channel.
+  private pendingSalesRequests: Map<string, {
+    resolve: (v: any) => void;
+    timeout: NodeJS.Timeout;
+  }> = new Map();
+
+  public async requestSales(range: 'day' | 'week' | 'month'): Promise<any> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      return { unavailable: true, reason: 'not_connected' };
+    }
+    const requestId = `sales_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const message = this.crypto.createSignedMessage(
+      'SALES_REQUEST',
+      this.deviceId,
+      { requestId, range },
+      this.getPrivateKey()
+    );
+    return new Promise((resolve) => {
+      const timeout = setTimeout(() => {
+        this.pendingSalesRequests.delete(requestId);
+        resolve({ unavailable: true, reason: 'timeout' });
+      }, 10_000);
+      this.pendingSalesRequests.set(requestId, { resolve, timeout });
+      try {
+        this.send(message);
+      } catch {
+        clearTimeout(timeout);
+        this.pendingSalesRequests.delete(requestId);
+        resolve({ unavailable: true, reason: 'send_failed' });
+      }
+    });
+  }
+
+  private handleSalesResponse(message: AdminProtocolMessage): void {
+    const payload = (message as any).payload || {};
+    const requestId = payload.requestId;
+    if (!requestId) return;
+    const pending = this.pendingSalesRequests.get(requestId);
+    if (!pending) return;
+    clearTimeout(pending.timeout);
+    this.pendingSalesRequests.delete(requestId);
+    // Strip the requestId before handing to callers.
+    const { requestId: _rid, ...rest } = payload;
+    pending.resolve(rest);
   }
 
   /**
