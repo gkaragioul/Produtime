@@ -68,6 +68,8 @@ export class AgentService extends EventEmitter {
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private statsInterval: NodeJS.Timeout | null = null;
   private reconnectTimeout: NodeJS.Timeout | null = null;
+  private pairingPollTimeout: NodeJS.Timeout | null = null;
+  private pairingPollCancelled: boolean = false;
   
   private state: AgentState = {
     status: 'disconnected',
@@ -361,7 +363,22 @@ export class AgentService extends EventEmitter {
     const pollInterval = 5000; // 5 seconds
     let pollCount = 0;
 
+    // Reset cancellation state for a new pairing session.
+    this.pairingPollCancelled = false;
+    if (this.pairingPollTimeout) {
+      clearTimeout(this.pairingPollTimeout);
+      this.pairingPollTimeout = null;
+    }
+
+    const schedule = () => {
+      if (this.pairingPollCancelled) return;
+      this.pairingPollTimeout = setTimeout(poll, pollInterval);
+    };
+
     const poll = async () => {
+      this.pairingPollTimeout = null;
+      if (this.pairingPollCancelled) return;
+
       if (pollCount >= maxPolls || this.state.status !== 'pairing') {
         if (this.state.status === 'pairing') {
           console.log('[AGENT] Cloud pairing polling timed out');
@@ -375,16 +392,15 @@ export class AgentService extends EventEmitter {
       }
 
       pollCount++;
-      
+
       try {
         const status = await this.checkCloudPairingStatus(cloudApiUrl, requestId);
-        
+        if (this.pairingPollCancelled) return;
+
         if (status.status === 'approved') {
-          // Pairing approved - handle the approval
           console.log('[AGENT] Cloud pairing approved!');
           await this.handleCloudPairApproved(status);
         } else if (status.status === 'denied') {
-          // Pairing denied
           console.log('[AGENT] Cloud pairing denied');
           this.state.status = 'disconnected';
           this.state.isCloudConnection = false;
@@ -392,17 +408,15 @@ export class AgentService extends EventEmitter {
           this.emitStateChanged();
           this.emit('pairDenied', { reason: status.reason || 'Pairing request denied' });
         } else {
-          // Still pending - continue polling
-          setTimeout(poll, pollInterval);
+          schedule();
         }
       } catch (error) {
         console.error('[AGENT] Error polling pairing status:', error);
-        setTimeout(poll, pollInterval);
+        schedule();
       }
     };
 
-    // Start polling
-    setTimeout(poll, pollInterval);
+    schedule();
   }
 
   /**
@@ -504,8 +518,17 @@ export class AgentService extends EventEmitter {
    * Requirement 11.4: Fall back to local-only mode if unavailable
    */
   private connectToCloud(cloudWsEndpoint: string): void {
+    // Cancel any pending reconnect — we're starting one now.
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+
+    // Tear down previous socket fully so its listeners don't linger in memory.
     if (this.ws) {
-      this.ws.close();
+      try { this.ws.removeAllListeners(); } catch {}
+      try { this.ws.close(); } catch {}
+      this.ws = null;
     }
 
     console.log(`[AGENT] Connecting to Cloud Admin Console: ${cloudWsEndpoint}`);
@@ -516,6 +539,16 @@ export class AgentService extends EventEmitter {
     try {
       const ws = new WebSocket(cloudWsEndpoint);
       this.ws = ws;
+
+      // Guard: 'error' and 'close' can both fire for the same socket.
+      // Without this, handleCloudDisconnect ran twice → two reconnect timers
+      // → WebSocket pile-up and duplicate tray/state updates.
+      let disconnectHandled = false;
+      const handleDisconnect = () => {
+        if (disconnectHandled) return;
+        disconnectHandled = true;
+        this.handleCloudDisconnect();
+      };
 
       ws.on('open', () => {
         console.log('[AGENT] Connected to Cloud Admin Console');
@@ -553,12 +586,12 @@ export class AgentService extends EventEmitter {
 
       ws.on('close', (code, reason) => {
         console.log(`[AGENT] Disconnected from Cloud Admin Console: code=${code}, reason=${reason}`);
-        this.handleCloudDisconnect();
+        handleDisconnect();
       });
 
       ws.on('error', (err) => {
         console.error('[AGENT] Cloud WebSocket error:', err);
-        this.handleCloudDisconnect();
+        handleDisconnect();
       });
     } catch (err) {
       console.error('[AGENT] Failed to connect to cloud:', err);
@@ -573,13 +606,24 @@ export class AgentService extends EventEmitter {
    */
   private handleCloudDisconnect(): void {
     this.stopHeartbeat();
-    this.ws = null;
+
+    if (this.ws) {
+      try { this.ws.removeAllListeners(); } catch {}
+      this.ws = null;
+    }
+
     this.state.status = 'disconnected';
     this.emitStateChanged();
 
     // Always reconnect to cloud — never give up
     const cloudEndpoint = this.pairingState?.cloudWsEndpoint || CLOUD_ADMIN_WSS_URL;
     if (cloudEndpoint) {
+      // Drop any pending reconnect so we don't stack two timers.
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = null;
+      }
+
       this.cloudReconnectAttempts++;
 
       // Exponential backoff: delay = base * 2^(attempt-1), capped at max (60s)
@@ -591,6 +635,7 @@ export class AgentService extends EventEmitter {
       console.log(`[AGENT] Cloud reconnecting in ${delay}ms (attempt ${this.cloudReconnectAttempts})`);
 
       this.reconnectTimeout = setTimeout(() => {
+        this.reconnectTimeout = null;
         this.connectToCloud(cloudEndpoint);
       }, delay);
     }
@@ -1327,14 +1372,29 @@ export class AgentService extends EventEmitter {
    */
   public shutdown(): void {
     this.stopHeartbeat();
-    
+
+    // Cancel pairing poll so stale setTimeout closures don't fire after shutdown.
+    this.pairingPollCancelled = true;
+    if (this.pairingPollTimeout) {
+      clearTimeout(this.pairingPollTimeout);
+      this.pairingPollTimeout = null;
+    }
+
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
     }
-    
+
     if (this.ws) {
-      this.ws.close();
+      try { this.ws.removeAllListeners(); } catch {}
+      try { this.ws.close(); } catch {}
+      this.ws = null;
     }
+
+    // Drop listeners attached to the singleton (IPCHandlers / tray).
+    // Singleton persists across app-lifecycle events, so uncleaned listeners
+    // would stack if init ever ran again.
+    this.removeAllListeners();
 
     console.log('Agent service shutdown');
   }
