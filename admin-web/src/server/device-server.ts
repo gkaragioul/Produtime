@@ -911,24 +911,27 @@ export class AdminServer {
       return;
     }
 
+    const url = `${botUrl.replace(/\/$/, '')}/internal/sales/${encodeURIComponent(String(uid))}?range=${range}`;
     try {
       const ctrl = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), 5000);
-      const url = `${botUrl.replace(/\/$/, '')}/internal/sales/${encodeURIComponent(String(uid))}?range=${range}`;
       const res = await fetch(url, {
         headers: { 'X-Internal-Api-Key': apiKey },
         signal: ctrl.signal,
       });
       clearTimeout(timeout);
       if (!res.ok) {
+        this.log(`[SERVER] SALES_REQUEST ${url} -> HTTP ${res.status}`);
         reply({ unavailable: true });
         return;
       }
       const body = await res.json();
       this.salesCache.set(cacheKey, { at: Date.now(), body });
       reply(body);
-    } catch (e) {
-      this.log(`[SERVER] SALES_REQUEST: bot unreachable: ${e}`);
+    } catch (e: any) {
+      const cause = e?.cause;
+      const causeInfo = cause ? ` cause={code:${cause.code} errno:${cause.errno} address:${cause.address} port:${cause.port} syscall:${cause.syscall}}` : '';
+      this.log(`[SERVER] SALES_REQUEST ${url} failed: ${e?.name}: ${e?.message}${causeInfo}`);
       reply({ unavailable: true });
     }
   }
