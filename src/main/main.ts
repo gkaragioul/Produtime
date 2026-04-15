@@ -83,6 +83,16 @@ class TimePortApp {
   // Timer for periodic heartbeat checks - needs to be cleaned up on app shutdown
   private heartbeatTimer: NodeJS.Timeout | null = null;
 
+  // Throttle tray updates — skip if rendered values are unchanged. Prevents the
+  // tray icon from redrawing thousands of times per minute when the cloud
+  // connection is flapping (managed/name/cloud flags rarely actually change).
+  private lastTrayManagedKey: string = '';
+
+  // Guard: connectAgentServiceToSystemTray must only wire listeners once.
+  // The AgentService singleton outlives init calls, so duplicate wiring would
+  // stack listeners and multiply tray redraws per event.
+  private trayListenersConnected: boolean = false;
+
   constructor() {
     startupLogger.info("TimePortApp constructor called");
     this.initializeApp();
@@ -789,10 +799,16 @@ class TimePortApp {
         return;
       }
 
+      if (this.trayListenersConnected) {
+        console.log("[AGENT] Tray listeners already connected, skipping duplicate wiring");
+        return;
+      }
+
       // Import AgentService to get the singleton instance
       import("./services/agent/agent-service").then(({ AgentService }) => {
         try {
           const agentService = AgentService.getInstance();
+          this.trayListenersConnected = true;
 
           // Update system tray with initial state
           const initialState = agentService.getState();
@@ -856,6 +872,10 @@ class TimePortApp {
     const isManaged = pairingState?.paired === true;
     const managedByName = state?.tenantName || state?.adminName || pairingState?.tenantName || pairingState?.adminName || null;
     const isCloudConnection = state?.isCloudConnection === true;
+
+    const key = `${isManaged}|${managedByName}|${isCloudConnection}`;
+    if (key === this.lastTrayManagedKey) return;
+    this.lastTrayManagedKey = key;
 
     this.systemTray.updateManagedStatus(isManaged, managedByName, isCloudConnection);
   }
@@ -1273,7 +1293,20 @@ class TimePortApp {
       }
     }
 
-    // 2. Remove IPC handlers
+    // 2a. Shut down agent service (stops WS, heartbeat/stats intervals,
+    // pending reconnect timers, and pairing poll). Must happen BEFORE the
+    // IPCHandlers instance that owns the agent is discarded.
+    if (this.ipcHandlers) {
+      try {
+        console.log("  → Shutting down agent service...");
+        this.ipcHandlers.shutdownAgentService();
+        console.log("  ✅ Agent service shut down");
+      } catch (error) {
+        console.error("  ❌ Error shutting down agent service:", error);
+      }
+    }
+
+    // 2b. Remove IPC handlers
     if (this.ipcHandlers) {
       try {
         console.log("  → Removing IPC handlers...");

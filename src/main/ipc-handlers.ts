@@ -2090,10 +2090,27 @@ export class IPCHandlers {
    * Initialize the agent service
    * Called from main.ts after app is ready
    */
+  private agentServiceInitialized: boolean = false;
   public async initializeAgentService(appVersion: string): Promise<void> {
+    // AgentService is a singleton that outlives this IPCHandlers instance.
+    // If we add listeners twice, every event is broadcast twice — fires IPC
+    // updates to renderer twice, redraws tray twice, etc.
+    if (this.agentServiceInitialized) {
+      this.logger.warn('AGENT', 'Agent service already initialized on this IPCHandlers — skipping duplicate listener registration');
+      return;
+    }
+
     try {
       this.agentService = AgentService.getInstance(this.database);
       await this.agentService.initialize(appVersion);
+
+      // Clear any listeners from a previous IPCHandlers instance before
+      // re-registering. Safe because we own the full set below.
+      this.agentService.removeAllListeners('stateChanged');
+      this.agentService.removeAllListeners('locked');
+      this.agentService.removeAllListeners('unlocked');
+      this.agentService.removeAllListeners('policyUpdated');
+      this.agentService.removeAllListeners('exportRequested');
 
       this.agentService.on('stateChanged', (state: AgentState) => {
         this.broadcastAgentStateChange(state);
@@ -2115,6 +2132,7 @@ export class IPCHandlers {
         await this.handleAgentExportRequest(request);
       });
 
+      this.agentServiceInitialized = true;
       this.logger.info('AGENT', 'Agent service initialized');
     } catch (error: any) {
       this.logger.error('AGENT', 'Failed to initialize agent service', { error: error.message });
