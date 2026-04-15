@@ -14,6 +14,7 @@ import { LogViewer } from './components/LogViewer';
 import { DeviceDetailPage } from './components/DeviceDetailPage';
 import { AppCategorization } from './components/AppCategorization';
 import { Analytics } from './components/Analytics';
+import { LockerView } from './components/LockerView';
 import {
   DashboardSummaryResponse,
   DashboardSummaryEnhanced,
@@ -29,7 +30,7 @@ import {
 // Logo — use the copied asset path
 const adminLogo = 'assets/PTAdminIcon.png';
 
-type PageType = 'dashboard' | 'devices' | 'policies' | 'pairing' | 'logs' | 'device-detail' | 'app-categories' | 'analytics';
+type PageType = 'dashboard' | 'devices' | 'policies' | 'pairing' | 'logs' | 'device-detail' | 'app-categories' | 'analytics' | 'locker';
 
 declare global {
   interface Window {
@@ -204,6 +205,7 @@ const App: React.FC = () => {
     { id: 'policies', label: 'Policies', icon: '📋' },
     { id: 'pairing', label: 'Pairing', icon: '🔗', badge: pendingCount > 0 ? pendingCount : undefined },
     { id: 'logs', label: 'Server Logs', icon: '📝' },
+    { id: 'locker', label: 'Password Locker', icon: '🔐' },
   ];
 
   return (
@@ -335,6 +337,7 @@ const App: React.FC = () => {
           {currentPage === 'policies' && <PolicyManager />}
           {currentPage === 'pairing' && <PairingInbox onCountChange={setPendingCount} />}
           {currentPage === 'logs' && <LogViewer />}
+          {currentPage === 'locker' && <LockerView />}
           {currentPage === 'device-detail' && selectedDeviceId && (
             <DeviceDetailPage deviceId={selectedDeviceId} onBack={navigateBack} />
           )}
