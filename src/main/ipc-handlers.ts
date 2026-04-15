@@ -587,8 +587,29 @@ export class IPCHandlers {
     ipcMain.handle('agent:unpair', this.handleAgentUnpair.bind(this));
     ipcMain.handle('agent:getEffectivePolicy', this.handleAgentGetEffectivePolicy.bind(this));
     ipcMain.handle('agent:isManaged', this.handleAgentIsManaged.bind(this));
+    ipcMain.handle('agent:getSalesStats', this.handleAgentGetSalesStats.bind(this));
 
     console.log('IPC handlers registered successfully');
+  }
+
+  private async handleAgentGetSalesStats(
+    _event: IpcMainInvokeEvent,
+    range: 'day' | 'week' | 'month'
+  ): Promise<IPCResponse<any>> {
+    try {
+      const svc = this.agentService;
+      if (!svc) {
+        return { success: true, data: { unavailable: true, reason: 'not_initialized' } };
+      }
+      const r: 'day' | 'week' | 'month' = (['day','week','month'] as const).includes(range as any)
+        ? range
+        : 'week';
+      const data = await (svc as any).requestSales(r);
+      return { success: true, data };
+    } catch (error) {
+      console.error('Error requesting sales stats:', error);
+      return { success: false, error: String(error) };
+    }
   }
 
   private async handleGetActivityDiagnostics(

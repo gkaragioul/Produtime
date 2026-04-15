@@ -407,6 +407,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   agentIsManaged: (): Promise<IPCResponse<boolean>> =>
     ipcRenderer.invoke('agent:isManaged'),
 
+  // Per-agent Slack sales stats, proxied through admin-web → Slack bot.
+  agentGetSalesStats: (range: 'day' | 'week' | 'month'): Promise<IPCResponse<any>> =>
+    ipcRenderer.invoke('agent:getSalesStats', range),
+
   // Agent event listeners
   onAgentStateChanged: (callback: (state: any) => void) => {
     const listener = (_event: any, state: any) => callback(state);
