@@ -93,6 +93,11 @@ class TimePortApp {
   // stack listeners and multiply tray redraws per event.
   private trayListenersConnected: boolean = false;
 
+  // Set on 'before-quit' so the window 'close' handler stops swallowing the
+  // quit (otherwise the tray keeps the app alive and auto-update installers
+  // sit forever on "Restarting shortly...").
+  private isQuitting: boolean = false;
+
   constructor() {
     startupLogger.info("TimePortApp constructor called");
     this.initializeApp();
@@ -512,6 +517,7 @@ class TimePortApp {
 
     // Handle app before quit
     app.on("before-quit", () => {
+      this.isQuitting = true;
       startupLogger.logShutdown("user requested quit");
       this.cleanup();
     });
@@ -630,8 +636,13 @@ class TimePortApp {
 
     // Handle window events for system tray integration
     this.mainWindow.on("close", (event) => {
+      // If the app is actually quitting (auto-update install, menu → Quit,
+      // OS shutdown), let the window close normally. Only hide-to-tray when
+      // the user hits the X button during regular use.
+      if (this.isQuitting) {
+        return;
+      }
       if (this.systemTray) {
-        // Prevent closing, minimize to tray instead
         event.preventDefault();
         this.mainWindow?.hide();
         console.log("🔽 Window minimized to tray");
