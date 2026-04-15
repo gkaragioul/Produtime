@@ -129,6 +129,8 @@ export function validateCustomDateRange(
 export const SettingsTab: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [employeeNameLocked, setEmployeeNameLocked] = useState(false);
+  const [slackUserId, setSlackUserId] = useState('');
   const [settings, setSettings] = useState<SettingsData>({
     work_schedule_start: '09:00',
     work_schedule_end: '17:00',
@@ -463,6 +465,8 @@ export const SettingsTab: React.FC = () => {
         employee_name: settingsMap.employee_name || '',
         admin_alert_email: settingsMap.admin_alert_email || '',
       });
+      setEmployeeNameLocked(settingsMap.employee_name_locked === 'true');
+      setSlackUserId(settingsMap.slack_user_id || '');
     } catch (error) {
       console.error('Error loading settings:', error);
     } finally {
@@ -494,6 +498,9 @@ export const SettingsTab: React.FC = () => {
   };
 
   const handleInputChange = (key: keyof SettingsData, value: string) => {
+    if (key === 'employee_name' && employeeNameLocked) {
+      return; // locked — admin-only editable after first save
+    }
     setSettings((prev) => ({ ...prev, [key]: value }));
 
     // Validate the input immediately
@@ -574,6 +581,11 @@ export const SettingsTab: React.FC = () => {
       }
 
       await ipcService.setSetting(key, value);
+
+      // First successful save of employee_name locks the field.
+      if (key === 'employee_name' && value.trim()) {
+        setEmployeeNameLocked(true);
+      }
 
       // Notify other parts of the UI (e.g., dashboard) that settings changed
       try {
@@ -1400,8 +1412,9 @@ export const SettingsTab: React.FC = () => {
                   onChange={(e) =>
                     handleInputChange('employee_name', e.target.value)
                   }
-                  placeholder="Enter employee name..."
-                  disabled={isLoading}
+                  placeholder={employeeNameLocked ? '' : 'Enter employee name (can only be set once)...'}
+                  disabled={isLoading || employeeNameLocked}
+                  title={employeeNameLocked ? 'Locked — contact your admin to change.' : ''}
                   aria-invalid={
                     !!(
                       validationResults['employee_name']?.error ||
@@ -1410,7 +1423,27 @@ export const SettingsTab: React.FC = () => {
                   }
                 />
                 {renderFieldValidation('employee_name')}
+                {employeeNameLocked && (
+                  <div className="field-help">Locked — contact your admin to change.</div>
+                )}
+                {!employeeNameLocked && (
+                  <div className="field-help">Your name can only be set once from here. After saving, only an admin can change it.</div>
+                )}
               </div>
+              {slackUserId && (
+                <div className="form-group">
+                  <label>Slack User ID:</label>
+                  <input
+                    type="text"
+                    value={slackUserId}
+                    disabled
+                    readOnly
+                    title="Managed by your admin"
+                    style={{ fontFamily: 'monospace' }}
+                  />
+                  <div className="field-help">Managed by your admin.</div>
+                </div>
+              )}
             </div>
 
             {/* Privacy Settings Section */}
