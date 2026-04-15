@@ -24,6 +24,18 @@ export interface SalesTicket {
   currency: string | null;
   resolvedAt: string;
   permalink: string | null;
+
+  // Optional rich fields populated when the bot had the full GPT output
+  // (new cases) or the backfill text parser recovered them (historical).
+  travelDates?: string | null;
+  travelers?: string | null;
+  contact?: string | null;
+  clientBudget?: string | null;
+  whatTheyWanted?: string | null;
+  objectionsOrBlockers?: string | null;
+  notes?: string | null;
+  agentDisplayName?: string | null;
+  caseDate?: string | null;
 }
 
 export interface SalesResponse {
