@@ -258,8 +258,11 @@ const App: React.FC = () => {
         {/* Navigation */}
         <nav style={{ flex: 1, padding: '20px 0', overflow: 'auto' }}>
           {navItems.map((item) => (
+            <React.Fragment key={item.id}>
+            {item.id === 'locker' && (
+              <div style={{ borderTop: '1px solid #333', margin: '12px 20px' }} />
+            )}
             <button
-              key={item.id}
               onClick={() => { setCurrentPage(item.id as PageType); setSidebarOpen(false); }}
               style={{
                 width: '100%',
@@ -294,6 +297,7 @@ const App: React.FC = () => {
                 </span>
               )}
             </button>
+            </React.Fragment>
           ))}
         </nav>
 
