@@ -5,7 +5,10 @@ const LOCKER_URL = 'https://app-production-f45b.up.railway.app';
 export const LockerView: React.FC = () => {
   return (
     <div style={{ padding: '20px' }}>
-      <h1 style={{ margin: '0 0 16px', fontSize: '24px' }}>WOTLocker</h1>
+      <h1 style={{ margin: '0 0 16px', fontSize: '24px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <img src="assets/WOTLockerIcon.png" alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+        WOTLocker
+      </h1>
       <div style={{
         backgroundColor: 'white',
         borderRadius: '8px',

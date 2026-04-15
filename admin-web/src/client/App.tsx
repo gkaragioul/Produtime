@@ -205,7 +205,7 @@ const App: React.FC = () => {
     { id: 'policies', label: 'Policies', icon: '📋' },
     { id: 'pairing', label: 'Pairing', icon: '🔗', badge: pendingCount > 0 ? pendingCount : undefined },
     { id: 'logs', label: 'Server Logs', icon: '📝' },
-    { id: 'locker', label: 'WOTLocker', icon: '🔐' },
+    { id: 'locker', label: 'WOTLocker', icon: 'assets/WOTLockerIcon.png' },
   ];
 
   return (
@@ -276,7 +276,11 @@ const App: React.FC = () => {
                 borderLeft: currentPage === item.id ? '3px solid #4CAF50' : '3px solid transparent',
               }}
             >
-              <span>{item.icon}</span>
+              {item.icon.startsWith('assets/') ? (
+                <img src={item.icon} alt="" style={{ width: 18, height: 18, objectFit: 'contain' }} />
+              ) : (
+                <span>{item.icon}</span>
+              )}
               <span style={{ flex: 1 }}>{item.label}</span>
               {item.badge && (
                 <span style={{
