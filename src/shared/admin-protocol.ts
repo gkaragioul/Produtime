@@ -27,6 +27,8 @@ export type AdminMessageType =
   | 'LOCK'
   | 'UNLOCK'
   | 'UNPAIR'
+  | 'SALES_REQUEST'
+  | 'SALES_RESPONSE'
   | 'ERROR'
   | 'ACK';
 
@@ -129,6 +131,9 @@ export interface PolicyData {
   
   // Employee info (can be set by admin)
   employeeName?: string;
+
+  // Slack user id (set by admin; read-only on client)
+  slackUserId?: string;
 
   // App categorization (synced from admin console)
   appCategories?: Record<string, 'productive' | 'neutral' | 'distracting'>;
@@ -279,6 +284,44 @@ export interface UnpairMessage extends BaseMessage {
   payload: { reason: string };
 }
 
+export interface SalesRequestPayload {
+  requestId: string;
+  range: 'day' | 'week' | 'month';
+}
+
+export interface SalesResponsePayload {
+  requestId: string;
+  counters?: {
+    wins: number;
+    losses: number;
+    winRate: number;
+    totalAmount: number;
+    currency?: string | null;
+  };
+  recent?: Array<{
+    client: string | null;
+    destination: string | null;
+    outcome: 'won' | 'lost';
+    amount: number | null;
+    currency: string | null;
+    resolvedAt: string;
+    permalink: string | null;
+  }>;
+  unconfigured?: boolean;
+  unavailable?: boolean;
+  error?: string;
+}
+
+export interface SalesRequestMessage extends BaseMessage {
+  type: 'SALES_REQUEST';
+  payload: SalesRequestPayload;
+}
+
+export interface SalesResponseMessage extends BaseMessage {
+  type: 'SALES_RESPONSE';
+  payload: SalesResponsePayload;
+}
+
 export interface ErrorMessage extends BaseMessage {
   type: 'ERROR';
   payload: ErrorPayload;
@@ -303,6 +346,8 @@ export type AdminProtocolMessage =
   | LockMessage
   | UnlockMessage
   | UnpairMessage
+  | SalesRequestMessage
+  | SalesResponseMessage
   | ErrorMessage
   | AckMessage;
 

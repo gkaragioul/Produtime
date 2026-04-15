@@ -788,6 +788,7 @@ export class AgentService extends EventEmitter {
       'idleThreshold', 'breakDuration', 'privacyModeEnabled', 'privacyApps',
       'titleSharingEnabled', 'autoExportEnabled', 'autoExportTime',
       'exportFolder', 'reportRetentionDays', 'employeeName',
+      'slackUserId',
       'appCategories',
     ];
 
@@ -805,6 +806,13 @@ export class AgentService extends EventEmitter {
 
         // Also apply to settings table so the entire app respects admin policy
         this.database.setSetting(dbKey, dbValue);
+
+        // Admin controls the lock: non-empty name locks; empty clears the lock
+        // so the user can re-enter on next boot.
+        if (key === 'employeeName') {
+          const trimmed = String(value || '').trim();
+          this.database.setSetting('employee_name_locked', trimmed ? 'true' : 'false');
+        }
       }
     }
 
@@ -829,6 +837,7 @@ export class AgentService extends EventEmitter {
       exportFolder: 'export_folder',
       reportRetentionDays: 'report_retention_days',
       employeeName: 'employee_name',
+      slackUserId: 'slack_user_id',
       appCategories: 'app_categories',
     };
     return mapping[key] || key;
