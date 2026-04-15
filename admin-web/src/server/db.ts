@@ -18,6 +18,8 @@ export interface DeviceRecord {
   app_version: string;
   ip: string;
   policy_id?: string;
+  display_name?: string | null;
+  slack_user_id?: string | null;
 }
 
 export interface PolicyRecord {
@@ -382,6 +384,19 @@ export class AdminDatabase {
       CREATE INDEX IF NOT EXISTS idx_weekly_reports_week ON weekly_reports(week_end);
     `);
 
+    // Idempotent column adds for identity metadata on devices.
+    // SQLite has no ALTER TABLE ... ADD COLUMN IF NOT EXISTS, so swallow
+    // the "duplicate column name" error on upgrade.
+    const addColumnIfMissing = (table: string, column: string, type: string) => {
+      try {
+        this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+      } catch (e: any) {
+        if (!/duplicate column name/i.test(String(e?.message))) throw e;
+      }
+    };
+    addColumnIfMissing('devices', 'display_name', 'TEXT');
+    addColumnIfMissing('devices', 'slack_user_id', 'TEXT');
+
     console.log('Admin Console database initialized');
   }
 
@@ -448,6 +463,14 @@ export class AdminDatabase {
     if (info.policy_id !== undefined) {
       updates.push('policy_id = ?');
       values.push(info.policy_id);
+    }
+    if (info.display_name !== undefined) {
+      updates.push('display_name = ?');
+      values.push(info.display_name);
+    }
+    if (info.slack_user_id !== undefined) {
+      updates.push('slack_user_id = ?');
+      values.push(info.slack_user_id);
     }
 
     if (updates.length > 0) {
