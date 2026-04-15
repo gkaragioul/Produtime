@@ -911,7 +911,10 @@ export class AdminServer {
       return;
     }
 
-    const url = `${botUrl.replace(/\/$/, '')}/internal/sales/${encodeURIComponent(String(uid))}?range=${range}`;
+    // Pass the key in BOTH header and query — some Railway/CDN paths strip
+    // non-standard headers on their way to the origin. The server accepts
+    // either.
+    const url = `${botUrl.replace(/\/$/, '')}/internal/sales/${encodeURIComponent(String(uid))}?range=${range}&key=${encodeURIComponent(apiKey)}`;
     try {
       const ctrl = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), 5000);
