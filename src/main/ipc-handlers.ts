@@ -325,6 +325,7 @@ export class IPCHandlers {
       'agent:unpair',
       'agent:getEffectivePolicy',
       'agent:isManaged',
+      'agent:getSalesStats',
     ];
     channelsToReset.forEach((ch) => {
       try {
@@ -1625,8 +1626,9 @@ export class IPCHandlers {
       'agent:unpair',
       'agent:getEffectivePolicy',
       'agent:isManaged',
+      'agent:getSalesStats',
     ];
-    
+
     additionalHandlers.forEach((channel) => {
       try {
         ipcMain.removeHandler(channel);
