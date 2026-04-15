@@ -45,6 +45,10 @@ declare global {
       getDevice: (deviceId: string) => Promise<any>;
       deleteDevice: (deviceId: string) => Promise<{ success: boolean }>;
       getConnectedDevices: () => Promise<string[]>;
+      updateDeviceIdentity: (
+        deviceId: string,
+        patch: { displayName?: string | null; slackUserId?: string | null }
+      ) => Promise<{ success: boolean; error?: string; pushedLive?: boolean }>;
       getAllPolicies: () => Promise<any[]>;
       getPolicy: (policyId: string) => Promise<any>;
       createPolicy: (policy: any) => Promise<{ success: boolean; policyId: string }>;

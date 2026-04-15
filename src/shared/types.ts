@@ -135,6 +135,7 @@ export interface ElectronAPI {
   agentUnpair: () => Promise<IPCResponse<void>>;
   agentGetEffectivePolicy: () => Promise<IPCResponse<any>>;
   agentIsManaged: () => Promise<IPCResponse<boolean>>;
+  agentGetSalesStats: (range: 'day' | 'week' | 'month') => Promise<IPCResponse<any>>;
 
   // Agent event listeners
   onAgentStateChanged?: (callback: (state: any) => void) => () => void;
