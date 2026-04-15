@@ -15,6 +15,8 @@ interface Device {
   app_version: string;
   ip: string;
   policy_id?: string;
+  display_name?: string | null;
+  slack_user_id?: string | null;
   isOnline?: boolean;
 }
 
@@ -28,6 +30,40 @@ export const DeviceList: React.FC<DeviceListProps> = ({ onDeviceClick }) => {
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editing, setEditing] = useState<Device | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editSlackId, setEditSlackId] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  const openEdit = (device: Device) => {
+    setEditing(device);
+    setEditName(device.display_name ?? device.device_name ?? '');
+    setEditSlackId(device.slack_user_id ?? '');
+    setEditError('');
+  };
+
+  const submitEdit = async () => {
+    if (!editing) return;
+    setSavingEdit(true);
+    setEditError('');
+    try {
+      const res = await window.adminAPI.updateDeviceIdentity(editing.device_id, {
+        displayName: editName.trim(),
+        slackUserId: editSlackId.trim() || null,
+      });
+      if (res?.success) {
+        await loadDevices();
+        setEditing(null);
+      } else {
+        setEditError(res?.error || 'Failed to save changes.');
+      }
+    } catch (e: any) {
+      setEditError(e?.message || 'Failed to save changes.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
 
   useEffect(() => {
     loadDevices();
@@ -207,8 +243,13 @@ export const DeviceList: React.FC<DeviceListProps> = ({ onDeviceClick }) => {
                         }}
                       >
                         <td style={{ padding: '16px' }}>
-                          <div style={{ fontWeight: 500 }}>{device.device_name}</div>
+                          <div style={{ fontWeight: 500 }}>{device.display_name || device.device_name}</div>
                           <div style={{ fontSize: '12px', color: '#999' }}>{device.ip}</div>
+                          {device.slack_user_id && (
+                            <div style={{ fontSize: '11px', color: '#999', fontFamily: 'monospace', marginTop: '2px' }}>
+                              Slack: {device.slack_user_id}
+                            </div>
+                          )}
                         </td>
                         <td style={{ padding: '16px' }}>
                           <span style={{
@@ -236,7 +277,22 @@ export const DeviceList: React.FC<DeviceListProps> = ({ onDeviceClick }) => {
                         <td style={{ padding: '16px', fontSize: '13px', color: '#666' }}>
                           {formatTime(device.last_seen)}
                         </td>
-                        <td style={{ padding: '16px', textAlign: 'right' }}>
+                        <td style={{ padding: '16px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); openEdit(device); }}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: '6px',
+                              border: '1px solid #4a90d9',
+                              backgroundColor: 'white',
+                              color: '#4a90d9',
+                              cursor: 'pointer',
+                              fontSize: '12px',
+                              marginRight: '8px',
+                            }}
+                          >
+                            Edit
+                          </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); handleDelete(device); }}
                             style={{
@@ -332,6 +388,99 @@ export const DeviceList: React.FC<DeviceListProps> = ({ onDeviceClick }) => {
           </div>
         )}
       </div>
+
+      {editing && (
+        <div
+          onClick={() => (!savingEdit ? setEditing(null) : undefined)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: '12px', padding: '24px',
+              width: '400px', boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
+            }}
+          >
+            <h3 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '16px' }}>
+              Edit device
+            </h3>
+            <p style={{ fontSize: '12px', color: '#666', marginBottom: '16px' }}>
+              Changes sync to the device immediately when it is online, and on its
+              next reconnect if it is offline.
+            </p>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>
+                Display name
+              </label>
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                autoFocus
+                style={{
+                  width: '100%', padding: '8px 12px', border: '1px solid #ddd',
+                  borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            <div style={{ marginBottom: '14px' }}>
+              <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>
+                Slack user ID
+              </label>
+              <input
+                type="text"
+                value={editSlackId}
+                onChange={(e) => setEditSlackId(e.target.value)}
+                placeholder="U01ABCDEF"
+                style={{
+                  width: '100%', padding: '8px 12px', border: '1px solid #ddd',
+                  borderRadius: '6px', fontSize: '14px', fontFamily: 'monospace',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
+                Used to pull the agent's sales stats from the Slack bot.
+              </div>
+            </div>
+
+            {editError && (
+              <div style={{ fontSize: '12px', color: '#c0392b', marginBottom: '10px' }}>
+                {editError}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button
+                onClick={() => setEditing(null)}
+                disabled={savingEdit}
+                style={{
+                  padding: '8px 16px', borderRadius: '6px', border: '1px solid #ddd',
+                  background: 'white', cursor: savingEdit ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitEdit}
+                disabled={savingEdit || !editName.trim()}
+                style={{
+                  padding: '8px 16px', borderRadius: '6px', border: 'none',
+                  background: '#4a90d9', color: 'white',
+                  cursor: (savingEdit || !editName.trim()) ? 'not-allowed' : 'pointer',
+                  opacity: (savingEdit || !editName.trim()) ? 0.6 : 1,
+                }}
+              >
+                {savingEdit ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
