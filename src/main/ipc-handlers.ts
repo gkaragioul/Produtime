@@ -746,12 +746,36 @@ export class IPCHandlers {
         this.enhancedLicenseService.assertEntitledOrThrow('Update Settings');
       }
 
+      // Employee name is locked after first save. Admin policy pushes bypass this
+      // by writing via applyPolicy() which does not go through this IPC path.
+      if (request.key === 'employee_name') {
+        const locked = this.database.getSetting('employee_name_locked') === 'true';
+        if (locked) {
+          return { success: false, error: 'employee_name is locked. Contact your admin to change.' };
+        }
+        const trimmed = String(request.value ?? '').trim();
+        if (!trimmed) {
+          return { success: false, error: 'employee_name cannot be empty.' };
+        }
+        // Normalise and lock as part of the same write.
+        request = { ...request, value: trimmed };
+      }
+      if (request.key === 'slack_user_id') {
+        // slack_user_id is admin-owned; never writable via the generic settings IPC.
+        return { success: false, error: 'slack_user_id is managed by the admin.' };
+      }
+
       // Persist setting (prefer validated method if available)
       const dbAny: any = this.database as any;
       if (typeof dbAny.setSettingWithValidation === 'function') {
         dbAny.setSettingWithValidation(request.key, request.value);
       } else {
         this.database.setSetting(request.key, request.value);
+      }
+
+      // Lock the name after the first successful user-initiated save.
+      if (request.key === 'employee_name') {
+        this.database.setSetting('employee_name_locked', 'true');
       }
 
       // Apply to live ActivityTracker where applicable
