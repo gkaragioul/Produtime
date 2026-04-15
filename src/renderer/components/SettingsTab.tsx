@@ -7,6 +7,7 @@ import { AdminLoginDialog } from './AdminLoginDialog';
 import { IPCService } from '../services/ipc-service';
 import { PDFReportService } from '../services/pdf-report-service';
 import { AutoUpdaterService } from '../services/auto-updater-service';
+import { DiagnosticsPanel } from './DiagnosticsPanel';
 
 import {
   SettingsValidationService,
@@ -1608,6 +1609,9 @@ export const SettingsTab: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Diagnostics — live log tail with copy/clear controls */}
+            <DiagnosticsPanel />
           </div>
         </div>
       </div>
