@@ -185,6 +185,65 @@ app.delete('/api/devices/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// Edit display name and/or Slack user id. Both fields are optional —
+// sending `null` clears the field; omitting it leaves it unchanged.
+app.patch('/api/devices/:id', (req, res) => {
+  const deviceId = req.params.id;
+  const existing = db.getDevice(deviceId);
+  if (!existing) {
+    res.status(404).json({ success: false, error: 'Device not found' });
+    return;
+  }
+
+  const displayNameRaw = req.body?.displayName;
+  const slackUserIdRaw = req.body?.slackUserId;
+  const patch: any = {};
+  if (displayNameRaw !== undefined) {
+    const v = displayNameRaw === null ? null : String(displayNameRaw).trim();
+    patch.display_name = v;
+    if (v) patch.device_name = v;
+  }
+  if (slackUserIdRaw !== undefined) {
+    patch.slack_user_id = slackUserIdRaw === null ? null : String(slackUserIdRaw).trim();
+  }
+  if (Object.keys(patch).length === 0) {
+    res.json({ success: true, noop: true });
+    return;
+  }
+
+  db.updateDeviceInfo(deviceId, patch);
+  db.insertAuditLog({
+    action: 'DEVICE_EDIT',
+    device_id: deviceId,
+    details: `display_name=${patch.display_name ?? ''} slack_user_id=${patch.slack_user_id ?? ''}`,
+    timestamp: Date.now(),
+    admin_user: 'admin',
+  });
+
+  // Push a targeted policy update so the client mirrors the admin changes.
+  // Merge identity into the device's assigned policy if any, otherwise send
+  // an identity-only payload. applyPolicy on the client only writes fields
+  // that are explicitly defined, so other settings are left untouched.
+  const updated = db.getDevice(deviceId) || existing;
+  const assignedId = updated.policy_id;
+  let basePolicy: any = {};
+  if (assignedId) {
+    const p = db.getPolicy(assignedId);
+    if (p) {
+      try { basePolicy = JSON.parse(p.policy_json); } catch {}
+    }
+  }
+  const identityPolicy: any = {
+    ...basePolicy,
+    version: `identity-${Date.now()}`,
+    updatedAt: Date.now(),
+    employeeName: updated.display_name ?? '',
+    slackUserId: updated.slack_user_id ?? '',
+  };
+  const pushed = deviceServer.pushPolicy(deviceId, identityPolicy);
+  res.json({ success: true, pushedLive: pushed });
+});
+
 // --- Policy routes ---
 app.get('/api/policies', (_req, res) => {
   res.json(db.getAllPolicies());
