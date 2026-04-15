@@ -326,6 +326,9 @@ export class IPCHandlers {
       'agent:getEffectivePolicy',
       'agent:isManaged',
       'agent:getSalesStats',
+      'logs:getTail',
+      'logs:openFolder',
+      'logs:clear',
     ];
     channelsToReset.forEach((ch) => {
       try {
@@ -589,6 +592,32 @@ export class IPCHandlers {
     ipcMain.handle('agent:getEffectivePolicy', this.handleAgentGetEffectivePolicy.bind(this));
     ipcMain.handle('agent:isManaged', this.handleAgentIsManaged.bind(this));
     ipcMain.handle('agent:getSalesStats', this.handleAgentGetSalesStats.bind(this));
+
+    // Diagnostic log handlers
+    ipcMain.handle('logs:getTail', async (_e, maxLines?: number) => {
+      try {
+        const data = this.logger.readLogFileTail(typeof maxLines === 'number' ? maxLines : 500);
+        return { success: true, data };
+      } catch (err) {
+        return { success: false, error: String(err) };
+      }
+    });
+    ipcMain.handle('logs:openFolder', async () => {
+      try {
+        this.logger.openLogsFolder();
+        return { success: true };
+      } catch (err) {
+        return { success: false, error: String(err) };
+      }
+    });
+    ipcMain.handle('logs:clear', async () => {
+      try {
+        const ok = this.logger.clearCurrentLog();
+        return { success: ok };
+      } catch (err) {
+        return { success: false, error: String(err) };
+      }
+    });
 
     console.log('IPC handlers registered successfully');
   }
@@ -1627,6 +1656,9 @@ export class IPCHandlers {
       'agent:getEffectivePolicy',
       'agent:isManaged',
       'agent:getSalesStats',
+      'logs:getTail',
+      'logs:openFolder',
+      'logs:clear',
     ];
 
     additionalHandlers.forEach((channel) => {

@@ -411,6 +411,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   agentGetSalesStats: (range: 'day' | 'week' | 'month'): Promise<IPCResponse<any>> =>
     ipcRenderer.invoke('agent:getSalesStats', range),
 
+  // Diagnostic log access (Settings → Diagnostics section)
+  logsGetTail: (maxLines?: number): Promise<IPCResponse<string>> =>
+    ipcRenderer.invoke('logs:getTail', maxLines),
+  logsOpenFolder: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke('logs:openFolder'),
+  logsClear: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke('logs:clear'),
+
   // Agent event listeners
   onAgentStateChanged: (callback: (state: any) => void) => {
     const listener = (_event: any, state: any) => callback(state);

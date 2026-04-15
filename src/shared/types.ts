@@ -137,6 +137,11 @@ export interface ElectronAPI {
   agentIsManaged: () => Promise<IPCResponse<boolean>>;
   agentGetSalesStats: (range: 'day' | 'week' | 'month') => Promise<IPCResponse<any>>;
 
+  // Diagnostics / logs viewer
+  logsGetTail: (maxLines?: number) => Promise<IPCResponse<string>>;
+  logsOpenFolder: () => Promise<IPCResponse<void>>;
+  logsClear: () => Promise<IPCResponse<void>>;
+
   // Agent event listeners
   onAgentStateChanged?: (callback: (state: any) => void) => () => void;
   onAgentLocked?: (callback: (data: { reason: string; message: string }) => void) => () => void;

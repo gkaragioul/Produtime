@@ -242,6 +242,47 @@ export class Logger {
     const { shell } = require("electron");
     shell.openPath(this.logFile);
   }
+
+  public openLogsFolder(): void {
+    this.ensureInitialized();
+    if (!this.logFile) return;
+    const { shell } = require("electron");
+    shell.openPath(path.dirname(this.logFile));
+  }
+
+  /**
+   * Read the tail of the current log file from disk.
+   * Falls back to the in-memory buffer if the file can't be read yet.
+   */
+  public readLogFileTail(maxLines: number = 500): string {
+    this.ensureInitialized();
+    try {
+      if (this.logFile && fs.existsSync(this.logFile)) {
+        const raw = fs.readFileSync(this.logFile, "utf8");
+        const lines = raw.split(/\r?\n/);
+        return lines.slice(-maxLines).join("\n");
+      }
+    } catch (e) {
+      // Fall through to the buffer below.
+    }
+    return this.logBuffer.slice(-maxLines).join("\n");
+  }
+
+  public clearCurrentLog(): boolean {
+    this.ensureInitialized();
+    if (!this.logFile) return false;
+    try {
+      fs.writeFileSync(this.logFile, "");
+      this.logBuffer = [];
+      this.writeToFileInternal(
+        `[${new Date().toISOString()}] [INFO ] [logger         ] Log cleared by user`
+      );
+      return true;
+    } catch (e) {
+      console.error("Failed to clear log file:", e);
+      return false;
+    }
+  }
 }
 
 // Export singleton instance
