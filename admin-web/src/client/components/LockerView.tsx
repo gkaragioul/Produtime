@@ -5,7 +5,7 @@ const LOCKER_URL = 'https://app-production-f45b.up.railway.app';
 export const LockerView: React.FC = () => {
   return (
     <div style={{ padding: '20px' }}>
-      <h1 style={{ margin: '0 0 16px', fontSize: '24px' }}>Password Locker</h1>
+      <h1 style={{ margin: '0 0 16px', fontSize: '24px' }}>WOTLocker</h1>
       <div style={{
         backgroundColor: 'white',
         borderRadius: '8px',
@@ -32,7 +32,7 @@ export const LockerView: React.FC = () => {
             fontWeight: 500,
           }}
         >
-          Open Password Locker ↗
+          Open WOTLocker ↗
         </a>
       </div>
     </div>

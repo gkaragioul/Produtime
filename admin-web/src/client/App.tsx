@@ -205,7 +205,7 @@ const App: React.FC = () => {
     { id: 'policies', label: 'Policies', icon: '📋' },
     { id: 'pairing', label: 'Pairing', icon: '🔗', badge: pendingCount > 0 ? pendingCount : undefined },
     { id: 'logs', label: 'Server Logs', icon: '📝' },
-    { id: 'locker', label: 'Password Locker', icon: '🔐' },
+    { id: 'locker', label: 'WOTLocker', icon: '🔐' },
   ];
 
   return (
