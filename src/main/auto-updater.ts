@@ -114,10 +114,13 @@ export class AutoUpdaterManager {
     // No-op — electron-updater auto-downloads when AVAILABLE
     ipcMain.handle('updater:downloadUpdate', async () => ({ success: true }));
 
-    // Triggered when user clicks "Restart now" — quits and installs
+    // Triggered when user clicks "Restart now" — quits and installs.
+    // isSilent=false: show the NSIS UI so install can't hang on UAC/file
+    // locks without the user noticing. isForceRunAfter=true: relaunch on
+    // completion. The prior silent=true path stuck for some users.
     ipcMain.handle('updater:installUpdate', async () => {
       if (this.updateDownloaded) {
-        setImmediate(() => autoUpdater.quitAndInstall(true, true));
+        setImmediate(() => autoUpdater.quitAndInstall(false, true));
       }
       return { success: true };
     });
