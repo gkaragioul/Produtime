@@ -60,6 +60,9 @@ export class AdminServer {
   private logBuffer: string[] = [];
   private readonly MAX_LOG_ENTRIES = 500;
 
+  // 60s in-memory cache for Slack bot sales responses, keyed by "<uid>:<range>"
+  private salesCache: Map<string, { at: number; body: any }> = new Map();
+
   // Event callbacks
   public onDeviceConnected?: (deviceId: string) => void;
   public onDeviceDisconnected?: (deviceId: string) => void;
@@ -856,9 +859,77 @@ export class AdminServer {
       case 'EXPORT_RESULT':
         this.handleExportResult(deviceId, (message as any).payload);
         break;
+      case 'SALES_REQUEST':
+        this.handleSalesRequest(deviceId, (message as any).payload);
+        break;
       case 'ACK':
         // Handle acknowledgment
         break;
+    }
+  }
+
+  /**
+   * Proxy a device's sales request to the internal Slack-bot endpoint.
+   * The device must have a slack_user_id assigned by the admin; otherwise
+   * we return { unconfigured: true } so the client can show an empty state.
+   */
+  private async handleSalesRequest(
+    deviceId: string,
+    payload: { requestId: string; range: 'day' | 'week' | 'month' }
+  ): Promise<void> {
+    const range = (['day', 'week', 'month'] as const).includes(payload?.range as any)
+      ? (payload.range as 'day' | 'week' | 'month')
+      : 'week';
+    const requestId = payload?.requestId || '';
+
+    const reply = (response: any) => {
+      const device = this.connectedDevices.get(deviceId);
+      if (!device) return;
+      const msg = this.signMessage('SALES_RESPONSE', deviceId, { requestId, ...response });
+      try { device.ws.send(JSON.stringify(msg)); } catch {}
+    };
+
+    const row = this.db.getDevice(deviceId);
+    const uid = (row as any)?.slack_user_id;
+    if (!uid || !String(uid).trim()) {
+      reply({ unconfigured: true });
+      return;
+    }
+
+    const botUrl = process.env.SLACK_BOT_INTERNAL_URL;
+    const apiKey = process.env.INTERNAL_API_KEY;
+    if (!botUrl || !apiKey) {
+      this.log('[SERVER] SALES_REQUEST: SLACK_BOT_INTERNAL_URL or INTERNAL_API_KEY not configured');
+      reply({ unavailable: true, error: 'server_misconfigured' });
+      return;
+    }
+
+    const cacheKey = `${uid}:${range}`;
+    const cached = this.salesCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < 60_000) {
+      reply(cached.body);
+      return;
+    }
+
+    try {
+      const ctrl = new AbortController();
+      const timeout = setTimeout(() => ctrl.abort(), 5000);
+      const url = `${botUrl.replace(/\/$/, '')}/internal/sales/${encodeURIComponent(String(uid))}?range=${range}`;
+      const res = await fetch(url, {
+        headers: { 'X-Internal-Api-Key': apiKey },
+        signal: ctrl.signal,
+      });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        reply({ unavailable: true });
+        return;
+      }
+      const body = await res.json();
+      this.salesCache.set(cacheKey, { at: Date.now(), body });
+      reply(body);
+    } catch (e) {
+      this.log(`[SERVER] SALES_REQUEST: bot unreachable: ${e}`);
+      reply({ unavailable: true });
     }
   }
 
