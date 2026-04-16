@@ -103,6 +103,11 @@ export class AutoUpdaterManager {
     });
 
     autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
+      // A fresh download cycle — reset the one-shot native dialog flag so
+      // a later version that the user deferred shows the prompt again.
+      if (this.downloadedInfo?.version !== info.version) {
+        this.installPromptShown = false;
+      }
       this.updateDownloaded = true;
       this.downloadedInfo = info;
       this.broadcastState({
@@ -209,9 +214,8 @@ export class AutoUpdaterManager {
   }
 
   private async showDownloadedDialog(info: UpdateInfo): Promise<void> {
-    const parent = this.mainWindow && !this.mainWindow.isDestroyed() ? this.mainWindow : undefined;
-    const result = await dialog.showMessageBox(parent!, {
-      type: 'info',
+    const opts = {
+      type: 'info' as const,
       title: 'ProduTime update ready',
       message: `Version ${info.version} has been downloaded.`,
       detail: 'Install now to apply the update. You can keep working and install later from Settings.',
@@ -219,7 +223,14 @@ export class AutoUpdaterManager {
       defaultId: 0,
       cancelId: 1,
       noLink: true,
-    }).catch(() => ({ response: 1 }));
+    };
+    const parent = this.mainWindow && !this.mainWindow.isDestroyed() ? this.mainWindow : null;
+    // Use the parented overload only when we have a live window — passing
+    // a destroyed/missing handle on Windows silently drops the dialog.
+    const p = parent
+      ? dialog.showMessageBox(parent, opts)
+      : dialog.showMessageBox(opts);
+    const result = await p.catch(() => ({ response: 1 }));
     if (result.response === 0) {
       this.triggerQuitAndInstall();
     }
@@ -294,5 +305,19 @@ export class AutoUpdaterManager {
       this.checkTimer = null;
     }
     autoUpdater.removeAllListeners();
+    // Our own IPC channels — must be explicitly removed so a hot-reload
+    // init doesn't throw "Attempted to register a second handler".
+    for (const ch of ['updater:checkForUpdates', 'updater:downloadUpdate', 'updater:installUpdate', 'updater:getStatus']) {
+      try { ipcMain.removeHandler(ch); } catch {}
+    }
+  }
+
+  /**
+   * Re-push the current state to the renderer. Called when the main window
+   * becomes visible after being hidden to tray so a DOWNLOADED state that
+   * arrived while the window was hidden isn't lost.
+   */
+  public replayState(): void {
+    this.broadcastState(this.currentState);
   }
 }

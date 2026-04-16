@@ -657,6 +657,14 @@ class TimePortApp {
       if (this.systemTray) {
         this.systemTray.updateState({ isVisible: true });
       }
+      // If an update landed while the window was hidden to tray, the
+      // renderer re-mount would have lost the state — replay so the
+      // progress bar / "Install now" surfaces correctly on next show.
+      try {
+        this.autoUpdater?.replayState();
+      } catch (err) {
+        console.warn("AutoUpdater replayState failed:", (err as Error).message);
+      }
     });
 
     this.mainWindow.on("hide", () => {
@@ -720,6 +728,13 @@ class TimePortApp {
   private async initializeAutoUpdater(): Promise<void> {
     if (!this.mainWindow) {
       startupLogger.warn("AutoUpdater: no main window, skipping");
+      return;
+    }
+    // electron-updater needs app-update.yml which only exists inside the
+    // packaged installer. Running in dev throws ENOENT every check and
+    // spams the retry chain.
+    if (!app.isPackaged) {
+      startupLogger.info("AutoUpdater: skipping in unpackaged dev run");
       return;
     }
     const { AutoUpdaterManager } = await import("./auto-updater");
@@ -1204,21 +1219,6 @@ class TimePortApp {
       console.log("✅ DATABASE FUNCTIONALITY TEST COMPLETED");
     } catch (error) {
       console.error("❌ DATABASE FUNCTIONALITY TEST FAILED:", error);
-    }
-  }
-
-  private async testAutoUpdaterFunctionality(): Promise<void> {
-    try {
-      console.log("🔍 TESTING UPDATER FUNCTIONALITY...");
-
-      if (!this.autoUpdater) {
-        throw new Error("Updater not initialized");
-      }
-
-      console.log("✅ Updater instance exists");
-      console.log("✅ UPDATER FUNCTIONALITY TEST COMPLETED");
-    } catch (error) {
-      console.error("❌ AUTO-UPDATER FUNCTIONALITY TEST FAILED:", error);
     }
   }
 
