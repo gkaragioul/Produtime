@@ -73,8 +73,14 @@ if ($DirtyStatus -and $AllowDirty) {
 
 # 3) Target tag doesn't already exist on the releases repo — otherwise
 # gh release create would error after a full rebuild (wasted time).
-$ExistingRelease = gh release view $Tag --repo $RepoRelease --json tagName 2>$null
-if ($ExistingRelease) {
+# gh returns non-zero when the release is missing, which is the happy
+# path here; suppress stderr and rely on the exit code.
+$prev = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+gh release view $Tag --repo $RepoRelease --json tagName *> $null
+$TagExists = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $prev
+if ($TagExists) {
     Write-Host "      [FAIL] Release $Tag already exists on $RepoRelease." -ForegroundColor Red
     Write-Host "             Pick a higher version, or delete the existing release first." -ForegroundColor DarkGray
     exit 1
