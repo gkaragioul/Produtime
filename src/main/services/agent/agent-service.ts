@@ -612,6 +612,16 @@ export class AgentService extends EventEmitter {
       this.ws = null;
     }
 
+    // Resolve any in-flight SALES_REQUEST so the renderer doesn't stare at
+    // a spinner for the full 10s timeout window.
+    if (this.pendingSalesRequests && this.pendingSalesRequests.size > 0) {
+      for (const { resolve, timeout } of this.pendingSalesRequests.values()) {
+        try { clearTimeout(timeout); } catch {}
+        try { resolve({ unavailable: true, reason: 'disconnected' }); } catch {}
+      }
+      this.pendingSalesRequests.clear();
+    }
+
     this.state.status = 'disconnected';
     this.emitStateChanged();
 
