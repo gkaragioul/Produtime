@@ -118,10 +118,34 @@ export class AutoUpdaterManager {
     // isSilent=false: show the NSIS UI so install can't hang on UAC/file
     // locks without the user noticing. isForceRunAfter=true: relaunch on
     // completion. The prior silent=true path stuck for some users.
+    //
+    // Fallback: if quit doesn't fire within 8 s (cleanup deadlock, stuck
+    // tray, holding-on native module, etc.) we hard-exit so the NSIS
+    // installer can replace the locked exe. The user just has to relaunch
+    // ProduTime once after the installer finishes.
     ipcMain.handle('updater:installUpdate', async () => {
-      if (this.updateDownloaded) {
-        setImmediate(() => autoUpdater.quitAndInstall(false, true));
-      }
+      if (!this.updateDownloaded) return { success: false, error: 'no_download' };
+
+      const HARD_EXIT_DELAY_MS = 8000;
+      const hardExit = setTimeout(() => {
+        console.warn('[UPDATER] quitAndInstall timed out — forcing process exit');
+        try { app.exit(0); } catch {}
+        try { process.exit(0); } catch {}
+      }, HARD_EXIT_DELAY_MS);
+      hardExit.unref?.();
+
+      // Make sure the close handler lets the window go.
+      try { (global as any).__produtimeForceQuit = true; } catch {}
+
+      setImmediate(() => {
+        try {
+          autoUpdater.quitAndInstall(false, true);
+        } catch (e) {
+          console.error('[UPDATER] quitAndInstall threw:', e);
+          clearTimeout(hardExit);
+          try { app.exit(0); } catch {}
+        }
+      });
       return { success: true };
     });
 
