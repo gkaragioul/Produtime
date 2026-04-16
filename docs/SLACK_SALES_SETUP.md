@@ -20,7 +20,13 @@ Both services must share the same `INTERNAL_API_KEY`.
 | Name | Example | Purpose |
 |---|---|---|
 | `INTERNAL_API_KEY` | same value as above | Sent as `X-Internal-Api-Key` on proxied requests. |
-| `SLACK_BOT_INTERNAL_URL` | `http://<railway-private>:8000` | Private URL to the Slack bot's Flask app. |
+| `SLACK_BOT_INTERNAL_URL` | `https://wot-slack-bot-production.up.railway.app` | Public URL of the Slack bot service. The endpoint is key-gated. |
+
+> **Why the public URL, not `*.railway.internal`?** Railway's private DNS only
+> resolves between services in the **same** project. WOT-Produtime and
+> WOT-Slack-Bot live in separate projects, so the private hostname returns
+> `ENOTFOUND`. Hitting the public URL goes through Railway's edge but still
+> lands on the same Flask handler, key-gated by `X-Internal-Api-Key`.
 
 Devices never see these values — the proxy happens entirely on the server.
 
@@ -33,10 +39,17 @@ PYTHONPATH=src SLACK_BOT_TOKEN=xoxb-... \
   python scripts/backfill_sales_store_from_aggregate.py
 ```
 
-This reads `#sales-aggregate` and fills `sales_cases`. Posts that were
-created before we started attaching structured metadata will be skipped
-(they have no `event_payload`). Re-running the script is safe
-(`INSERT OR IGNORE`).
+This reads `#sales-aggregate` and fills `sales_cases`. Two paths:
+
+1. New posts (after this feature shipped) carry structured `event_payload`
+   metadata — we use it directly.
+2. Older posts get re-parsed from the rendered template (Case / Agent /
+   Outcome / Amount / Destination / Travel dates / Travelers / Contact /
+   Budget / What they wanted / Objections / Notes). The agent's Slack
+   user_id is recovered with a `conversations.replies` lookup on the
+   permalinked thread.
+
+Re-running is safe (`INSERT OR IGNORE` on `channel:thread_ts`).
 
 ## 3. Link an agent
 

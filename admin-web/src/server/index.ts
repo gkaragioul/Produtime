@@ -224,6 +224,12 @@ app.patch('/api/devices/:id', (req, res) => {
   // Merge identity into the device's assigned policy if any, otherwise send
   // an identity-only payload. applyPolicy on the client only writes fields
   // that are explicitly defined, so other settings are left untouched.
+  //
+  // CRUCIAL: only include `employeeName` in the push when the admin
+  // actually edited it. The client's applyPolicy treats an empty string as
+  // an admin-initiated clear and unlocks the user's name input — sending
+  // it on every PATCH (even ones that only change slackUserId) would
+  // silently undo the lock.
   const updated = db.getDevice(deviceId) || existing;
   const assignedId = updated.policy_id;
   let basePolicy: any = {};
@@ -237,9 +243,21 @@ app.patch('/api/devices/:id', (req, res) => {
     ...basePolicy,
     version: `identity-${Date.now()}`,
     updatedAt: Date.now(),
-    employeeName: updated.display_name ?? '',
-    slackUserId: updated.slack_user_id ?? '',
   };
+  if ('display_name' in patch) {
+    identityPolicy.employeeName = updated.display_name ?? '';
+  }
+  if ('slack_user_id' in patch) {
+    identityPolicy.slackUserId = updated.slack_user_id ?? '';
+  }
+
+  // Invalidate any cached sales response for both old and new uid so the
+  // client sees the change before the 60 s TTL expires.
+  if ('slack_user_id' in patch) {
+    deviceServer.invalidateSalesCache(existing.slack_user_id ?? null);
+    deviceServer.invalidateSalesCache(updated.slack_user_id ?? null);
+  }
+
   const pushed = deviceServer.pushPolicy(deviceId, identityPolicy);
   res.json({ success: true, pushedLive: pushed });
 });

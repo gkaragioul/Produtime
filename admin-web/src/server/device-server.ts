@@ -62,6 +62,8 @@ export class AdminServer {
 
   // 60s in-memory cache for Slack bot sales responses, keyed by "<uid>:<range>"
   private salesCache: Map<string, { at: number; body: any }> = new Map();
+  private static readonly SALES_CACHE_TTL_MS = 60_000;
+  private static readonly SALES_CACHE_MAX = 500;
 
   // Event callbacks
   public onDeviceConnected?: (deviceId: string) => void;
@@ -98,7 +100,32 @@ export class AdminServer {
     setInterval(() => {
       this.cleanupStaleConnections();
       this.db.cleanupExpiredPairs();
+      this.sweepSalesCache();
     }, 30000);
+  }
+
+  /** Drop expired entries; bound the cache to MAX entries (oldest first). */
+  private sweepSalesCache(): void {
+    const now = Date.now();
+    for (const [k, v] of this.salesCache) {
+      if (now - v.at > AdminServer.SALES_CACHE_TTL_MS) {
+        this.salesCache.delete(k);
+      }
+    }
+    while (this.salesCache.size > AdminServer.SALES_CACHE_MAX) {
+      const oldest = this.salesCache.keys().next().value;
+      if (!oldest) break;
+      this.salesCache.delete(oldest);
+    }
+  }
+
+  /** Invalidate every cache entry for a given Slack user id. */
+  public invalidateSalesCache(uid: string | null | undefined): void {
+    if (!uid) return;
+    const prefix = `${uid}:`;
+    for (const k of this.salesCache.keys()) {
+      if (k.startsWith(prefix)) this.salesCache.delete(k);
+    }
   }
 
   /**
@@ -906,15 +933,18 @@ export class AdminServer {
 
     const cacheKey = `${uid}:${range}`;
     const cached = this.salesCache.get(cacheKey);
-    if (cached && Date.now() - cached.at < 60_000) {
+    if (cached && Date.now() - cached.at < AdminServer.SALES_CACHE_TTL_MS) {
       reply(cached.body);
       return;
     }
 
-    // Pass the key in BOTH header and query — some Railway/CDN paths strip
-    // non-standard headers on their way to the origin. The server accepts
-    // either.
-    const url = `${botUrl.replace(/\/$/, '')}/internal/sales/${encodeURIComponent(String(uid))}?range=${range}&key=${encodeURIComponent(apiKey)}`;
+    // Header-only auth. Earlier we shipped a `?key=` query fallback to work
+    // around a suspected CDN header strip; verified after the fact that the
+    // header actually reached the origin, so the fallback was dropped to
+    // keep the secret out of URLs / proxy logs.
+    const url = `${botUrl.replace(/\/$/, '')}/internal/sales/${encodeURIComponent(String(uid))}?range=${range}`;
+    // Used in failure logs without leaking secrets — strip query string.
+    const safeUrl = `${botUrl.replace(/\/$/, '')}/internal/sales/${encodeURIComponent(String(uid))}`;
     try {
       const ctrl = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), 5000);
@@ -924,7 +954,7 @@ export class AdminServer {
       });
       clearTimeout(timeout);
       if (!res.ok) {
-        this.log(`[SERVER] SALES_REQUEST ${url} -> HTTP ${res.status}`);
+        this.log(`[SERVER] SALES_REQUEST ${safeUrl} -> HTTP ${res.status}`);
         reply({ unavailable: true });
         return;
       }
@@ -934,7 +964,7 @@ export class AdminServer {
     } catch (e: any) {
       const cause = e?.cause;
       const causeInfo = cause ? ` cause={code:${cause.code} errno:${cause.errno} address:${cause.address} port:${cause.port} syscall:${cause.syscall}}` : '';
-      this.log(`[SERVER] SALES_REQUEST ${url} failed: ${e?.name}: ${e?.message}${causeInfo}`);
+      this.log(`[SERVER] SALES_REQUEST ${safeUrl} failed: ${e?.name}: ${e?.message}${causeInfo}`);
       reply({ unavailable: true });
     }
   }
