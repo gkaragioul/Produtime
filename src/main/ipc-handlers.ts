@@ -325,10 +325,6 @@ export class IPCHandlers {
       'agent:unpair',
       'agent:getEffectivePolicy',
       'agent:isManaged',
-      'agent:getSalesStats',
-      'logs:getTail',
-      'logs:openFolder',
-      'logs:clear',
     ];
     channelsToReset.forEach((ch) => {
       try {
@@ -591,55 +587,8 @@ export class IPCHandlers {
     ipcMain.handle('agent:unpair', this.handleAgentUnpair.bind(this));
     ipcMain.handle('agent:getEffectivePolicy', this.handleAgentGetEffectivePolicy.bind(this));
     ipcMain.handle('agent:isManaged', this.handleAgentIsManaged.bind(this));
-    ipcMain.handle('agent:getSalesStats', this.handleAgentGetSalesStats.bind(this));
-
-    // Diagnostic log handlers
-    ipcMain.handle('logs:getTail', async (_e, maxLines?: number) => {
-      try {
-        const data = this.logger.readLogFileTail(typeof maxLines === 'number' ? maxLines : 500);
-        return { success: true, data };
-      } catch (err) {
-        return { success: false, error: String(err) };
-      }
-    });
-    ipcMain.handle('logs:openFolder', async () => {
-      try {
-        this.logger.openLogsFolder();
-        return { success: true };
-      } catch (err) {
-        return { success: false, error: String(err) };
-      }
-    });
-    ipcMain.handle('logs:clear', async () => {
-      try {
-        const ok = this.logger.clearCurrentLog();
-        return { success: ok };
-      } catch (err) {
-        return { success: false, error: String(err) };
-      }
-    });
 
     console.log('IPC handlers registered successfully');
-  }
-
-  private async handleAgentGetSalesStats(
-    _event: IpcMainInvokeEvent,
-    range: 'day' | 'week' | 'month'
-  ): Promise<IPCResponse<any>> {
-    try {
-      const svc = this.agentService;
-      if (!svc) {
-        return { success: true, data: { unavailable: true, reason: 'not_initialized' } };
-      }
-      const r: 'day' | 'week' | 'month' = (['day','week','month'] as const).includes(range as any)
-        ? range
-        : 'week';
-      const data = await (svc as any).requestSales(r);
-      return { success: true, data };
-    } catch (error) {
-      console.error('Error requesting sales stats:', error);
-      return { success: false, error: String(error) };
-    }
   }
 
   private async handleGetActivityDiagnostics(
@@ -797,36 +746,12 @@ export class IPCHandlers {
         this.enhancedLicenseService.assertEntitledOrThrow('Update Settings');
       }
 
-      // Employee name is locked after first save. Admin policy pushes bypass this
-      // by writing via applyPolicy() which does not go through this IPC path.
-      if (request.key === 'employee_name') {
-        const locked = this.database.getSetting('employee_name_locked') === 'true';
-        if (locked) {
-          return { success: false, error: 'employee_name is locked. Contact your admin to change.' };
-        }
-        const trimmed = String(request.value ?? '').trim();
-        if (!trimmed) {
-          return { success: false, error: 'employee_name cannot be empty.' };
-        }
-        // Normalise and lock as part of the same write.
-        request = { ...request, value: trimmed };
-      }
-      if (request.key === 'slack_user_id') {
-        // slack_user_id is admin-owned; never writable via the generic settings IPC.
-        return { success: false, error: 'slack_user_id is managed by the admin.' };
-      }
-
       // Persist setting (prefer validated method if available)
       const dbAny: any = this.database as any;
       if (typeof dbAny.setSettingWithValidation === 'function') {
         dbAny.setSettingWithValidation(request.key, request.value);
       } else {
         this.database.setSetting(request.key, request.value);
-      }
-
-      // Lock the name after the first successful user-initiated save.
-      if (request.key === 'employee_name') {
-        this.database.setSetting('employee_name_locked', 'true');
       }
 
       // Apply to live ActivityTracker where applicable
@@ -1655,12 +1580,8 @@ export class IPCHandlers {
       'agent:unpair',
       'agent:getEffectivePolicy',
       'agent:isManaged',
-      'agent:getSalesStats',
-      'logs:getTail',
-      'logs:openFolder',
-      'logs:clear',
     ];
-
+    
     additionalHandlers.forEach((channel) => {
       try {
         ipcMain.removeHandler(channel);

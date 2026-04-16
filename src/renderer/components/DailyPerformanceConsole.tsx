@@ -19,7 +19,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityLog } from '../../shared/types';
 import { TodayStatus } from './TodayStatus';
 import { FocusSummary } from './FocusSummary';
-import { SalesStatsPanel } from './SalesStatsPanel';
 import { TrackingControls } from './TrackingControls';
 import {
   computeExpectedWindow,
@@ -479,7 +478,7 @@ export const DailyPerformanceConsole: React.FC = () => {
     <div className="daily-performance-console">
       {/* Main Two-Column Layout */}
       <div className="console-main-row">
-        {/* Left Column: Today Status + Controls + Focus Summary */}
+        {/* Left Column: Today Status + Metrics + Controls */}
         <div className="console-left-column">
           {/* A) TODAY STATUS - Primary, Dominant */}
           <TodayStatus
@@ -490,7 +489,7 @@ export const DailyPerformanceConsole: React.FC = () => {
             untrackedSeconds={0}
             isTracking={isTracking}
           />
-
+          
           {/* D) CONTROLS - De-emphasized */}
           <TrackingControls
             isTracking={isTracking}
@@ -501,10 +500,11 @@ export const DailyPerformanceConsole: React.FC = () => {
             onPause={handlePauseTracking}
             onResume={handleResumeTracking}
           />
-
-          {/* B) FOCUS SUMMARY - moved from right column so the agent sees
-              activity + focus in one scroll, and the right column can be
-              dedicated to sales tickets. */}
+        </div>
+        
+        {/* Right Column: Focus Summary */}
+        <div className="console-right-column">
+          {/* B) FOCUS SUMMARY - Replaces Recent Activity */}
           <FocusSummary
             focusStats={focusStats}
             recentLogs={recent}
@@ -512,11 +512,6 @@ export const DailyPerformanceConsole: React.FC = () => {
             focusQuality={dailyInsight.userState.focusQuality}
             dominantActivity={dailyInsight.userState.dominantActivity}
           />
-        </div>
-
-        {/* Right Column: Slack sales stats for this agent */}
-        <div className="console-right-column">
-          <SalesStatsPanel />
         </div>
       </div>
     </div>

@@ -190,14 +190,6 @@ export const adminAPI = {
   getDevice: (deviceId: string) => apiGet(`/api/devices/${deviceId}`),
   deleteDevice: (deviceId: string) => apiDelete(`/api/devices/${deviceId}`),
   getConnectedDevices: () => apiGet('/api/devices/connected'),
-  updateDeviceIdentity: (
-    deviceId: string,
-    patch: { displayName?: string | null; slackUserId?: string | null }
-  ) =>
-    apiFetch(`/api/devices/${deviceId}`, {
-      method: 'PATCH',
-      body: JSON.stringify(patch),
-    }),
 
   // Policy operations
   getAllPolicies: () => apiGet('/api/policies'),
