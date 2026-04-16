@@ -31,9 +31,6 @@ export const PolicyView: React.FC<PolicyViewProps> = ({ isManaged = false, admin
   const [loading, setLoading] = useState(true);
   const [nameInput, setNameInput] = useState('');
   const [nameSaved, setNameSaved] = useState(false);
-  const [nameLocked, setNameLocked] = useState(false);
-  const [nameError, setNameError] = useState('');
-  const [slackUserId, setSlackUserId] = useState('');
 
   useEffect(() => {
     const loadPolicy = async () => {
@@ -75,27 +72,23 @@ export const PolicyView: React.FC<PolicyViewProps> = ({ isManaged = false, admin
       }
     };
 
-    // Load employee name + lock flag + slack id directly from settings
-    const loadIdentity = async () => {
+    // Load employee name directly from settings
+    const loadName = async () => {
       try {
         const ipcService = IPCService.getInstance();
         const allSettings = await ipcService.getAllSettings();
-        const m = allSettings.reduce((acc, s) => { acc[s.key] = s.value; return acc; }, {} as Record<string,string>);
-        if (m.employee_name) setNameInput(m.employee_name);
-        setNameLocked(m.employee_name_locked === 'true');
-        setSlackUserId(m.slack_user_id || '');
+        const nameEntry = allSettings.find(s => s.key === 'employee_name');
+        if (nameEntry?.value) setNameInput(nameEntry.value);
       } catch {}
     };
 
     loadPolicy();
-    loadIdentity();
+    loadName();
 
-    // Listen for policy updates when managed — refresh identity too so admin
-    // edits to name or slack user id propagate live.
+    // Listen for policy updates when managed
     if (isManaged) {
       const unsubscribe = window.electronAPI.onAgentPolicyUpdated?.((newPolicy) => {
         setPolicy(newPolicy);
-        loadIdentity();
       });
       return () => {
         unsubscribe?.();
@@ -146,76 +139,37 @@ export const PolicyView: React.FC<PolicyViewProps> = ({ isManaged = false, admin
             <input
               type="text"
               value={nameInput}
-              disabled={nameLocked}
-              title={nameLocked ? 'Locked — contact your admin to change.' : ''}
-              onChange={(e) => { setNameInput(e.target.value); setNameSaved(false); setNameError(''); }}
+              onChange={(e) => { setNameInput(e.target.value); setNameSaved(false); }}
               placeholder="Enter your name"
               style={{
                 flex: 1, padding: '8px 12px', border: '1px solid #ddd',
                 borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box',
-                backgroundColor: nameLocked ? '#ececec' : '#fff',
-                color: nameLocked ? '#666' : '#222',
-                cursor: nameLocked ? 'not-allowed' : 'text',
               }}
             />
-            {!nameLocked && (
-              <button
-                onClick={async () => {
-                  const trimmed = nameInput.trim();
-                  if (!trimmed) { setNameError('Enter a name before saving.'); return; }
-                  try {
-                    const resp = await window.electronAPI.setSetting({ key: 'employee_name', value: trimmed });
-                    if ((resp as any)?.success === false) {
-                      setNameError((resp as any).error || 'Could not save name.');
-                      return;
-                    }
-                    setNameInput(trimmed);
-                    setNameLocked(true);
-                    setNameSaved(true);
-                    setNameError('');
-                    setTimeout(() => setNameSaved(false), 2000);
-                  } catch {
-                    setNameError('Could not save name.');
-                  }
-                }}
-                style={{
-                  padding: '8px 18px', backgroundColor: '#4a90d9', color: '#fff',
-                  border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
-                }}
-              >
-                Save
-              </button>
-            )}
+            <button
+              onClick={async () => {
+                try {
+                  await window.electronAPI.setSetting({ key: 'employee_name', value: nameInput.trim() });
+                  setNameSaved(true);
+                  setTimeout(() => setNameSaved(false), 2000);
+                } catch {}
+              }}
+              style={{
+                padding: '8px 18px', backgroundColor: '#4a90d9', color: '#fff',
+                border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: 600,
+              }}
+            >
+              Save
+            </button>
           </div>
-          {nameLocked && (
-            <div style={{ fontSize: '12px', color: '#666', marginTop: '6px' }}>Locked — contact your admin to change.</div>
-          )}
           {nameSaved && (
             <div style={{ fontSize: '12px', color: '#28a745', marginTop: '6px' }}>Name saved — it will sync to the admin panel on next heartbeat.</div>
           )}
-          {nameError && (
-            <div style={{ fontSize: '12px', color: '#c0392b', marginTop: '6px' }}>{nameError}</div>
-          )}
-          {!nameLocked && !nameInput && (
-            <div style={{ fontSize: '12px', color: '#999', marginTop: '6px' }}>Please enter your name so your administrator can identify you. This can only be set once.</div>
+          {!nameInput && (
+            <div style={{ fontSize: '12px', color: '#999', marginTop: '6px' }}>Please enter your name so your administrator can identify you.</div>
           )}
         </div>
       </div>
-
-      {/* Slack User ID (admin-managed, read-only) */}
-      {slackUserId && (
-        <div style={{ marginBottom: '24px' }}>
-          <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '12px', color: '#444' }}>
-            Slack User ID
-          </h3>
-          <div style={{ backgroundColor: '#f5f5f5', borderRadius: '8px', padding: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontFamily: 'monospace', fontSize: '13px', color: '#333' }}>{slackUserId}</span>
-              <span style={{ fontSize: '12px', color: '#888' }}>Managed by your admin</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Work Schedule Section */}
       <div style={{ marginBottom: '24px' }}>

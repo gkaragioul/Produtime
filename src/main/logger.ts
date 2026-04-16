@@ -242,68 +242,6 @@ export class Logger {
     const { shell } = require("electron");
     shell.openPath(this.logFile);
   }
-
-  public openLogsFolder(): void {
-    this.ensureInitialized();
-    if (!this.logFile) return;
-    const { shell } = require("electron");
-    shell.openPath(path.dirname(this.logFile));
-  }
-
-  /**
-   * Read the tail of the current log file from disk without loading the
-   * whole file into memory.
-   *
-   * Reads the last ~ ``maxLines * AVG_LINE_BYTES`` from the file, splits on
-   * newlines, and returns the trailing ``maxLines`` entries. Falls back to
-   * the in-memory buffer if the file can't be opened.
-   */
-  public readLogFileTail(maxLines: number = 500): string {
-    this.ensureInitialized();
-    const AVG_LINE_BYTES = 200;
-    let fd: number | null = null;
-    try {
-      if (!this.logFile || !fs.existsSync(this.logFile)) {
-        return this.logBuffer.slice(-maxLines).join("\n");
-      }
-      const stat = fs.statSync(this.logFile);
-      const readSize = Math.min(stat.size, Math.max(maxLines * AVG_LINE_BYTES, 64 * 1024));
-      const start = Math.max(0, stat.size - readSize);
-      fd = fs.openSync(this.logFile, "r");
-      const buf = Buffer.alloc(readSize);
-      fs.readSync(fd, buf, 0, readSize, start);
-      let chunk = buf.toString("utf8");
-      // Drop the (likely partial) first line when we didn't start at 0.
-      if (start > 0) {
-        const nl = chunk.indexOf("\n");
-        if (nl !== -1) chunk = chunk.slice(nl + 1);
-      }
-      const lines = chunk.split(/\r?\n/);
-      return lines.slice(-maxLines).join("\n");
-    } catch (e) {
-      return this.logBuffer.slice(-maxLines).join("\n");
-    } finally {
-      if (fd !== null) {
-        try { fs.closeSync(fd); } catch {}
-      }
-    }
-  }
-
-  public clearCurrentLog(): boolean {
-    this.ensureInitialized();
-    if (!this.logFile) return false;
-    try {
-      fs.writeFileSync(this.logFile, "");
-      this.logBuffer = [];
-      this.writeToFileInternal(
-        `[${new Date().toISOString()}] [INFO ] [logger         ] Log cleared by user`
-      );
-      return true;
-    } catch (e) {
-      console.error("Failed to clear log file:", e);
-      return false;
-    }
-  }
 }
 
 // Export singleton instance

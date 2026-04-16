@@ -323,20 +323,6 @@ export class DatabaseManager {
           CREATE INDEX IF NOT EXISTS idx_admin_login_attempts_date_success ON admin_login_attempts(attempted_at, success);
         `,
       },
-      {
-        version: 11,
-        description: 'Seed employee_name_locked for existing named installs',
-        up: `
-          -- Back-fill lock flag for existing installs that already have a name set.
-          -- Fresh installs start without the key; saving or receiving the name sets it.
-          INSERT OR IGNORE INTO settings (key, value)
-          SELECT 'employee_name_locked', 'true'
-          FROM settings
-          WHERE key = 'employee_name'
-            AND TRIM(value) != ''
-            AND NOT EXISTS (SELECT 1 FROM settings WHERE key = 'employee_name_locked');
-        `,
-      },
     ];
 
     // Get current migration version
