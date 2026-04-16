@@ -468,6 +468,7 @@ const App: React.FC = () => {
           onDownload={() => window.electronAPI.downloadUpdate()}
           onInstall={() => window.electronAPI.installUpdate()}
           onDismiss={() => setUpdateDismissed(true)}
+          onRetry={() => window.electronAPI.checkForUpdates()}
         />
       )}
     </div>

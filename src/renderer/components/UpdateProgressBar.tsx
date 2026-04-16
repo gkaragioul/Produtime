@@ -6,6 +6,7 @@ interface Props {
   onDownload: () => void;
   onInstall: () => void;
   onDismiss: () => void;
+  onRetry?: () => void;
 }
 
 export const UpdateProgressBar: React.FC<Props> = ({
@@ -13,6 +14,7 @@ export const UpdateProgressBar: React.FC<Props> = ({
   onDownload,
   onInstall,
   onDismiss,
+  onRetry,
 }) => {
   const [visible, setVisible] = useState(false);
   const [isStartingDownload, setIsStartingDownload] = useState(false);
@@ -121,6 +123,15 @@ export const UpdateProgressBar: React.FC<Props> = ({
               {error?.slice(0, 80)}
             </span>
           </div>
+          {onRetry && (
+            <button
+              style={{ ...styles.actionBtn, marginRight: 8 }}
+              onClick={onRetry}
+              title="Check again"
+            >
+              Retry
+            </button>
+          )}
           <button style={styles.dismissBtn} onClick={onDismiss} title="Dismiss">
             ✕
           </button>
@@ -210,6 +221,18 @@ const styles: Record<string, React.CSSProperties> = {
     border: "none",
     borderRadius: 5,
     padding: "5px 10px",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+  },
+  actionBtn: {
+    background: "transparent",
+    color: "#3182ce",
+    border: "1px solid #3182ce",
+    borderRadius: 5,
+    padding: "4px 10px",
     cursor: "pointer",
     fontSize: 12,
     fontWeight: 600,
