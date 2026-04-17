@@ -537,7 +537,12 @@ export class AgentService extends EventEmitter {
     this.emitStateChanged();
 
     try {
-      const ws = new WebSocket(cloudWsEndpoint);
+      // Cap inbound frames at 256KB. Without this, a hostile or compromised
+      // cloud endpoint could send a multi-MB payload and OOM the main
+      // process via JSON.parse amplification, or exhaust the buffer.
+      const ws = new WebSocket(cloudWsEndpoint, {
+        maxPayload: 256 * 1024,
+      } as any);
       this.ws = ws;
 
       // Guard: 'error' and 'close' can both fire for the same socket.
