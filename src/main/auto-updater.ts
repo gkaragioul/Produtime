@@ -294,7 +294,47 @@ export class AutoUpdaterManager {
     }
   }
 
+  /**
+   * Channels owned by this manager. Kept here as the single source of
+   * truth so both register + cleanup stay in sync and IPCHandlers can
+   * defer to AutoUpdaterManager for ownership.
+   */
+  private static readonly IPC_CHANNELS: readonly string[] = [
+    'updater:checkForUpdates',
+    'updater:downloadUpdate',
+    'updater:installUpdate',
+    'updater:getStatus',
+    'updater:openReleasesPage',
+  ];
+
+  /**
+   * Remove any already-registered updater handlers. Idempotent —
+   * `ipcMain.removeHandler` is a no-op on channels without a handler.
+   * Must run before `registerIPC()` when re-registering, because
+   * `ipcMain.handle()` throws if a handler is already present.
+   */
+  private unregisterIPC(): void {
+    for (const ch of AutoUpdaterManager.IPC_CHANNELS) {
+      try { ipcMain.removeHandler(ch); } catch {}
+    }
+  }
+
+  /**
+   * Public re-registration hook. Call after any post-init IPC refresh
+   * that may have wiped our handlers (e.g. IPCHandlers.removeAllHandlers
+   * during the second initializeIPC pass in main.ts). Idempotent and
+   * safe to call multiple times.
+   */
+  public reregisterIPC(): void {
+    this.safeLog('info', 'reregisterIPC called — re-registering updater IPC handlers');
+    this.registerIPC();
+  }
+
   private registerIPC(): void {
+    // Idempotent: drop any prior registrations before re-adding. Prevents
+    // the "Attempted to register a second handler" throw when this runs
+    // via reregisterIPC() after the IPC refresh.
+    this.unregisterIPC();
     ipcMain.handle('updater:checkForUpdates', async () => {
       this.safeLog('info', 'IPC updater:checkForUpdates invoked');
       this.pendingManualChecks = Math.min(
@@ -615,15 +655,7 @@ export class AutoUpdaterManager {
     autoUpdater.removeAllListeners();
     // Our own IPC channels — must be explicitly removed so a hot-reload
     // init doesn't throw "Attempted to register a second handler".
-    for (const ch of [
-      'updater:checkForUpdates',
-      'updater:downloadUpdate',
-      'updater:installUpdate',
-      'updater:getStatus',
-      'updater:openReleasesPage',
-    ]) {
-      try { ipcMain.removeHandler(ch); } catch {}
-    }
+    this.unregisterIPC();
   }
 
   /**
