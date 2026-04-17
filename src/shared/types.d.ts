@@ -16,8 +16,7 @@ export interface ElectronAPI {
     downloadUpdate: () => Promise<IPCResponse<void>>;
     installUpdate: () => Promise<IPCResponse<void>>;
     getUpdateStatus: () => Promise<IPCResponse<UpdateState>>;
-    getLastUpdateCheckTime: () => Promise<IPCResponse<string | null>>;
-    openUpdateLogs: () => Promise<IPCResponse<void>>;
+    openReleasesPage: () => Promise<IPCResponse<void>>;
     onUpdateStatusChanged: (callback: (status: UpdateState) => void) => () => void;
     onActivityChanged: (callback: (activity: any) => void) => () => void;
     startTracking: () => Promise<IPCResponse<void>>;
@@ -89,8 +88,7 @@ export declare enum IPCChannels {
     DOWNLOAD_UPDATE = "updater:downloadUpdate",
     INSTALL_UPDATE = "updater:installUpdate",
     GET_UPDATE_STATUS = "updater:getStatus",
-    GET_LAST_UPDATE_CHECK_TIME = "updater:getLastCheckTime",
-    OPEN_UPDATE_LOGS = "updater:openLogs",
+    OPEN_UPDATE_RELEASES_PAGE = "updater:openReleasesPage",
     UPDATE_STATUS_CHANGED = "updater:statusChanged",
     ACTIVITY_START = "activity:start",
     ACTIVITY_STOP = "activity:stop",

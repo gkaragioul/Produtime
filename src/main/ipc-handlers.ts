@@ -85,7 +85,6 @@ export class IPCHandlers {
 
   constructor(
     database: DatabaseManager,
-    _autoUpdater?: unknown, // kept for call-site compat — updates handled in AutoUpdaterManager
     pdfGenerator?: PDFGenerator,
     systemTray?: SystemTrayManager,
     autoExportScheduler?: any,

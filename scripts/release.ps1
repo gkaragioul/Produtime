@@ -10,7 +10,7 @@
 #
 # Preflight checks (fail-fast before a full rebuild):
 #   - package.json "version" matches -Version (electron-builder uses package.json)
-#   - git worktree is clean (no uncommitted changes) — -AllowDirty overrides
+#   - git worktree is clean (no uncommitted changes) ---AllowDirty overrides
 #   - target tag does not already exist on the releases repo
 # =============================================================================
 
@@ -56,7 +56,7 @@ if ($PackageJson.version -ne $Version) {
 }
 Write-Host "      package.json version matches: $Version" -ForegroundColor Green
 
-# 2) Worktree is clean — prevents releasing unsaved changes by accident.
+# 2) Worktree is clean --prevents releasing unsaved changes by accident.
 Push-Location $RootDir
 $DirtyStatus = git status --porcelain=v1 2>$null
 Pop-Location
@@ -71,7 +71,48 @@ if ($DirtyStatus -and $AllowDirty) {
     Write-Host "      Working tree is clean." -ForegroundColor Green
 }
 
-# 3) Target tag doesn't already exist on the releases repo — otherwise
+# 3) gh CLI is authenticated and has write access to the releases repo.
+# Failing here (before the ~multi-minute build) is far cheaper than failing
+# at gh release create in step 4. `gh repo view` without --json prints the
+# repo summary; we only care about the exit code (0 = reachable + readable).
+$prev = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+gh auth status *> $null
+$GhAuthOk = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $prev
+if (-not $GhAuthOk) {
+    Write-Host "      [FAIL] gh CLI is not authenticated. Run 'gh auth login' and re-try." -ForegroundColor Red
+    exit 1
+}
+Write-Host "      gh CLI is authenticated." -ForegroundColor Green
+
+$prev = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+gh repo view $RepoRelease *> $null
+$RepoViewOk = ($LASTEXITCODE -eq 0)
+$ErrorActionPreference = $prev
+if (-not $RepoViewOk) {
+    Write-Host "      [FAIL] gh cannot read $RepoRelease. Check org access and token scopes (needs 'repo')." -ForegroundColor Red
+    exit 1
+}
+# `gh repo view --json viewerPermission` reports what the token can do on the repo.
+# We need push or admin to upload release assets. Pure read access will fail later.
+$prev = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+$PermJson = gh repo view $RepoRelease --json viewerPermission 2>$null | ConvertFrom-Json
+$ErrorActionPreference = $prev
+$Perm = if ($PermJson) { $PermJson.viewerPermission } else { $null }
+if ($Perm -and $Perm -notin @('ADMIN', 'MAINTAIN', 'WRITE')) {
+    Write-Host "      [FAIL] gh token has '$Perm' on $RepoRelease; need WRITE/MAINTAIN/ADMIN to upload release assets." -ForegroundColor Red
+    exit 1
+}
+if ($Perm) {
+    Write-Host "      gh token has '$Perm' permission on $RepoRelease." -ForegroundColor Green
+} else {
+    Write-Host "      WARN: could not resolve viewerPermission on $RepoRelease --proceeding." -ForegroundColor Yellow
+}
+
+# 4) Target tag doesn't already exist on the releases repo --otherwise
 # gh release create would error after a full rebuild (wasted time).
 # gh returns non-zero when the release is missing, which is the happy
 # path here; suppress stderr and rely on the exit code.
@@ -120,7 +161,7 @@ Pop-Location
 
 $OutDir = Join-Path $RootDir "build-output"
 
-# Find the installer EXE — name is fixed so permanent GitHub latest link works
+# Find the installer EXE --name is fixed so permanent GitHub latest link works
 $InstallerFile = Get-Item -Path (Join-Path $OutDir "WOT-Produtime-Setup.exe") -ErrorAction SilentlyContinue
 if (-not $InstallerFile) {
     Write-Error "WOT-Produtime-Setup.exe not found in $OutDir"
@@ -140,6 +181,14 @@ Write-Host "      Installer: $($InstallerFile.Name)" -ForegroundColor Green
 Write-Host "      latest.yml: found" -ForegroundColor Green
 if (Test-Path $BlockMap) {
     Write-Host "      blockmap: found (enables diff updates)" -ForegroundColor Green
+} else {
+    # No blockmap means every update is a full ~100 MB download for every
+    # client. electron-builder normally generates one; if it's missing,
+    # something is off in the builder config or the build step partially
+    # failed. Warn loudly --this costs users bandwidth.
+    Write-Host "      [WARN] blockmap MISSING --every client will pay a FULL download on update." -ForegroundColor Red
+    Write-Host "             Expected at: $BlockMap" -ForegroundColor DarkGray
+    Write-Host "             Check electron-builder config and the build log for 'blockmap' warnings." -ForegroundColor DarkGray
 }
 
 # -- Step 3: SHA256 ---------------------------------------------------------------
@@ -148,14 +197,74 @@ $Hash = (Get-FileHash -Path $InstallerFile.FullName -Algorithm SHA256).Hash.ToLo
 Write-Host "      SHA256: $Hash" -ForegroundColor Green
 
 # -- Step 4: GitHub Release -------------------------------------------------------
-$ReleaseNotes = "ProduTime v$Version`n`nInstaller SHA256: $Hash`n`nDownload and run to install. Auto-updates enabled."
+# Build a commit-list body from the source repo since the previous release
+# tag on the *releases* repo. Note: tags live on the releases repo, commits
+# live on the source repo, so we query the releases repo for the previous
+# tag name and then grep the source repo's log for anything after the
+# matching commit in the source repo's history.
+$prev = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+$PrevTagJson = gh release view --repo $RepoRelease --json tagName 2>$null | ConvertFrom-Json
+$ErrorActionPreference = $prev
+$PrevTag = if ($PrevTagJson) { $PrevTagJson.tagName } else { $null }
+
+$CommitList = ""
+$ChangesHeader = ""
+if ($PrevTag) {
+    Push-Location $RootDir
+    # Preferred: source-repo tag exists ->clean $PrevTag..HEAD range.
+    # git rev-parse writes "fatal:" to stderr when the tag is missing, which
+    # under $ErrorActionPreference=Stop (set at the top of this script)
+    # halts execution. Wrap in Continue so the exit code drives the check.
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    git rev-parse --verify "refs/tags/$PrevTag" *> $null
+    $SrcTagExists = ($LASTEXITCODE -eq 0)
+    $ErrorActionPreference = $prev
+    if ($SrcTagExists) {
+        $CommitList = (git log --pretty=format:"- %s" "$PrevTag..HEAD" 2>$null) -join "`n"
+        $ChangesHeader = "## Changes since $PrevTag"
+    } else {
+        # Fallback: source-repo tag missing (shallow clone, tag only pushed
+        # to releases repo). Use the timestamp of the previous GitHub
+        # release as a cutoff instead of dumping `git log -n 30`, which
+        # leaks unrelated historical commits from before the last release.
+        $prev = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $PrevRelJson = gh release view $PrevTag --repo $RepoRelease --json publishedAt 2>$null | ConvertFrom-Json
+        $ErrorActionPreference = $prev
+        $PublishedAt = if ($PrevRelJson) { $PrevRelJson.publishedAt } else { $null }
+        if ($PublishedAt) {
+            $CommitList = (git log --pretty=format:"- %s" --since="$PublishedAt" 2>$null) -join "`n"
+            $ChangesHeader = "## Changes since $PrevTag ($PublishedAt)"
+        } else {
+            # Last-resort: only 10 commits, clearly marked as approximate
+            # so readers know not to trust the boundary.
+            $CommitList = (git log --pretty=format:"- %s" -n 10 2>$null) -join "`n"
+            $ChangesHeader = "## Recent commits (approximate -- previous tag/release date unknown)"
+        }
+    }
+    Pop-Location
+}
+
+$NotesBodyLines = @(
+    "ProduTime v$Version",
+    "",
+    "Installer SHA256: $Hash",
+    "",
+    "Download and run to install. Auto-updates enabled."
+)
+if ($CommitList) {
+    $NotesBodyLines += @("", $ChangesHeader, "", $CommitList)
+}
+$ReleaseNotes = $NotesBodyLines -join "`n"
 
 Write-Host "[4/5] Creating GitHub release $Tag on $RepoRelease..." -ForegroundColor Yellow
 
 if ($DryRun) {
     Write-Host "      DRY RUN -- skipping GitHub release creation" -ForegroundColor DarkGray
 } else {
-    # Build asset list — installer + latest.yml are required; blockmap is optional
+    # Build asset list --installer + latest.yml are required; blockmap is optional
     $Assets = @($InstallerFile.FullName, $LatestYml)
     if (Test-Path $BlockMap) { $Assets += $BlockMap }
 

@@ -324,7 +324,6 @@ export const SettingsTab: React.FC = () => {
       setIsAuthenticated(true);
       loadSettings();
 
-      loadLastCheckTime();
       loadLastAutoExportStatus();
       loadAutoStartState();
       loadPrivacySettings();
@@ -377,10 +376,6 @@ export const SettingsTab: React.FC = () => {
     } catch (error) {
       console.error('[AUTO-START] Error loading auto-start state:', error);
     }
-  };
-
-  const loadLastCheckTime = async () => {
-    // Assisted updater tracks check times internally
   };
 
   const handleCheckForUpdates = async () => {

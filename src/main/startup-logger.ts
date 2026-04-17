@@ -8,9 +8,10 @@
 import * as fs from "fs";
 import * as path from "path";
 
-// Determine log directory - must work before Electron app is ready
-const DATA_ROOT = process.env.APPDATA ||
-  (process.platform === 'darwin' ? process.env.HOME + '/Library/Application Support' : '/var/local');
+// Determine log directory - must work before Electron app is ready.
+// Windows-only app: APPDATA is always set; /var/local is a last-ditch
+// fallback for dev on WSL without APPDATA.
+const DATA_ROOT = process.env.APPDATA || '/var/local';
 const LOG_DIR = path.join(DATA_ROOT, 'produtime', 'logs');
 
 // Ensure log directory exists immediately

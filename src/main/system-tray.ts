@@ -43,12 +43,6 @@ export class SystemTrayManager {
       const trayIcon = this.loadTrayIcon();
       console.log('Loaded tray icon');
 
-      // Set template image for macOS
-      if (process.platform === 'darwin') {
-        trayIcon.setTemplateImage(true);
-        console.log('Set template image for macOS');
-      }
-
       console.log('Creating Tray instance...');
       this.tray = new Tray(trayIcon);
       console.log('Tray instance created');

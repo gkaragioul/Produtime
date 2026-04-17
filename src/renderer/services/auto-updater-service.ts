@@ -52,6 +52,41 @@ export class AutoUpdaterService {
     if (!response.success) throw new Error(response.error || 'Failed to install update');
   }
 
+  /**
+   * Fetch the current updater state from the main process and seed the
+   * local cache. Call on mount so a renderer refresh doesn't leave the
+   * progress bar blank when the main process already knows an update is
+   * DOWNLOADED / AVAILABLE.
+   */
+  public async syncCurrentState(): Promise<UpdateState | null> {
+    try {
+      const response = await window.electronAPI.getUpdateStatus();
+      if (response?.success && response.data) {
+        this.currentState = response.data;
+        this.statusChangeListeners.forEach((l) => {
+          try { l(response.data!); } catch (e) { console.error('Update listener error:', e); }
+        });
+        return response.data;
+      }
+    } catch (e) {
+      console.warn('syncCurrentState failed:', e);
+    }
+    return null;
+  }
+
+  /**
+   * Escape hatch for corrupt installs of the current version — opens the
+   * GitHub releases page so the user can download a fresh installer.
+   */
+  public async openReleasesPage(): Promise<void> {
+    const api: any = (window as any).electronAPI;
+    if (!api || typeof api.openReleasesPage !== 'function') {
+      throw new Error('openReleasesPage IPC is not available in this renderer');
+    }
+    const response = await api.openReleasesPage();
+    if (!response.success) throw new Error(response.error || 'Failed to open releases page');
+  }
+
   public getCurrentState(): UpdateState {
     return { ...this.currentState };
   }

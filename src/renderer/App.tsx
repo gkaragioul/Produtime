@@ -10,6 +10,7 @@ import { PolicyView } from "./components/PolicyView";
 import { AdminLockScreen } from "./components/AdminLockScreen";
 import { PairingModal } from "./components/PairingModal";
 import { UpdateProgressBar } from "./components/UpdateProgressBar";
+import { AutoUpdaterService } from "./services/auto-updater-service";
 import logoHeader from "../../assets/logo-header.png";
 import { UpdateState } from "../shared/types";
 
@@ -38,6 +39,7 @@ const App: React.FC = () => {
   // Auto-updater state
   const [updateState, setUpdateState] = useState<UpdateState | null>(null);
   const [updateDismissed, setUpdateDismissed] = useState(false);
+  const [updateError, setUpdateError] = useState<string>("");
 
   // Admin Console (Agent) state
   const [isManaged, setIsManaged] = useState<boolean>(false);
@@ -65,12 +67,21 @@ const App: React.FC = () => {
     getVersion();
   }, []);
 
-  // Auto-updater listener
+  // Auto-updater listener + initial state seed.
+  // The seed call handles renderer reloads (F5, devtools refresh) — without
+  // it, the main process keeps the DOWNLOADED state but the progress bar
+  // stays blank until the next status event fires.
   useEffect(() => {
     const unsubscribe = window.electronAPI.onUpdateStatusChanged?.((state: UpdateState) => {
       setUpdateState(state);
       setUpdateDismissed(false);
     });
+    AutoUpdaterService.getInstance()
+      .syncCurrentState()
+      .then((seeded) => {
+        if (seeded) setUpdateState(seeded);
+      })
+      .catch(() => { /* swallowed — service logs already */ });
     return () => unsubscribe?.();
   }, []);
 
@@ -461,14 +472,46 @@ const App: React.FC = () => {
         </>
       )}
 
-      {/* Update progress bar — fixed bottom-left, always on top */}
+      {/* Update progress bar — fixed bottom-left, always on top.
+          Callbacks route through AutoUpdaterService so failures surface
+          instead of silently swallowing the rejection. */}
       {!updateDismissed && (
         <UpdateProgressBar
           updateState={updateState}
-          onDownload={() => window.electronAPI.downloadUpdate()}
-          onInstall={() => window.electronAPI.installUpdate()}
+          errorMessage={updateError}
+          onDownload={async () => {
+            try {
+              setUpdateError("");
+              await AutoUpdaterService.getInstance().downloadUpdate();
+            } catch (e) {
+              setUpdateError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+          onInstall={async () => {
+            try {
+              setUpdateError("");
+              await AutoUpdaterService.getInstance().installUpdate();
+            } catch (e) {
+              setUpdateError(e instanceof Error ? e.message : String(e));
+            }
+          }}
           onDismiss={() => setUpdateDismissed(true)}
-          onRetry={() => window.electronAPI.checkForUpdates()}
+          onRetry={async () => {
+            try {
+              setUpdateError("");
+              await AutoUpdaterService.getInstance().checkForUpdates();
+            } catch (e) {
+              setUpdateError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+          onOpenReleasesPage={async () => {
+            try {
+              setUpdateError("");
+              await AutoUpdaterService.getInstance().openReleasesPage();
+            } catch (e) {
+              setUpdateError(e instanceof Error ? e.message : String(e));
+            }
+          }}
         />
       )}
     </div>
