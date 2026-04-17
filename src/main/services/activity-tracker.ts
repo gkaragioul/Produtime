@@ -234,7 +234,12 @@ export class ActivityTracker {
   }
 
   public setPollInterval(ms: number) {
-    this.options.pollInterval = ms;
+    const MIN_POLL_MS = 100;
+    const MAX_POLL_MS = 60_000;
+    const n = Number(ms);
+    const bounded =
+      Number.isFinite(n) ? Math.max(MIN_POLL_MS, Math.min(MAX_POLL_MS, Math.floor(n))) : this.options.pollInterval;
+    this.options.pollInterval = bounded;
     if (this.trackingInterval) {
       clearInterval(this.trackingInterval);
       this.trackingInterval = setInterval(() => {
