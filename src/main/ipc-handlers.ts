@@ -1463,7 +1463,16 @@ export class IPCHandlers {
   ): Promise<IPCResponse<AdminLockoutState>> {
     try {
       const lockoutState = this.database.getLockoutState();
-      return { success: true, data: lockoutState };
+      // Redact brute-force progress from the renderer. The renderer only needs
+      // is_locked / locked_until to drive the lockout UI; leaking the running
+      // failed-attempts count lets a compromised renderer enumerate remaining
+      // tries before the 5/15-min lockout triggers.
+      const safeState: AdminLockoutState = {
+        ...lockoutState,
+        failed_attempts_count: 0,
+        last_attempt_at: null,
+      };
+      return { success: true, data: safeState };
     } catch (error) {
       console.error('Error getting admin lockout state:', error);
       return {
@@ -2280,6 +2289,9 @@ export class IPCHandlers {
     enabled: boolean
   ): Promise<IPCResponse<void>> {
     try {
+      if (typeof enabled !== 'boolean') {
+        return { success: false, error: 'privacy:setMode requires a boolean argument' };
+      }
       this.database.setSetting('privacy_mode_enabled', enabled ? 'true' : 'false');
       return { success: true };
     } catch (error) {
