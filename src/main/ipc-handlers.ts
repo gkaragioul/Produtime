@@ -848,13 +848,33 @@ export class IPCHandlers {
         switch (request.key) {
           case 'idle_threshold': {
             const v = parseInt(String(request.value));
-            if (!isNaN(v)) tracker.updateIdleThreshold(v);
+            // Bound idle threshold to a sane range: 10s .. 1h
+            if (!isNaN(v) && v >= 10 && v <= 3600) {
+              tracker.updateIdleThreshold(v);
+            } else if (!isNaN(v)) {
+              this.logger.warn(
+                'IPC',
+                `Rejected out-of-range idle_threshold=${v} (allowed: 10..3600)`
+              );
+            }
             break;
           }
           case 'poll_interval_ms': {
             const v = parseInt(String(request.value));
-            if (!isNaN(v) && typeof tracker.setPollInterval === 'function') {
+            // Bound poll interval: 250ms .. 60s. A value of 0 would busy-loop
+            // the main thread; a huge value would break tracking accuracy.
+            if (
+              !isNaN(v) &&
+              v >= 250 &&
+              v <= 60000 &&
+              typeof tracker.setPollInterval === 'function'
+            ) {
               tracker.setPollInterval(v);
+            } else if (!isNaN(v)) {
+              this.logger.warn(
+                'IPC',
+                `Rejected out-of-range poll_interval_ms=${v} (allowed: 250..60000)`
+              );
             }
             break;
           }
