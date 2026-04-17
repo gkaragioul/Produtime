@@ -145,9 +145,19 @@ export const UpdateProgressBar: React.FC<Props> = ({
           <div style={styles.icon}>✔</div>
           <div style={styles.text}>
             <span style={styles.title}>
-              Installing {info?.version}… Restarting shortly
+              ProduTime {info?.version} ready to install
             </span>
           </div>
+          <button
+            style={styles.downloadBtn}
+            onClick={onInstall}
+            title="Quit ProduTime and run the installer now"
+          >
+            Install now
+          </button>
+          <button style={styles.dismissBtn} onClick={onDismiss} title="Install later">
+            ✕
+          </button>
         </>
       )}
 
