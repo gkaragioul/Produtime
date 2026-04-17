@@ -203,8 +203,15 @@ export class ActivityTracker {
     this.notifyActivityChange();
 
     // BUG FIX #3: Remove setTimeout to eliminate race condition
-    // Call checkCurrentActivity synchronously to immediately detect the current window
-    await this.checkCurrentActivity();
+    // Call checkCurrentActivity synchronously to immediately detect the current window.
+    // Guard against rejections from active-win / PowerShell fallback so resume always
+    // leaves the tracker in a sane, unpaused state.
+    try {
+      await this.checkCurrentActivity();
+    } catch (err) {
+      this.currentActivity = null;
+      this.notifyActivityChange();
+    }
   }
 
   public getCurrentActivity(): CurrentActivity | null {
@@ -234,7 +241,13 @@ export class ActivityTracker {
   }
 
   public setPollInterval(ms: number) {
-    this.options.pollInterval = ms;
+    // Defensive clamp: a 0/negative/NaN value would turn setInterval into a
+    // tight loop that starves the Electron main thread; an absurdly large
+    // value would silently break activity tracking. Keep this in sync with
+    // the IPC-layer validation in ipc-handlers.ts.
+    const safeMs =
+      Number.isFinite(ms) && ms >= 250 && ms <= 60000 ? Math.floor(ms) : 1000;
+    this.options.pollInterval = safeMs;
     if (this.trackingInterval) {
       clearInterval(this.trackingInterval);
       this.trackingInterval = setInterval(() => {
