@@ -48,6 +48,12 @@ export const UpdateProgressBar: React.FC<Props> = ({
     if (status !== UpdateStatus.AVAILABLE) {
       setIsStartingDownload(false);
     }
+    // Also reset when an IPC-level error banner appears while still in
+    // AVAILABLE state. Without this, a failed download IPC leaves the
+    // button stuck on "Starting..." with no way to retry.
+    if (errorMessage && status === UpdateStatus.AVAILABLE) {
+      setIsStartingDownload(false);
+    }
   }, [updateState, errorMessage]);
 
   if (!visible || !updateState) return null;
