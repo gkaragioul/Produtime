@@ -94,6 +94,39 @@ export class IPCHandlers {
     return false;
   }
 
+  // Settings keys the renderer MUST NOT be able to read via the generic IPC.
+  // The write deny-list covers mutation, but the read paths are separate —
+  // without this, a renderer XSS (or any compromised renderer code) can read
+  // the scrypt admin password hash (enabling offline brute force), the SMTP
+  // password, the encrypted-agent-private-key blob, and license/lockout
+  // state. None of these have a legitimate renderer use case; auth-bearing
+  // handlers read them directly from the DB in the main process.
+  private readonly RENDERER_DENIED_READ_KEYS: ReadonlyArray<string> = [
+    'admin_password_hash',
+    'admin_lockout_',
+    'license_',
+    'entitlement_',
+    'agent_',
+    'device_privkey_encrypted',
+    'device_private_key',
+    'email_smtp_pass',
+    'email_smtp_password',
+    'failed_attempts_',
+  ];
+
+  private isRendererDeniedReadKey(key: string): boolean {
+    if (!key) return false;
+    const k = String(key);
+    for (const denied of this.RENDERER_DENIED_READ_KEYS) {
+      if (denied.endsWith('_')) {
+        if (k.startsWith(denied)) return true;
+      } else if (k === denied) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // License public key for verification (in production, this would be embedded)
   private readonly LICENSE_PUBLIC_KEY =
     process.env.ED25519_PUBLIC_KEY ||
@@ -757,6 +790,17 @@ export class IPCHandlers {
     request: GetSettingRequest
   ): Promise<IPCResponse<string | null>> {
     try {
+      // Reject reads of security-sensitive settings from the renderer.
+      // Returning null (not an error) so callers that probe for optional
+      // values don't break, but the sensitive material never leaves main.
+      if (this.isRendererDeniedReadKey(request.key)) {
+        this.logger.warn(
+          'IPC',
+          `Blocked renderer read of protected setting: ${request.key}`
+        );
+        return { success: true, data: null };
+      }
+
       const value = this.database.getSetting(request.key);
       return { success: true, data: value };
     } catch (error) {
@@ -837,7 +881,13 @@ export class IPCHandlers {
   ): Promise<IPCResponse<Setting[]>> {
     try {
       const settings = this.database.getAllSettings();
-      return { success: true, data: settings };
+      // Filter out security-sensitive rows before returning to renderer.
+      // Protects the admin password hash, SMTP creds, license state, and
+      // agent private-key blob from leaking via a bulk dump.
+      const filtered = (settings || []).filter(
+        (s) => !this.isRendererDeniedReadKey(s.key)
+      );
+      return { success: true, data: filtered };
     } catch (error) {
       console.error('Error getting all settings:', error);
       return { success: false, error: `Failed to get all settings: ${error}` };
@@ -1268,6 +1318,21 @@ export class IPCHandlers {
         const parts = adminPasswordHash.split(':');
         if (parts.length !== 2) {
           this.logger.warn('ADMIN', 'Invalid password hash format in database');
+          // Still run scrypt against a dummy salt/hash so a malformed stored
+          // hash doesn't leak via response-time (the "no hash vs wrong
+          // password" timing distinction).
+          const dummySalt = crypto.randomBytes(16);
+          const dummyHash = crypto.randomBytes(32);
+          const incomingDerivedKey = crypto.scryptSync(
+            request.password || '',
+            dummySalt,
+            32
+          );
+          try {
+            crypto.timingSafeEqual(incomingDerivedKey, dummyHash);
+          } catch {
+            // length mismatch — ignore
+          }
           isValidPassword = false;
         } else {
           const salt = Buffer.from(parts[0], 'hex');
@@ -1275,7 +1340,9 @@ export class IPCHandlers {
           const incomingDerivedKey = crypto.scryptSync(request.password || '', salt, 32);
 
           // Use constant-time comparison to prevent timing attacks
-          isValidPassword = crypto.timingSafeEqual(incomingDerivedKey, storedHash);
+          isValidPassword =
+            incomingDerivedKey.length === storedHash.length &&
+            crypto.timingSafeEqual(incomingDerivedKey, storedHash);
         }
       } catch (err) {
         // Hashing or comparison failed

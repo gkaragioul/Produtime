@@ -187,7 +187,48 @@ export class PDFGenerator {
 
   public async openReport(filePath: string): Promise<void> {
     try {
-      await shell.openPath(filePath);
+      // Restrict shell.openPath to .pdf files inside known-safe directories.
+      // Without this, a compromised renderer could pass an arbitrary path
+      // (e.g. an .exe next to the app, an .hta in %TEMP%, or a startup
+      // shortcut) and main would shell-launch it as the user.
+      if (typeof filePath !== 'string' || filePath.length === 0) {
+        throw new Error('Invalid file path');
+      }
+      const resolved = path.resolve(filePath);
+      if (path.extname(resolved).toLowerCase() !== '.pdf') {
+        throw new Error('Only .pdf reports can be opened');
+      }
+
+      const home = path.resolve(require('os').homedir());
+      const allowedParents = [
+        path.resolve(this.reportsDir),
+        path.join(home, 'Downloads'),
+        path.join(home, 'Documents'),
+      ];
+      // Also allow the configured export folder when set.
+      try {
+        const exportDir = this.database.getSetting('export_folder');
+        if (exportDir && exportDir.trim().length > 0) {
+          allowedParents.push(path.resolve(exportDir));
+        }
+      } catch {
+        // Ignore — fall back to defaults.
+      }
+
+      const inSafeDir = allowedParents.some(
+        (allowed) =>
+          resolved === allowed || resolved.startsWith(allowed + path.sep)
+      );
+      if (!inSafeDir) {
+        throw new Error(
+          'Refusing to open path outside Reports/Downloads/Documents/Export'
+        );
+      }
+      if (!fs.existsSync(resolved)) {
+        throw new Error(`Report file not found: ${resolved}`);
+      }
+
+      await shell.openPath(resolved);
     } catch (error) {
       console.error('Error opening report:', error);
       throw new Error(`Failed to open report: ${error}`);

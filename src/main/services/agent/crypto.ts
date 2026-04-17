@@ -37,9 +37,16 @@ class NonceStore {
       return false; // Replay detected
     }
 
-    // Check if timestamp is within acceptable window
-    if (Math.abs(now - timestamp) > this.expiryMs) {
-      return false; // Message too old or from future
+    // Check if timestamp is within acceptable window.
+    // We allow a small future skew (clock drift between peers) but reject
+    // anything older than expiryMs. Using Math.abs here would have accepted
+    // messages up to expiryMs in the future, doubling the replay window.
+    const FUTURE_SKEW_MS = 30_000;
+    if (timestamp > now + FUTURE_SKEW_MS) {
+      return false; // Timestamp too far in the future
+    }
+    if (timestamp < now - this.expiryMs) {
+      return false; // Message too old
     }
 
     // Store nonce
