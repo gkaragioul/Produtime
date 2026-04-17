@@ -296,6 +296,7 @@ export class AutoUpdaterManager {
 
   private registerIPC(): void {
     ipcMain.handle('updater:checkForUpdates', async () => {
+      this.safeLog('info', 'IPC updater:checkForUpdates invoked');
       this.pendingManualChecks = Math.min(
         this.pendingManualChecks + 1,
         AutoUpdaterManager.MAX_PENDING_MANUAL
@@ -305,7 +306,9 @@ export class AutoUpdaterManager {
         return { success: true };
       } catch (e: any) {
         this.consumeManualToken();
-        return { success: false, error: e.message };
+        const msg = e?.message || String(e);
+        this.safeLog('error', `IPC updater:checkForUpdates rejected: ${msg}`);
+        return { success: false, error: msg };
       }
     });
 
@@ -313,15 +316,35 @@ export class AutoUpdaterManager {
     // operator flips autoDownload off, or the initial auto-download
     // errored and the user clicks the explicit retry button.
     ipcMain.handle('updater:downloadUpdate', async () => {
+      this.safeLog('info', 'IPC updater:downloadUpdate invoked');
       try {
+        // Defensive: if we don't have cached update info (e.g. because a
+        // stale startup "not available" cached before the menu-triggered
+        // check that actually found a newer version), run a fresh check
+        // first so downloadUpdate has a valid updateInfo to work with.
+        // Harmless if info is already current.
+        if (this.currentState.status !== UpdateStatus.AVAILABLE &&
+            this.currentState.status !== UpdateStatus.ERROR) {
+          this.safeLog('info', `downloadUpdate: current state=${this.currentState.status}, running fresh check first`);
+          try {
+            await autoUpdater.checkForUpdates();
+          } catch (checkErr: any) {
+            this.safeLog('warn', `downloadUpdate: pre-check failed: ${checkErr?.message || checkErr}`);
+          }
+        }
         await autoUpdater.downloadUpdate();
+        this.safeLog('info', 'IPC updater:downloadUpdate completed');
         return { success: true };
       } catch (e: any) {
-        return { success: false, error: e.message };
+        const msg = e?.message || String(e);
+        const stack = e?.stack ? ` | stack: ${e.stack.split('\n').slice(0, 3).join(' | ')}` : '';
+        this.safeLog('error', `IPC updater:downloadUpdate rejected: ${msg}${stack}`);
+        return { success: false, error: msg };
       }
     });
 
     ipcMain.handle('updater:installUpdate', async () => {
+      this.safeLog('info', `IPC updater:installUpdate invoked (updateDownloaded=${this.updateDownloaded})`);
       if (!this.updateDownloaded) return { success: false, error: 'no_download' };
       this.triggerQuitAndInstall();
       return { success: true };
