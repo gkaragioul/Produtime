@@ -292,8 +292,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAdminLockoutState: (): Promise<IPCResponse<AdminLockoutState>> =>
     ipcRenderer.invoke(IPCChannels.ADMIN_GET_LOCKOUT_STATE),
 
-  resetAdminLockout: (): Promise<IPCResponse<void>> =>
-    ipcRenderer.invoke(IPCChannels.ADMIN_RESET_LOCKOUT),
+  resetAdminLockout: (
+    request?: { password?: string }
+  ): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPCChannels.ADMIN_RESET_LOCKOUT, request),
 
   // Email Configuration API
   getEmailConfig: (): Promise<IPCResponse<any>> =>

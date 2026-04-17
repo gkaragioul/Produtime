@@ -251,7 +251,7 @@ export const AdminLoginDialog: React.FC<AdminLoginDialogProps> = ({
                       setIsLocked(false);
                       setError('');
                       setLockoutRemaining(0);
-                      await adminAuthService?.resetLockout();
+                      await adminAuthService?.resetLockout(password);
                       // Best-effort confirm
                       try {
                         const locked = await adminAuthService?.isLockedOut();

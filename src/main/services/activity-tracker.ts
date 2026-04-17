@@ -41,6 +41,11 @@ export class ActivityTracker {
   private isPaused = false;
   private currentActivity: CurrentActivity | null = null;
   private trackingInterval: NodeJS.Timeout | null = null;
+  // Re-entrancy guard for checkCurrentActivity. The poll interval can be as
+  // low as 500ms while a single sampling pass (getActiveWindow → 3 samples
+  // over 250ms + DB writes) can exceed that under load, so timer ticks can
+  // overlap and corrupt currentActivity / pendingDetection state.
+  private isCheckingActivity = false;
   private idleCheckInterval: NodeJS.Timeout | null = null;
   private lastActivityTime: Date = new Date();
   private readonly appStartTime: Date = new Date(); // When this tracker instance was created
@@ -504,6 +509,11 @@ export class ActivityTracker {
   }
 
   private async checkCurrentActivity(): Promise<void> {
+    // Re-entrancy guard: skip if a prior tick is still sampling/writing.
+    // Drops a tick rather than letting two concurrent passes mutate
+    // currentActivity, pendingDetection and commit overlapping log rows.
+    if (this.isCheckingActivity) return;
+    this.isCheckingActivity = true;
     try {
       // If we're currently idle, don't check for activity changes to prevent flashing
       // The idle detection system will handle ending idle when appropriate
@@ -592,6 +602,8 @@ export class ActivityTracker {
       }
     } catch (err) {
       console.error('Activity check failed:', err);
+    } finally {
+      this.isCheckingActivity = false;
     }
   }
 

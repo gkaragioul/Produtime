@@ -423,10 +423,16 @@ export class AutoExportScheduler {
   }
 
   private async tick() {
+    // Claim the export slot synchronously, before any awaits. Prior code set
+    // this.isExporting only deep inside tick() (after several awaits), so two
+    // overlapping ticks could both pass the guard and both kick off a PDF
+    // generation, producing duplicate reports and double 'last_auto_export_date'
+    // writes.
     if (this.isExporting) {
       this.opts.logger('[AutoExport] Export already in progress, skipping tick');
       return;
     }
+    this.isExporting = true;
     try {
       const enabled = this.db.getSetting('auto_export_enabled');
       if (enabled !== 'true') {
@@ -563,13 +569,7 @@ export class AutoExportScheduler {
       this.opts.logger(
         '[AutoExport] Generating comprehensive report with enhanced analytics...'
       );
-      this.isExporting = true;
-      let result;
-      try {
-        result = await this.pdf.generateReport(options as any);
-      } finally {
-        this.isExporting = false;
-      }
+      const result = await this.pdf.generateReport(options as any);
 
       this.db.setSetting('last_auto_export_date', today);
       try {
@@ -598,6 +598,10 @@ export class AutoExportScheduler {
         );
       } catch {}
       this.opts.logger('[AutoExport] Error:', err);
+    } finally {
+      // Always release the slot — whether we actually generated a PDF or
+      // bailed out on a guard (disabled / folder invalid / schedule not met).
+      this.isExporting = false;
     }
   }
 }

@@ -34,7 +34,7 @@ export interface ElectronAPI {
     onTrayActionTriggered: (callback: (actionId: string) => void) => () => void;
     adminLogin: (request: AdminLoginRequest) => Promise<IPCResponse<AdminLoginResponse>>;
     getAdminLockoutState: () => Promise<IPCResponse<AdminLockoutState>>;
-    resetAdminLockout: () => Promise<IPCResponse<void>>;
+    resetAdminLockout: (request?: { password?: string }) => Promise<IPCResponse<void>>;
     getEmailConfig: () => Promise<IPCResponse<any>>;
     saveEmailConfig: (config: any) => Promise<IPCResponse<any>>;
     testEmail: () => Promise<IPCResponse<any>>;
