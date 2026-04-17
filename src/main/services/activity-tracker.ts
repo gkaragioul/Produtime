@@ -244,10 +244,15 @@ export class ActivityTracker {
     // Defensive clamp: a 0/negative/NaN value would turn setInterval into a
     // tight loop that starves the Electron main thread; an absurdly large
     // value would silently break activity tracking. Keep this in sync with
-    // the IPC-layer validation in ipc-handlers.ts.
-    const safeMs =
-      Number.isFinite(ms) && ms >= 250 && ms <= 60000 ? Math.floor(ms) : 1000;
-    this.options.pollInterval = safeMs;
+    // the IPC-layer validation in ipc-handlers.ts. On non-finite input we
+    // preserve the previous interval instead of resetting to a default.
+    const MIN_POLL_MS = 100;
+    const MAX_POLL_MS = 60_000;
+    const n = Number(ms);
+    const bounded = Number.isFinite(n)
+      ? Math.max(MIN_POLL_MS, Math.min(MAX_POLL_MS, Math.floor(n)))
+      : this.options.pollInterval;
+    this.options.pollInterval = bounded;
     if (this.trackingInterval) {
       clearInterval(this.trackingInterval);
       this.trackingInterval = setInterval(() => {
