@@ -26,8 +26,7 @@ var IPCChannels;
     IPCChannels["DOWNLOAD_UPDATE"] = "updater:downloadUpdate";
     IPCChannels["INSTALL_UPDATE"] = "updater:installUpdate";
     IPCChannels["GET_UPDATE_STATUS"] = "updater:getStatus";
-    IPCChannels["GET_LAST_UPDATE_CHECK_TIME"] = "updater:getLastCheckTime";
-    IPCChannels["OPEN_UPDATE_LOGS"] = "updater:openLogs";
+    IPCChannels["OPEN_UPDATE_RELEASES_PAGE"] = "updater:openReleasesPage";
     // Auto-updater events (main -> renderer)
     IPCChannels["UPDATE_STATUS_CHANGED"] = "updater:statusChanged";
     // Activity control

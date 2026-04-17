@@ -786,14 +786,12 @@ export class ActivityTracker {
       return { appName: 'System', windowTitle: 'Paused' };
     }
     if (!activeWin) {
-      // Fallback to platform-specific methods when active-win native module is unavailable
+      // Fallback to platform-specific methods when active-win native module is unavailable.
+      // Windows-only app: no macOS fallback. Linux path kept for dev on WSL.
       if (process.platform === 'win32') {
         return this.getActiveWindowWindows();
-      } else if (process.platform === 'darwin') {
-        return this.getActiveWindowMacOS();
-      } else {
-        return this.getActiveWindowLinux();
       }
+      return this.getActiveWindowLinux();
     }
     try {
       // Take 3 samples to balance accuracy vs speed (reduced from 5)
@@ -884,32 +882,6 @@ export class ActivityTracker {
         Add-Type @"\n  using System;\n  using System.Runtime.InteropServices;\n  using System.Text;\n  public class Win32 {\n    [DllImport("user32.dll")]\n    public static extern IntPtr GetForegroundWindow();\n    [DllImport("user32.dll")]\n    public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);\n    [DllImport("user32.dll", SetLastError=true)]\n    public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);\n  }\n"@\n        $hwnd = [Win32]::GetForegroundWindow()\n        $title = New-Object System.Text.StringBuilder 256\n        [Win32]::GetWindowText($hwnd, $title, $title.Capacity) | Out-Null\n        $processId = 0\n        [Win32]::GetWindowThreadProcessId($hwnd, [ref]$processId) | Out-Null\n        $process = Get-Process -Id $processId -ErrorAction SilentlyContinue\n        if ($process) {\n          Write-Output "$($process.ProcessName)|$($title.ToString())"\n        }\n      `;
 
       exec(`powershell -Command "${command}"`, (error, stdout) => {
-        if (error) {
-          resolve(null);
-          return;
-        }
-        const output = stdout.trim();
-        if (output && output.includes('|')) {
-          const [appName, windowTitle] = output.split('|', 2);
-          resolve({
-            appName: appName || 'Unknown',
-            windowTitle: windowTitle || 'Unknown Window',
-          });
-        } else {
-          resolve(null);
-        }
-      });
-    });
-  }
-
-  private async getActiveWindowMacOS(): Promise<{
-    appName: string;
-    windowTitle: string;
-  } | null> {
-    return new Promise((resolve) => {
-      const script = `
-        tell application "System Events"\n          set frontApp to name of first application process whose frontmost is true\n          set frontWindow to name of front window of first application process whose frontmost is true\n        end tell\n        return frontApp & "|" & frontWindow\n      `;
-      exec(`osascript -e '${script}'`, (error, stdout) => {
         if (error) {
           resolve(null);
           return;

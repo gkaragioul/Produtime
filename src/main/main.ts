@@ -490,13 +490,6 @@ class TimePortApp {
 
         // Test IPC functionality
         this.testIPCFunctionality();
-
-        // On macOS, re-create window when dock icon is clicked
-        app.on("activate", () => {
-          if (BrowserWindow.getAllWindows().length === 0) {
-            this.createMainWindow();
-          }
-        });
       } catch (error) {
         const err = error as any;
         startupLogger.crash("Failed to initialize app", err);
@@ -506,13 +499,11 @@ class TimePortApp {
       }
     });
 
-    // Quit when all windows are closed (except on macOS)
+    // Windows-only app: always quit on window-all-closed (no dock semantics).
     app.on("window-all-closed", () => {
-      if (process.platform !== "darwin") {
-        startupLogger.info("All windows closed, quitting...");
-        this.cleanup();
-        app.quit();
-      }
+      startupLogger.info("All windows closed, quitting...");
+      this.cleanup();
+      app.quit();
     });
 
     // Handle app before quit
@@ -738,7 +729,18 @@ class TimePortApp {
       return;
     }
     const { AutoUpdaterManager } = await import("./auto-updater");
-    this.autoUpdater = new AutoUpdaterManager(this.mainWindow);
+    // Pre-install cleanup: run the bits that must survive the 8 s hard-exit
+    // fallback (SQLite WAL checkpoint, activity tracker flush) BEFORE the
+    // installer trigger. Bounded by AutoUpdaterManager so it can't hang.
+    const preInstallCleanup = async (): Promise<void> => {
+      try { this.activityTracker?.stopTracking(); } catch (e) {
+        console.warn("[UPDATE] pre-install activityTracker.stop failed:", (e as Error).message);
+      }
+      try { this.database?.close(); } catch (e) {
+        console.warn("[UPDATE] pre-install database.close failed:", (e as Error).message);
+      }
+    };
+    this.autoUpdater = new AutoUpdaterManager(this.mainWindow, preInstallCleanup);
     startupLogger.info("AutoUpdater initialized — checks GitHub releases on schedule");
   }
 
@@ -1174,7 +1176,6 @@ class TimePortApp {
 
       this.ipcHandlers = new IPCHandlers(
         this.database,
-        undefined, // auto-updater removed — assisted updater handles updates directly
         this.pdfGenerator || undefined,
         this.systemTray || undefined,
         this.autoExportScheduler || undefined,
@@ -1341,15 +1342,25 @@ class TimePortApp {
       }
     }
 
-    // 4. Stop assisted updater (clears background check timer)
+    // 4. Stop assisted updater (clears background check timer).
+    // SKIP if the updater is mid-hand-off to the installer: removing its
+    // event listeners + IPC handlers while electron-updater is trying to
+    // spawn the installer can race the hand-off on slow machines and
+    // leave the app quit with no installer launched. The updater cleans
+    // its own timers before quitAndInstall; the process exit releases
+    // everything else.
     if (this.autoUpdater) {
-      try {
-        console.log("  → Stopping updater...");
-        this.autoUpdater.cleanup();
-        this.autoUpdater = null;
-        console.log("  ✅ Updater stopped");
-      } catch (error) {
-        console.error("  ❌ Error stopping updater:", error);
+      if (this.autoUpdater.isInstalling()) {
+        console.log("  ⏭  Updater is installing — skipping cleanup to avoid racing installer spawn");
+      } else {
+        try {
+          console.log("  → Stopping updater...");
+          this.autoUpdater.cleanup();
+          this.autoUpdater = null;
+          console.log("  ✅ Updater stopped");
+        } catch (error) {
+          console.error("  ❌ Error stopping updater:", error);
+        }
       }
     }
 

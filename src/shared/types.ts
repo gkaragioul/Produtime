@@ -200,8 +200,7 @@ export enum IPCChannels {
   DOWNLOAD_UPDATE = 'updater:downloadUpdate',
   INSTALL_UPDATE = 'updater:installUpdate',
   GET_UPDATE_STATUS = 'updater:getStatus',
-  GET_LAST_UPDATE_CHECK_TIME = 'updater:getLastCheckTime',
-  OPEN_UPDATE_LOGS = 'updater:openLogs',
+  OPEN_UPDATE_RELEASES_PAGE = 'updater:openReleasesPage',
 
   // Auto-updater events (main -> renderer)
   UPDATE_STATUS_CHANGED = 'updater:statusChanged',

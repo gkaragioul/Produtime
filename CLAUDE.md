@@ -2,6 +2,7 @@
 
 ## Project Overview
 ProduTime is a free, local-only desktop time tracking app built with Electron + React + TypeScript.
+- **Platform:** Windows only (macOS is not supported; no `darwin` branches)
 - **Author:** George Karagioules
 - **Repo:** https://github.com/georgekgr12/produtime
 - **Admin Console:** Separate Electron app in `admin-console/` for managing devices on LAN
@@ -79,7 +80,7 @@ unset ELECTRON_RUN_AS_NODE && "node_modules/electron/dist/electron.exe" .
 
 ## Activity Tracking
 - Primary: `active-win` native module (requires VS Build Tools to compile)
-- Fallback: PowerShell Win32 API (`GetForegroundWindow`) on Windows, `osascript` on macOS, `xdotool` on Linux
+- Fallback: PowerShell Win32 API (`GetForegroundWindow`) on Windows. (Linux `xdotool` path retained for WSL dev only — macOS is not supported.)
 - Falls back automatically when `active-win` is unavailable
 
 ## App Categorization

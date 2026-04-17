@@ -59,8 +59,7 @@ const IPCChannels = {
   DOWNLOAD_UPDATE: 'updater:downloadUpdate',
   INSTALL_UPDATE: 'updater:installUpdate',
   GET_UPDATE_STATUS: 'updater:getStatus',
-  GET_LAST_UPDATE_CHECK_TIME: 'updater:getLastCheckTime',
-  OPEN_UPDATE_LOGS: 'updater:openLogs',
+  OPEN_UPDATE_RELEASES_PAGE: 'updater:openReleasesPage',
 
   // Auto-updater events (main -> renderer)
   UPDATE_STATUS_CHANGED: 'updater:statusChanged',
@@ -201,6 +200,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke(IPCChannels.INSTALL_UPDATE),
   getUpdateStatus: (): Promise<IPCResponse<UpdateState>> =>
     ipcRenderer.invoke(IPCChannels.GET_UPDATE_STATUS),
+  // Escape hatch when the current install is corrupt but up-to-date —
+  // opens the GitHub releases page in the default browser so the user
+  // can download a fresh installer manually.
+  openReleasesPage: (): Promise<IPCResponse<void>> =>
+    ipcRenderer.invoke(IPCChannels.OPEN_UPDATE_RELEASES_PAGE),
 
   // Auto-updater events (main -> renderer)
   onUpdateStatusChanged: (callback: (status: UpdateState) => void) => {

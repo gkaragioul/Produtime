@@ -7,6 +7,16 @@ interface Props {
   onInstall: () => void;
   onDismiss: () => void;
   onRetry?: () => void;
+  // Escape hatch: open the GitHub releases page in the browser so the
+  // user can manually download a fresh installer. Shown in ERROR state
+  // when in-app auto-update is stuck (corrupt current install,
+  // repo ACL change, persistent network failure).
+  onOpenReleasesPage?: () => void;
+  // Renderer-side error, e.g. IPC invoke failed. Kept separate from
+  // updateState.error (which is the main-process updater error) because
+  // the user-triggered click failure should be visible even when the
+  // state hasn't transitioned to ERROR.
+  errorMessage?: string;
 }
 
 export const UpdateProgressBar: React.FC<Props> = ({
@@ -15,13 +25,15 @@ export const UpdateProgressBar: React.FC<Props> = ({
   onInstall,
   onDismiss,
   onRetry,
+  onOpenReleasesPage,
+  errorMessage,
 }) => {
   const [visible, setVisible] = useState(false);
   const [isStartingDownload, setIsStartingDownload] = useState(false);
 
   useEffect(() => {
     if (!updateState) {
-      setVisible(false);
+      setVisible(!!errorMessage);
       return;
     }
     const { status } = updateState;
@@ -29,13 +41,14 @@ export const UpdateProgressBar: React.FC<Props> = ({
       status === UpdateStatus.AVAILABLE ||
         status === UpdateStatus.DOWNLOADING ||
         status === UpdateStatus.DOWNLOADED ||
-        status === UpdateStatus.ERROR
+        status === UpdateStatus.ERROR ||
+        !!errorMessage
     );
     // Reset "Starting..." on any status change — prevents stuck button if download fails early
     if (status !== UpdateStatus.AVAILABLE) {
       setIsStartingDownload(false);
     }
-  }, [updateState]);
+  }, [updateState, errorMessage]);
 
   if (!visible || !updateState) return null;
 
@@ -51,6 +64,11 @@ export const UpdateProgressBar: React.FC<Props> = ({
 
   return (
     <div style={styles.container}>
+      {errorMessage && status !== UpdateStatus.ERROR && (
+        <div style={styles.ipcError} title={errorMessage}>
+          Action failed: {errorMessage.slice(0, 100)}
+        </div>
+      )}
       {status === UpdateStatus.AVAILABLE && (
         <>
           <div style={styles.icon}>⬆</div>
@@ -132,6 +150,15 @@ export const UpdateProgressBar: React.FC<Props> = ({
               Retry
             </button>
           )}
+          {onOpenReleasesPage && (
+            <button
+              style={{ ...styles.actionBtn, marginRight: 8 }}
+              onClick={onOpenReleasesPage}
+              title="Download the installer manually from GitHub"
+            >
+              Get it manually
+            </button>
+          )}
           <button style={styles.dismissBtn} onClick={onDismiss} title="Dismiss">
             ✕
           </button>
@@ -202,6 +229,21 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+  },
+  ipcError: {
+    position: "absolute",
+    top: -22,
+    left: 0,
+    right: 0,
+    fontSize: 11,
+    color: "#fc8181",
+    background: "#1a202c",
+    borderRadius: 4,
+    padding: "3px 8px",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    boxShadow: "0 2px 6px rgba(0,0,0,0.3)",
   },
   track: {
     height: 4,
