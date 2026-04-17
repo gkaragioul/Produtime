@@ -268,13 +268,22 @@ if ($DryRun) {
     $Assets = @($InstallerFile.FullName, $LatestYml)
     if (Test-Path $BlockMap) { $Assets += $BlockMap }
 
-    gh release create $Tag `
-        --repo $RepoRelease `
-        --title "ProduTime v$Version" `
-        --notes $ReleaseNotes `
-        @Assets
-
-    if ($LASTEXITCODE -ne 0) { Write-Error "gh release create failed"; exit 1 }
+    # Write notes to a temp file and pass via --notes-file. Inline --notes
+    # via $ReleaseNotes triggers PowerShell's broken native-command argument
+    # parser: embedded quotes/parens in commit subjects get re-split and
+    # gh interprets word fragments as file globs ("no matches found for X").
+    $NotesFile = [System.IO.Path]::GetTempFileName()
+    try {
+        Set-Content -Path $NotesFile -Value $ReleaseNotes -Encoding UTF8 -NoNewline
+        gh release create $Tag `
+            --repo $RepoRelease `
+            --title "ProduTime v$Version" `
+            --notes-file $NotesFile `
+            @Assets
+        if ($LASTEXITCODE -ne 0) { Write-Error "gh release create failed"; exit 1 }
+    } finally {
+        Remove-Item -Path $NotesFile -ErrorAction SilentlyContinue
+    }
     Write-Host "      Release published: https://github.com/$RepoRelease/releases/tag/$Tag" -ForegroundColor Green
 }
 
