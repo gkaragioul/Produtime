@@ -1548,12 +1548,36 @@ export class IPCHandlers {
     this.licenseValidationTimers = [];
   }
 
+  /**
+   * Channels declared in the shared IPCChannels enum but owned by
+   * AutoUpdaterManager, not IPCHandlers. AutoUpdaterManager registers
+   * and unregisters these itself; removing them here would wipe them
+   * mid-session during the post-init "refresh" pass and cause
+   * "No handler registered" errors when the renderer later invokes them.
+   * See root-cause analysis in PR that added this filter.
+   */
+  private static readonly UPDATER_OWNED_CHANNELS: ReadonlySet<string> = new Set([
+    IPCChannels.CHECK_FOR_UPDATES,
+    IPCChannels.DOWNLOAD_UPDATE,
+    IPCChannels.INSTALL_UPDATE,
+    IPCChannels.GET_UPDATE_STATUS,
+    IPCChannels.OPEN_UPDATE_RELEASES_PAGE,
+    // UPDATE_STATUS_CHANGED is an event channel (send/receive), not an
+    // invoke handler — ipcMain.removeHandler is a no-op on it anyway,
+    // but we skip it here for correctness/clarity.
+    IPCChannels.UPDATE_STATUS_CHANGED,
+  ]);
+
   public removeAllHandlers(): void {
     // BUG FIX #2: Clear license validation timers to prevent memory leak
     this.cleanup();
 
-    // Remove all registered handlers using removeHandler (for ipcMain.handle)
+    // Remove all registered handlers using removeHandler (for ipcMain.handle).
+    // Skip channels owned by AutoUpdaterManager — those are registered and
+    // cleaned up by AutoUpdaterManager itself; wiping them here stranded
+    // the renderer with no handler after the post-init IPC refresh.
     Object.values(IPCChannels).forEach((channel) => {
+      if (IPCHandlers.UPDATER_OWNED_CHANNELS.has(channel)) return;
       try {
         ipcMain.removeHandler(channel);
       } catch (err) {

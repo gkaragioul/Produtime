@@ -443,6 +443,15 @@ class TimePortApp {
         // Reinitialize/augment IPC if necessary now that all services exist
         startupLogger.info("Refreshing IPC handlers with all services...");
         this.initializeIPC();
+        // Defense in depth: even though IPCHandlers.removeAllHandlers now
+        // skips updater-owned channels, explicitly re-register here so any
+        // future refactor that accidentally wipes them self-heals.
+        // Idempotent — safe to call whenever.
+        try {
+          this.autoUpdater?.reregisterIPC();
+        } catch (err) {
+          startupLogger.warn(`autoUpdater.reregisterIPC failed: ${(err as Error).message}`);
+        }
 
         // Initialize agent service for Admin Console connectivity
         startupLogger.info("Initializing agent service...");
