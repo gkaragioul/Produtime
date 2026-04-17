@@ -184,12 +184,23 @@ export class AutoUpdaterManager {
       this.broadcastState({ status: UpdateStatus.NOT_AVAILABLE });
       if (this.consumeManualToken()) {
         try {
-          dialog.showMessageBox({
-            type: 'info',
+          // Parent the dialog on the main window when alive so it stays
+          // on top and receives focus on Windows. An unparented dialog
+          // can end up behind other apps' windows and the user never
+          // sees the response to their click.
+          const opts = {
+            type: 'info' as const,
             title: 'No Updates Available',
-            message: `You're up to date! Current version: ${app.getVersion()}`,
+            message: `ProduTime v${app.getVersion()} is the latest version.`,
+            detail: 'You are up to date. We check automatically every 4 hours.',
             buttons: ['OK'],
-          });
+          };
+          const parent = this.mainWindow && !this.mainWindow.isDestroyed() ? this.mainWindow : null;
+          if (parent) {
+            dialog.showMessageBox(parent, opts);
+          } else {
+            dialog.showMessageBox(opts);
+          }
         } catch (err) {
           this.safeLog('warn', `up-to-date dialog failed: ${String(err)}`);
         }
