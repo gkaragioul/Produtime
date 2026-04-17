@@ -65,9 +65,24 @@ export const UpdateProgressBar: React.FC<Props> = ({
   return (
     <div style={styles.container}>
       {errorMessage && status !== UpdateStatus.ERROR && (
-        <div style={styles.ipcError} title={errorMessage}>
-          Action failed: {errorMessage.slice(0, 100)}
-        </div>
+        <>
+          <div style={styles.ipcError} title={errorMessage}>
+            Action failed: {errorMessage.slice(0, 250)}
+          </div>
+          {onOpenReleasesPage && (
+            // Action-failed banner is shown outside ERROR state (e.g. when
+            // the renderer IPC invoke rejected). Offer the escape hatch
+            // here too so the user isn't stranded in AVAILABLE state with
+            // a broken Download button.
+            <button
+              style={{ ...styles.actionBtn, marginLeft: 'auto', marginRight: 8 }}
+              onClick={onOpenReleasesPage}
+              title="Download the installer manually from GitHub"
+            >
+              Get it manually
+            </button>
+          )}
+        </>
       )}
       {status === UpdateStatus.AVAILABLE && (
         <>
