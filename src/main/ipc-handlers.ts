@@ -64,6 +64,36 @@ export class IPCHandlers {
   private readonly LOCKOUT_THRESHOLD = 5; // Lock account after this many failed attempts
   private readonly LOCKOUT_DURATION_MINUTES = 15; // Lockout duration in minutes
 
+  // Settings keys the renderer MUST NOT be able to write via the generic IPC.
+  // Includes the admin password hash (auth bypass), lockout state (bypass lockout),
+  // license/entitlement state, agent private keys, and SMTP credentials.
+  // Exact keys OR prefixes (ends with '_') are matched.
+  private readonly RENDERER_DENIED_SETTING_KEYS: ReadonlyArray<string> = [
+    'admin_password_hash',
+    'admin_lockout_',
+    'license_',
+    'entitlement_',
+    'agent_',
+    'device_privkey_encrypted',
+    'device_private_key',
+    'email_smtp_pass',
+    'email_smtp_password',
+    'failed_attempts_',
+  ];
+
+  private isRendererDeniedSettingKey(key: string): boolean {
+    if (!key) return false;
+    const k = String(key);
+    for (const denied of this.RENDERER_DENIED_SETTING_KEYS) {
+      if (denied.endsWith('_')) {
+        if (k.startsWith(denied)) return true;
+      } else if (k === denied) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   // License public key for verification (in production, this would be embedded)
   private readonly LICENSE_PUBLIC_KEY =
     process.env.ED25519_PUBLIC_KEY ||
@@ -745,6 +775,21 @@ export class IPCHandlers {
         this.enhancedLicenseService.assertEntitledOrThrow('Update Settings');
       }
 
+      // Reject writes to security-sensitive settings from the renderer.
+      // These keys hold the admin password hash, lockout state, license,
+      // agent private key material, and SMTP credentials — the renderer has
+      // no legitimate reason to write them and doing so bypasses admin auth.
+      if (this.isRendererDeniedSettingKey(request.key)) {
+        this.logger.warn(
+          'IPC',
+          `Blocked renderer write to protected setting: ${request.key}`
+        );
+        return {
+          success: false,
+          error: `Setting '${request.key}' cannot be modified via this channel.`,
+        };
+      }
+
       // Persist setting (prefer validated method if available)
       const dbAny: any = this.database as any;
       if (typeof dbAny.setSettingWithValidation === 'function') {
@@ -1342,9 +1387,46 @@ export class IPCHandlers {
   }
 
   private async handleResetAdminLockout(
-    event: IpcMainInvokeEvent
+    event: IpcMainInvokeEvent,
+    request?: { password?: string }
   ): Promise<IPCResponse<void>> {
     try {
+      // Lockout reset must require the admin password — otherwise an
+      // attacker in the renderer can bypass the 5-attempts / 15-minute
+      // brute-force protection by calling this channel directly.
+      const supplied = request?.password || '';
+      if (!supplied) {
+        return {
+          success: false,
+          error: 'Admin password required to reset lockout.',
+        };
+      }
+
+      const crypto = require('crypto');
+      const stored = await this.database.getSetting('admin_password_hash');
+      let ok = false;
+      if (stored) {
+        try {
+          const parts = String(stored).split(':');
+          if (parts.length === 2) {
+            const salt = Buffer.from(parts[0], 'hex');
+            const storedHash = Buffer.from(parts[1], 'hex');
+            const incoming = crypto.scryptSync(supplied, salt, 32);
+            ok =
+              incoming.length === storedHash.length &&
+              crypto.timingSafeEqual(incoming, storedHash);
+          }
+        } catch (err) {
+          this.logger.error('ADMIN', 'Lockout-reset password check failed', err);
+          ok = false;
+        }
+      }
+
+      if (!ok) {
+        this.logger.warn('ADMIN', 'Rejected lockout reset with invalid password');
+        return { success: false, error: 'Invalid admin password.' };
+      }
+
       this.database.updateLockoutState({
         is_locked: false,
         locked_until: null,
@@ -1369,6 +1451,23 @@ export class IPCHandlers {
       // License enforcement
       if (this.enhancedLicenseService) {
         this.enhancedLicenseService.assertEntitledOrThrow('Bulk Update Settings');
+      }
+
+      // Reject any batch containing a protected key rather than silently
+      // dropping it — caller should not be mixing protected and normal keys.
+      const denied: string[] = [];
+      for (const key of Object.keys(settings || {})) {
+        if (this.isRendererDeniedSettingKey(key)) denied.push(key);
+      }
+      if (denied.length > 0) {
+        this.logger.warn(
+          'IPC',
+          `Blocked renderer bulk write containing protected settings: ${denied.join(', ')}`
+        );
+        return {
+          success: false,
+          error: `The following settings cannot be modified via this channel: ${denied.join(', ')}`,
+        };
       }
 
       this.database.bulkUpdateSettings(settings);

@@ -159,12 +159,13 @@ export class AdminAuthService {
   }
 
   /**
-   * Reset admin lockout (for development/testing purposes)
+   * Reset admin lockout. Requires the admin password — the main process
+   * rejects unauthenticated resets to preserve brute-force protection.
    */
-  public async resetLockout(): Promise<void> {
+  public async resetLockout(password: string): Promise<void> {
     try {
       const response: IPCResponse<void> =
-        await window.electronAPI.resetAdminLockout();
+        await window.electronAPI.resetAdminLockout({ password });
 
       if (!response.success) {
         throw new Error(response.error || 'Failed to reset lockout');

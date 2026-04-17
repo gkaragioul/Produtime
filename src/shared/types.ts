@@ -86,7 +86,9 @@ export interface ElectronAPI {
     request: AdminLoginRequest
   ) => Promise<IPCResponse<AdminLoginResponse>>;
   getAdminLockoutState: () => Promise<IPCResponse<AdminLockoutState>>;
-  resetAdminLockout: () => Promise<IPCResponse<void>>;
+  resetAdminLockout: (request?: {
+    password?: string;
+  }) => Promise<IPCResponse<void>>;
 
   // Email Configuration API
   getEmailConfig: () => Promise<IPCResponse<any>>;
