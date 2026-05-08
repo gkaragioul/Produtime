@@ -1,11 +1,18 @@
-# ProduTime
+<h1 align="center">ProduTime</h1>
 
-**Free desktop time tracking and productivity monitoring app for World of Travel.**
+<p align="center">
+  <strong>Free desktop time tracking and productivity monitoring app for World of Travel.</strong><br>
+  <em>Electron, React, TypeScript, cloud admin controls, productivity reports, privacy mode, and silent update workflows.</em>
+</p>
 
-Developed by [George Karagioules](https://www.georgekaragioules.com) and provided free of charge to World of Travel as a freeware productivity tool.
-
----
-
+<p align="center">
+  <a href="#what-it-does">What It Does</a> •
+  <a href="#download">Download</a> •
+  <a href="#tech-stack">Tech Stack</a> •
+  <a href="#build-from-source">Build</a> •
+  <a href="#project-structure">Project Structure</a> •
+  <a href="#license">License</a>
+</p>
 ## What it does
 
 ProduTime runs silently in the background and tracks how time is spent across applications throughout the work day. It generates daily productivity reports and can be managed remotely via the cloud Admin Console.
