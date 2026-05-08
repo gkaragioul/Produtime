@@ -13,6 +13,7 @@
   <a href="#project-structure">Project Structure</a> •
   <a href="#license">License</a>
 </p>
+
 ## What it does
 
 ProduTime runs silently in the background and tracks how time is spent across applications throughout the work day. It generates daily productivity reports and can be managed remotely via the cloud Admin Console.
