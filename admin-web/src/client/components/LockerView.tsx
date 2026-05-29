@@ -6,8 +6,8 @@ export const LockerView: React.FC = () => {
   return (
     <div style={{ padding: '20px' }}>
       <h1 style={{ margin: '0 0 16px', fontSize: '24px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <img src="assets/WOTLockerIcon.png" alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />
-        WOTLocker
+        <img src="assets/PTAdminIcon.png" alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+        Secure Locker
       </h1>
       <div style={{
         backgroundColor: 'white',
@@ -17,7 +17,7 @@ export const LockerView: React.FC = () => {
         maxWidth: '640px',
       }}>
         <p style={{ margin: '0 0 20px', color: '#555', lineHeight: 1.5 }}>
-          WOT Locker is the team's shared password manager. It opens in a new
+          Secure Locker is the team's shared password manager. It opens in a new
           tab and has its own login.
         </p>
         <a
@@ -35,7 +35,7 @@ export const LockerView: React.FC = () => {
             fontWeight: 500,
           }}
         >
-          Open WOTLocker ↗
+          Open Secure Locker
         </a>
       </div>
     </div>

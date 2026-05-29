@@ -403,7 +403,7 @@ export class AutoUpdaterManager {
     ipcMain.handle('updater:openReleasesPage', async () => {
       try {
         // Publish config in package.json — keep in sync.
-        const url = 'https://github.com/wotbyalice/WOT-Produtime-Releases/releases/latest';
+        const url = 'https://github.com/gkaragioul/Produtime/releases/latest';
         await shell.openExternal(url);
         return { success: true };
       } catch (e: any) {

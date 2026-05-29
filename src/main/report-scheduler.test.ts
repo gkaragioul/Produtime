@@ -35,7 +35,7 @@ const { PDFGenerator } = require('./pdf-generator');
 const mockDb: any = {
   getSetting: jest.fn((key: string) => {
     if (key === 'export_folder') return 'C:/Exports';
-    if (key === 'employee_name') return 'Alice';
+    if (key === 'employee_name') return 'Example User';
     if (key === 'auto_export_enabled') return 'true';
     if (key === 'auto_export_time') return '18:00';
     return null;
@@ -81,7 +81,7 @@ describe('ReportScheduler', () => {
       if (key === 'auto_export_time') return '07:45';
       if (key === 'auto_export_enabled') return 'true';
       if (key === 'export_folder') return 'C:/Exports';
-      if (key === 'employee_name') return 'Alice';
+      if (key === 'employee_name') return 'Example User';
       return null;
     });
     const scheduler = new ReportScheduler(mockDb as any);
@@ -178,7 +178,7 @@ describe('ReportScheduler', () => {
       if (key === 'auto_export_enabled') return 'true';
       if (key === 'auto_export_time') return '18:00';
       if (key === 'export_folder') return 'C:/Exports';
-      if (key === 'employee_name') return 'Alice';
+      if (key === 'employee_name') return 'Example User';
       return null;
     });
     mockDb.setSetting = jest.fn();
@@ -215,7 +215,7 @@ describe('ReportScheduler', () => {
       if (key === 'auto_export_enabled') return 'true';
       if (key === 'auto_export_time') return '18:00';
       if (key === 'export_folder') return 'C:/Exports';
-      if (key === 'employee_name') return 'Alice';
+      if (key === 'employee_name') return 'Example User';
       return null;
     });
     mockDb.setSetting = jest.fn();

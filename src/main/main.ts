@@ -57,9 +57,6 @@ startupLogger.info("AutoExportScheduler imported");
 import type { ActivityTracker } from "./services/activity-tracker";
 startupLogger.info("ActivityTracker type imported");
 
-import type { LicenseService } from "./services/license-service";
-startupLogger.info("LicenseService type imported");
-
 import type { EnhancedLicenseService } from "./services/licensing/EnhancedLicenseService";
 startupLogger.info("EnhancedLicenseService type imported");
 
@@ -922,50 +919,7 @@ class TimePortApp {
     logger.info("MENU", "Starting menu initialization");
     logger.debug("MENU", "Updater exists", { exists: !!this.autoUpdater });
     try {
-      // Check if license is active to determine menu items
-      let isLicenseActive = false;
-      if (this.enhancedLicenseService) {
-        const status = this.enhancedLicenseService.getStatus();
-        isLicenseActive = status.mode === 'activated' || status.mode === 'trial';
-      }
-
-      // Build Help submenu dynamically based on license status
       const helpSubmenu: Electron.MenuItemConstructorOptions[] = [];
-
-      // Only show "Enter License Key..." if not fully activated with a license key
-      // Show it during trial so users can upgrade, hide only when activated
-      const isFullyActivated = this.enhancedLicenseService?.getStatus()?.mode === 'activated';
-      logger.info("MENU", `Building menu - isFullyActivated: ${isFullyActivated}`);
-      if (!isFullyActivated) {
-        helpSubmenu.push({
-          label: "Enter License Key…",
-          click: () => {
-            logger.info("MENU", "Enter License Key clicked");
-            try {
-              if (!this.mainWindow) {
-                logger.warn("MENU", "mainWindow is null, cannot send openActivation event");
-                return;
-              }
-              if (this.mainWindow.isDestroyed()) {
-                logger.warn("MENU", "mainWindow is destroyed, cannot send openActivation event");
-                return;
-              }
-              logger.info("MENU", "Sending license:openActivation to renderer");
-              this.mainWindow.webContents.send("license:openActivation");
-              // Also bring window to front
-              this.mainWindow.show();
-              this.mainWindow.focus();
-            } catch (err) {
-              logger.warn(
-                "MENU",
-                "Failed to send openActivation event",
-                err
-              );
-            }
-          },
-        });
-        helpSubmenu.push({ type: "separator" });
-      }
 
       // Always show Check for Updates and About
       helpSubmenu.push({
@@ -1043,39 +997,11 @@ class TimePortApp {
               click: async () => {
                 logger.info("MENU", "About menu item clicked");
                 const version = app.getVersion();
-                let licenseLine = "";
-
-                try {
-                  // Use EnhancedLicenseService for v1.8 licensing
-                  if (this.enhancedLicenseService) {
-                    const status = this.enhancedLicenseService.getStatus();
-                    if (status.mode === 'activated') {
-                      const exp = status.expiresAt
-                        ? new Date(status.expiresAt).toLocaleDateString()
-                        : null;
-                      licenseLine = `\n\nLicense: Active${exp ? ` — expires ${exp}` : ''}`;
-                    } else if (status.mode === 'trial') {
-                      const days = status.trialDaysRemaining;
-                      const plural = days === 1 ? "" : "s";
-                      licenseLine = `\n\nTrial: ${days != null ? `${days} day${plural} remaining` : "Active"}`;
-                    } else {
-                      licenseLine = `\n\nLicense: Not activated`;
-                    }
-                  } else {
-                    licenseLine = `\n\nLicense: Not activated`;
-                  }
-                } catch (e) {
-                  logger.warn(
-                    "MENU",
-                    "Failed to compute license status for About dialog",
-                    e
-                  );
-                  licenseLine = `\n\nLicense: Unknown`;
-                }
+                const licenseLine = "\n\nLicense: Freeware";
                 await dialog.showMessageBox(this.mainWindow!, {
                   type: "info",
                   title: "About ProduTime",
-                  message: `ProduTime v${version}${licenseLine}\n\nDeveloped by George Karagioules\nwww.georgekaragioules.com\n\nProvided free of charge to World of Travel as a freeware productivity tool.\nFree to use. Not for resale or redistribution.\n\nCopyright © 2026 George Karagioules. All rights reserved.`,
+                  message: `ProduTime v${version}${licenseLine}\n\nDeveloped by George Karagioules\nwww.georgekaragioules.com\n\nFree proprietary time tracking and productivity reporting software.\nNo activation key, subscription, or trial required.\nNot for resale or modified redistribution.\n\nCopyright (c) 2026 George Karagioules. All rights reserved.`,
                   buttons: ["OK"],
                 });
               },
@@ -1103,11 +1029,10 @@ class TimePortApp {
   }
 
   /**
-   * Rebuild the application menu (called after license status changes)
-   * This updates the Help menu to show/hide "Enter License Key..." based on activation status
+   * Rebuild the application menu.
    */
   public rebuildApplicationMenu(): void {
-    logger.info("MENU", "Rebuilding application menu after license status change");
+    logger.info("MENU", "Rebuilding application menu");
     this.initializeApplicationMenu();
   }
 

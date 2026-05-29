@@ -68,7 +68,7 @@ describe('PDFGenerator - Enhanced Analytics', () => {
       // Arrange
       os.hostname.mockReturnValue('TEST-COMPUTER');
       os.networkInterfaces.mockReturnValue({});
-      const db = createMockDb({ employee_name: 'Alice Smith' });
+      const db = createMockDb({ employee_name: 'Example User' });
       const generator = new PDFGenerator(db as any);
 
       // Act

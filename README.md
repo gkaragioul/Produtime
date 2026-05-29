@@ -1,64 +1,61 @@
-<h1 align="center">ProduTime</h1>
+# ProduTime
 
-<p align="center">
-  <strong>Free desktop time tracking and productivity monitoring app for World of Travel.</strong><br>
-  <em>Electron, React, TypeScript, cloud admin controls, productivity reports, privacy mode, and silent update workflows.</em>
-</p>
+Free proprietary desktop time tracking and productivity reporting software for
+Windows.
 
-<p align="center">
-  <a href="#what-it-does">What It Does</a> •
-  <a href="#screenshots">Screenshots</a> •
-  <a href="#tech-stack">Tech Stack</a> •
-  <a href="#build-from-source">Build</a> •
-  <a href="#project-structure">Project Structure</a> •
-  <a href="#license">License</a>
-</p>
+ProduTime is developed by [George Karagioules](https://www.georgekaragioules.com)
+and released as freeware. It is free to use, requires no activation key, and
+does not require a subscription. The source may be visible for transparency, but
+ProduTime is not open-source software.
 
-<p align="center">
-  <img src="assets/readme/produtime-main.png" alt="ProduTime desktop dashboard showing current activity, recent activity, active time, idle time and productivity metrics" width="920">
-</p>
+## What It Does
 
-## Screenshots
+ProduTime runs locally on a Windows desktop and helps users understand how time
+is spent during the work day.
 
-<p align="center">
-  <img src="assets/readme/produtime-top-apps.png" alt="ProduTime top apps and detailed activity report" width="30%">
-  <img src="assets/readme/produtime-dashboard.png" alt="ProduTime focus summary dashboard on Windows" width="30%">
-  <img src="assets/readme/produtime-admin-console.png" alt="ProduTime admin console dashboard" width="30%">
-</p>
+- Activity tracking for active windows, keyboard/mouse activity, and idle time
+- Daily productivity summaries and schedule progress
+- PDF reports for daily, weekly, monthly, and custom ranges
+- Privacy mode for sensitive app/window titles
+- Optional local/admin management features for controlled environments
+- Optional update checks through GitHub Releases
 
-## What it does
+## Download
 
-ProduTime runs silently in the background and tracks how time is spent across applications throughout the work day. It generates daily productivity reports and can be managed remotely via the cloud Admin Console.
+Get the latest installer from the
+[Releases page](https://github.com/gkaragioul/Produtime/releases/latest).
 
-- **Activity tracking** — monitors active windows, keyboard/mouse activity, and idle periods
-- **Daily insights** — progress against work schedule, focus quality, top apps
-- **PDF reports** — daily, weekly, and monthly productivity breakdowns
-- **Privacy mode** — sanitises window titles for sensitive applications
-- **Auto-updates** — in-app updates with download progress, silent install and restart
-- **Admin Console** — cloud-based centralised management, policy deployment, real-time monitoring
+> ProduTime is freeware: free to use, not for resale, and not for modified
+> redistribution under the ProduTime name.
 
----
+## Privacy Summary
 
-## Tech stack
+ProduTime stores activity records, settings, reports, and local app data on the
+user's device by default. It does not send telemetry, activity records, or usage
+analytics to George Karagioules.
+
+Network activity only happens when a user or administrator uses a networked
+feature, such as update checks, admin-console pairing, external links, or
+configured email/report delivery. See [PRIVACY.md](PRIVACY.md).
+
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Desktop shell | Electron |
 | UI | React + TypeScript |
-| Database | SQLite (better-sqlite3, WAL mode) |
+| Local database | SQLite / SQLCipher |
 | Bundler | Webpack |
 | Installer | NSIS via electron-builder |
-| Admin comms | WebSocket (Ed25519 signed messages) |
-| Updates | electron-updater → GitHub Releases |
+| Updates | electron-updater + GitHub Releases |
 
----
-
-## Build from source
+## Build From Source
 
 ### Prerequisites
 
 - Node.js 18+
-- Windows 10+ (native modules require Windows for activity tracking)
+- npm 8+
+- Windows 10+ for native activity-tracking behavior
 
 ### Install
 
@@ -70,43 +67,46 @@ npx @electron/rebuild --force --only better-sqlite3
 ### Build
 
 ```bash
-npm run build:main      # TypeScript → dist/main/
-npm run build:renderer  # Webpack → dist/renderer/
+npm run build:main
+npm run build:renderer
 ```
 
-### Run (development)
+### Run
 
 ```bash
-unset ELECTRON_RUN_AS_NODE && node_modules/electron/dist/electron.exe .
+npm start
 ```
 
-### Package installer
+### Package Installer
 
 ```bash
 npm run dist:x64
 ```
 
-Output: `build-output/ProduTime-Setup-<version>-x64.exe`
+Output:
 
----
-
-## Project structure
-
+```text
+build-output/ProduTime-Setup.exe
 ```
+
+## Project Structure
+
+```text
 src/
-  main/           Electron main process (database, IPC, tray, updater, agent)
-  renderer/       React frontend (dashboard, settings, reports)
+  main/           Electron main process, database, IPC, tray, updater
+  renderer/       React UI
   shared/         Shared TypeScript types
 assets/           Icons and images
-admin-console/    Local LAN Admin Console (separate Electron app)
-cloud-admin-web/  Cloud admin web dashboard (Vite + React)
-scripts/          Build, release, and maintenance scripts
+admin-console/    Optional ProduTime Admin Console
+admin-web/        Optional web admin console
+scripts/          Build and maintenance scripts
 ```
-
----
 
 ## License
 
-Freeware — see [LICENSE.txt](LICENSE.txt).
-Developed by George Karagioules · [www.georgekaragioules.com](https://www.georgekaragioules.com)
-© 2026 George Karagioules. All rights reserved.
+ProduTime is proprietary freeware. See [LICENSE.txt](LICENSE.txt).
+
+Third-party notices are listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Copyright (c) 2026 George Karagioules. All rights reserved.
