@@ -7,11 +7,23 @@
 
 <p align="center">
   <a href="#what-it-does">What It Does</a> •
-  <a href="#download">Download</a> •
+  <a href="#screenshots">Screenshots</a> •
   <a href="#tech-stack">Tech Stack</a> •
   <a href="#build-from-source">Build</a> •
   <a href="#project-structure">Project Structure</a> •
   <a href="#license">License</a>
+</p>
+
+<p align="center">
+  <img src="assets/readme/produtime-main.png" alt="ProduTime desktop dashboard showing current activity, recent activity, active time, idle time and productivity metrics" width="920">
+</p>
+
+## Screenshots
+
+<p align="center">
+  <img src="assets/readme/produtime-top-apps.png" alt="ProduTime top apps and detailed activity report" width="30%">
+  <img src="assets/readme/produtime-dashboard.png" alt="ProduTime focus summary dashboard on Windows" width="30%">
+  <img src="assets/readme/produtime-admin-console.png" alt="ProduTime admin console dashboard" width="30%">
 </p>
 
 ## What it does
@@ -24,14 +36,6 @@ ProduTime runs silently in the background and tracks how time is spent across ap
 - **Privacy mode** — sanitises window titles for sensitive applications
 - **Auto-updates** — in-app updates with download progress, silent install and restart
 - **Admin Console** — cloud-based centralised management, policy deployment, real-time monitoring
-
----
-
-## Download
-
-Get the latest installer from the [Releases page](https://github.com/wotbyalice/WOT-Produtime-Releases/releases/latest).
-
-> ProduTime is freeware. Free to use. Not for resale or redistribution.
 
 ---
 
