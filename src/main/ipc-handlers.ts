@@ -6,7 +6,7 @@ import { SystemTrayManager } from './system-tray';
 import { EmailService } from './services/email-service';
 import { ActivityTracker } from './services/activity-tracker';
 import { StartupHelper } from './startup-helper';
-// Freeware: LicenseService not used (EnhancedLicenseService stub handles everything)
+// Freeware entitlement checks are handled by EnhancedLicenseService.
 import { DeviceIdService } from './services/device-id-service';
 import { Logger } from './logger';
 import { EnhancedLicenseService } from './services/licensing/EnhancedLicenseService';
@@ -52,7 +52,6 @@ export class IPCHandlers {
   private activityTracker: ActivityTracker | null = null;
   private agentService: AgentService | null = null;
   private emailService: EmailService;
-  private licenseService: any;
   private deviceIdService: DeviceIdService;
   private logger: Logger;
   private enhancedLicenseService: EnhancedLicenseService | null = null;
@@ -164,8 +163,6 @@ export class IPCHandlers {
     this.onMenuRebuildNeeded = onMenuRebuildNeeded || null;
     this.emailService = EmailService.getInstance();
     this.emailService.configureFromDatabase((key) => this.database.getSetting(key));
-    // Freeware: legacy license service not initialized (no network calls)
-    this.licenseService = null;
     this.deviceIdService = DeviceIdService.getInstance();
     this.logger = Logger.getInstance();
     this.registerHandlers();
@@ -183,7 +180,7 @@ export class IPCHandlers {
 
   /**
    * Perform local license validation
-   * Uses EnhancedLicenseService (v1.8) when available, falls back to old LicenseService
+   * Uses EnhancedLicenseService freeware entitlement checks when available.
    */
   private performLocalLicenseValidation(electron: any): void {
     try {
@@ -205,14 +202,7 @@ export class IPCHandlers {
         return;
       }
 
-      // Fallback to old LicenseService
-      const status = this.licenseService.validateActivation();
-      if (!status.isActivated && !status.isTrialMode) {
-        this.logger.warn('LICENSE', 'Local validation: License invalid', {
-          message: status.message,
-        });
-        this.broadcastLicenseLockout(electron, status);
-      }
+      // Freeware fallback: no lockout.
     } catch (e) {
       this.logger.error('LICENSE', 'Local validation error', {
         error: e instanceof Error ? e.message : String(e),
@@ -222,7 +212,7 @@ export class IPCHandlers {
 
   /**
    * Perform server license validation with retry logic
-   * Uses EnhancedLicenseService (v1.8) heartbeat when available
+   * Uses EnhancedLicenseService freeware heartbeat hook when available.
    */
   private async performServerLicenseValidation(
     electron: any,
@@ -249,15 +239,7 @@ export class IPCHandlers {
         return;
       }
 
-      // Fallback to old LicenseService
-      const status = await this.licenseService.validateActivationWithServer();
-      if (!status.isActivated && !status.isTrialMode) {
-        this.logger.warn('LICENSE', 'Server validation: License revoked', {
-          message: status.message,
-          attempt,
-        });
-        this.broadcastLicenseLockout(electron, status);
-      }
+      // Freeware fallback: no server validation.
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
       this.logger.warn('LICENSE', 'Server validation error', {
@@ -675,7 +657,21 @@ export class IPCHandlers {
     request: GetActivityLogsRequest
   ): Promise<IPCResponse<ActivityLog[]>> {
     try {
-      const logs = this.database.getActivityLogs(request.limit, request.offset);
+      // Clamp renderer-supplied limit/offset. Unbounded values would pull the
+      // entire activity_logs table into memory (tens of thousands of rows on a
+      // long-running install) and can OOM the renderer. Mirrors the hard 100
+      // cap on handleGetActivityLogsByDate.
+      const MAX_LIMIT = 5000;
+      const MAX_OFFSET = 1_000_000;
+      const rawLimit = Number(request.limit);
+      const rawOffset = Number(request.offset);
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0
+        ? Math.min(Math.floor(rawLimit), MAX_LIMIT)
+        : MAX_LIMIT;
+      const offset = Number.isFinite(rawOffset) && rawOffset > 0
+        ? Math.min(Math.floor(rawOffset), MAX_OFFSET)
+        : 0;
+      const logs = this.database.getActivityLogs(limit, offset);
       // Apply privacy sanitization when reading logs
       const sanitizedLogs = this.sanitizeActivityLogs(logs);
       return { success: true, data: sanitizedLogs };
@@ -688,7 +684,7 @@ export class IPCHandlers {
   private async handleGetDailySummary(
     event: IpcMainInvokeEvent,
     request: { startDate: string; endDate: string }
-  ): Promise<IPCResponse<{ active: number; idle: number }>> {
+  ): Promise<IPCResponse<{ active: number; idle: number; away: number }>> {
     try {
       const summary = this.database.getActivitySummaryByDateRange(request.startDate, request.endDate);
       return {
@@ -696,6 +692,7 @@ export class IPCHandlers {
         data: {
           active: summary.total_active_seconds || 0,
           idle: summary.total_idle_seconds || 0,
+          away: summary.total_away_seconds || 0,
         },
       };
     } catch (error) {
@@ -742,7 +739,10 @@ export class IPCHandlers {
     const privacyAppsJson = this.database.getSetting('privacy_apps');
     if (privacyAppsJson) {
       try {
-        privacyApps = JSON.parse(privacyAppsJson);
+        const parsed = JSON.parse(privacyAppsJson);
+        privacyApps = Array.isArray(parsed) && parsed.every((i: unknown) => typeof i === 'string')
+          ? parsed
+          : DEFAULT_PRIVACY_APPS;
       } catch {
         privacyApps = DEFAULT_PRIVACY_APPS;
       }
@@ -2031,7 +2031,7 @@ export class IPCHandlers {
   }
 
   /**
-   * Get device ID for license activation
+   * Freeware compatibility: return device ID for older renderer builds.
    */
   private async handleGetDeviceId(): Promise<IPCResponse<string>> {
     try {
@@ -2047,26 +2047,19 @@ export class IPCHandlers {
   }
 
   /**
-   * Activate license with online activation
+   * Freeware compatibility: activation is not required.
    */
   private async handleActivateLicense(
     _event: IpcMainInvokeEvent,
-    request: ActivateLicenseRequest
+    _request: ActivateLicenseRequest
   ): Promise<IPCResponse<ActivationResponse>> {
-    try {
-      const deviceId = this.deviceIdService.getDeviceId();
-      const response = await this.licenseService.activateLicense(
-        request.licenseKey,
-        deviceId
-      );
-      return { success: true, data: response };
-    } catch (error) {
-      console.error('Error activating license:', error);
-      return {
-        success: false,
-        error: `Failed to activate license: ${error}`,
-      };
-    }
+    return {
+      success: true,
+      data: {
+        success: true,
+        message: 'ProduTime freeware edition is already activated.',
+      },
+    };
   }
 
   /**
@@ -2076,13 +2069,15 @@ export class IPCHandlers {
     IPCResponse<ActivationStatus>
   > {
     try {
-      this.logger.info('IPC', 'Validate activation request received');
-      const status = this.licenseService.validateActivation();
-      this.logger.info('IPC', 'Validation complete', {
-        isActivated: status.isActivated,
-        requiresReactivation: status.requiresReactivation,
-      });
-      return { success: true, data: status };
+      return {
+        success: true,
+        data: {
+          isActivated: true,
+          isTrialMode: false,
+          requiresReactivation: false,
+          message: 'ProduTime freeware edition is active.',
+        },
+      };
     } catch (error) {
       this.logger.error('IPC', 'Error validating activation', { error });
       return {
@@ -2093,16 +2088,17 @@ export class IPCHandlers {
   }
 
   /**
-   * Start 7-day trial mode
+   * Freeware compatibility: trial mode is not required.
    */
   private async handleStartTrial(): Promise<IPCResponse<ActivationResponse>> {
     try {
-      this.logger.info('IPC', 'Start trial request received');
-      const response = await this.licenseService.startTrial();
-      this.logger.info('IPC', 'Trial started successfully', {
-        expiresAt: response.expiryDate,
-      });
-      return { success: true, data: response };
+      return {
+        success: true,
+        data: {
+          success: true,
+          message: 'ProduTime freeware edition does not require a trial.',
+        },
+      };
     } catch (error) {
       this.logger.error('IPC', 'Error starting trial', { error });
       return {
@@ -2141,34 +2137,13 @@ export class IPCHandlers {
   }
 
   /**
-   * Start trial mode using EnhancedLicenseService
+   * Freeware compatibility: no trial is required.
    */
   private async handleEnhancedStartTrial(
     event: IpcMainInvokeEvent
   ): Promise<IPCResponse<{ success: boolean; error?: string }>> {
     try {
-      if (!this.enhancedLicenseService) {
-        // Fallback for development
-        return { success: true, data: { success: true } };
-      }
-
-      const result = await this.enhancedLicenseService.startTrial();
-
-      // If trial start was successful, rebuild the application menu to hide "Enter License Key..."
-      if (result.success) {
-        if (this.onMenuRebuildNeeded) {
-          try {
-            this.onMenuRebuildNeeded();
-            this.logger.info('IPC', 'Application menu rebuilt after successful trial start');
-          } catch (menuError: any) {
-            this.logger.warn('IPC', 'Failed to rebuild menu after trial start', { 
-              error: menuError.message 
-            });
-          }
-        }
-      }
-
-      return { success: true, data: result };
+      return { success: true, data: { success: true } };
     } catch (error: any) {
       this.logger.error('IPC', 'Error starting enhanced trial', { error });
       return {
@@ -2179,57 +2154,14 @@ export class IPCHandlers {
   }
 
   /**
-   * Activate license using EnhancedLicenseService
+   * Freeware compatibility: activation is not required.
    */
   private async handleEnhancedActivate(
     event: IpcMainInvokeEvent,
-    licenseKeyOrRequest: string | { licenseKey: string; deviceId?: string }
+    _licenseKeyOrRequest: string | { licenseKey: string; deviceId?: string }
   ): Promise<IPCResponse<{ success: boolean; error?: string }>> {
     try {
-      if (!this.enhancedLicenseService) {
-        // Fallback for development
-        return { success: true, data: { success: true } };
-      }
-
-      // Support both old object format and new string format
-      let licenseKey: string;
-      if (typeof licenseKeyOrRequest === 'string') {
-        licenseKey = licenseKeyOrRequest;
-      } else if (licenseKeyOrRequest && typeof licenseKeyOrRequest === 'object' && licenseKeyOrRequest.licenseKey) {
-        licenseKey = licenseKeyOrRequest.licenseKey;
-      } else {
-        return {
-          success: false,
-          error: 'License key is required',
-        };
-      }
-
-      if (!licenseKey || typeof licenseKey !== 'string') {
-        return {
-          success: false,
-          error: 'License key is required',
-        };
-      }
-
-      const result = await this.enhancedLicenseService.activateWithKey(
-        licenseKey
-      );
-
-      // If activation was successful, rebuild the application menu to hide "Enter License Key..."
-      if (result.success) {
-        if (this.onMenuRebuildNeeded) {
-          try {
-            this.onMenuRebuildNeeded();
-            this.logger.info('IPC', 'Application menu rebuilt after successful activation');
-          } catch (menuError: any) {
-            this.logger.warn('IPC', 'Failed to rebuild menu after activation', { 
-              error: menuError.message 
-            });
-          }
-        }
-      }
-
-      return { success: true, data: result };
+      return { success: true, data: { success: true } };
     } catch (error: any) {
       this.logger.error('IPC', 'Error activating license', { error });
       return {
@@ -2257,7 +2189,10 @@ export class IPCHandlers {
       const privacyAppsJson = this.database.getSetting('privacy_apps');
       if (privacyAppsJson) {
         try {
-          privacyApps = JSON.parse(privacyAppsJson);
+          const parsed = JSON.parse(privacyAppsJson);
+          privacyApps = Array.isArray(parsed) && parsed.every((i: unknown) => typeof i === 'string')
+            ? parsed
+            : DEFAULT_PRIVACY_APPS;
         } catch {
           // Fall back to default if JSON is invalid
           privacyApps = DEFAULT_PRIVACY_APPS;
@@ -2381,7 +2316,24 @@ export class IPCHandlers {
   private async handleAgentStartCloudPairing(_event: IpcMainInvokeEvent, request: { cloudApiUrl: string; pairCode: string }): Promise<IPCResponse<{ success: boolean; error?: string }>> {
     try {
       if (!this.agentService) return { success: false, error: 'Agent service not initialized' };
-      const result = await this.agentService.startCloudPairing(request.cloudApiUrl, request.pairCode);
+      if (!request || typeof request.cloudApiUrl !== 'string' || typeof request.pairCode !== 'string') {
+        return { success: false, error: 'Invalid pairing request' };
+      }
+      // Require https to prevent MITM / rogue pairing targets if renderer is compromised.
+      let parsed: URL;
+      try {
+        parsed = new URL(request.cloudApiUrl);
+      } catch {
+        return { success: false, error: 'Invalid cloud API URL' };
+      }
+      if (parsed.protocol !== 'https:') {
+        return { success: false, error: 'Cloud API URL must use HTTPS' };
+      }
+      const pairCode = request.pairCode.trim();
+      if (pairCode.length === 0 || pairCode.length > 128) {
+        return { success: false, error: 'Invalid pair code' };
+      }
+      const result = await this.agentService.startCloudPairing(parsed.toString(), pairCode);
       return { success: true, data: result };
     } catch (error: any) {
       return { success: false, error: error.message };

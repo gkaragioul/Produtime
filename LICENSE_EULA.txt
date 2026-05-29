@@ -1,16 +1,51 @@
-PRODUTIME END USER LICENSE AGREEMENT
+PRODUTIME FREEWARE END USER LICENSE AGREEMENT
+=============================================
 
-This software ("ProduTime") is provided free of charge by George Karagioules
-to Alice A.E. for internal business use.
+Copyright (c) 2026 George Karagioules.
+All rights reserved.
 
-Terms:
-1. This software is licensed, not sold.
-2. You may install and use this software on any number of devices within
-   Alice A.E. organization.
-3. You may not redistribute, sublicense, or sell this software.
-4. The software is provided "as is" without warranty of any kind.
-5. George Karagioules retains all intellectual property rights.
+ProduTime is proprietary freeware. It is free to install and use, but it is
+not open-source software. No subscription, trial, activation key, or paid
+license is required for the freeware edition.
 
-By installing this software, you agree to these terms.
+By installing or using ProduTime, you agree to the ProduTime Freeware License.
+The full license is included with the app as LICENSE.txt.
 
-© George Karagioules. All rights reserved.
+You may:
+
+1. install and use ProduTime for lawful personal, professional,
+   internal-business, or evaluation purposes;
+2. share the original, unmodified installer for free; and
+3. keep backup copies for your own use.
+
+You may not:
+
+1. sell, rent, sublicense, lease, or commercialize ProduTime;
+2. modify, decompile, disassemble, or create derivative works from ProduTime,
+   except to the extent permitted by applicable law;
+3. remove or alter copyright, trademark, license, or proprietary notices;
+4. distribute modified versions under the ProduTime name; or
+5. claim ownership or authorship of ProduTime.
+
+ProduTime stores activity records and settings locally by default. It does not
+send telemetry, activity records, or usage analytics to George Karagioules.
+Network activity may occur only when you or an administrator uses a networked
+feature, such as updates, external links, admin-console pairing, or configured
+email/report delivery.
+
+ProduTime includes third-party open-source components. Those components remain
+under their own licenses. Required notices are included in
+THIRD_PARTY_NOTICES.md.
+
+PRODUTIME IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND.
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, GEORGE KARAGIOULES SHALL NOT BE LIABLE
+FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR
+LOSS OF DATA, PROFITS, REVENUE, BUSINESS, GOODWILL, OR COMPUTER FUNCTION.
+
+This agreement is governed by the laws of Greece, unless applicable local law
+requires otherwise.
+
+Contact:
+George Karagioules
+https://www.georgekaragioules.com
+https://github.com/gkaragioul

@@ -1,117 +1,128 @@
-PRODUTIME - END USER LICENSE AGREEMENT (FREEWARE)
-==================================================
+PRODUTIME FREEWARE LICENSE
+==========================
 
-Copyright (c) 2026 George Karagioules
+Copyright (c) 2026 George Karagioules.
 All rights reserved.
 
-PLEASE READ THIS LICENSE AGREEMENT CAREFULLY BEFORE INSTALLING OR USING
-PRODUTIME. BY INSTALLING, COPYING, OR OTHERWISE USING THIS SOFTWARE, YOU
-AGREE TO BE BOUND BY THE TERMS OF THIS AGREEMENT.
+This license applies to ProduTime, including the desktop app, admin console,
+installers, bundled assets, and related documentation, unless a file clearly
+states otherwise.
 
---------------------------------------------------------------------------------
-1. ABOUT THIS SOFTWARE
---------------------------------------------------------------------------------
+1. SUMMARY
+----------
 
-ProduTime is developed and owned by George Karagioules ("Developer") and is
-provided free of charge to World of Travel and its staff as a freeware
-productivity tool. The Developer retains full ownership of the software and
-all associated intellectual property.
+ProduTime is proprietary freeware. It is free to download, install, and use,
+but it is not open-source software. George Karagioules retains all ownership,
+copyright, trademark, and other intellectual-property rights in ProduTime.
 
---------------------------------------------------------------------------------
 2. LICENSE GRANT
---------------------------------------------------------------------------------
+----------------
 
-George Karagioules ("Developer") grants you ("User") a free, non-exclusive,
-non-transferable, worldwide license to install and use ProduTime ("Software")
-for personal or professional purposes within World of Travel, subject to the
-terms of this Agreement.
+George Karagioules grants you a free, non-exclusive, non-transferable,
+worldwide license to install and use ProduTime for lawful personal,
+professional, internal-business, or evaluation purposes, subject to this
+license.
 
---------------------------------------------------------------------------------
-3. FREEWARE
---------------------------------------------------------------------------------
+No purchase, subscription, trial, activation key, or paid license is required
+to use the freeware edition.
 
-ProduTime is provided FREE OF CHARGE. You may use it without payment for any
-lawful purpose. You may share the original unmodified installer with others,
-provided no fee is charged and this Agreement is included.
+3. REDISTRIBUTION
+-----------------
 
---------------------------------------------------------------------------------
+You may share the original, unmodified ProduTime installer with others,
+provided that:
+
+a) you do not charge a fee for it;
+b) you do not imply that you created, own, sponsor, or officially represent
+   ProduTime;
+c) you include this license and all required third-party notices; and
+d) you do not bundle ProduTime with malware, deceptive offers, or unrelated
+   commercial packages.
+
 4. RESTRICTIONS
---------------------------------------------------------------------------------
+---------------
 
-You may NOT:
+You may not:
 
-  a) Sell, sublicense, rent, lease, or otherwise commercialise the Software;
-  b) Modify, decompile, disassemble, or create derivative works from the
-     Software, except to the extent permitted by applicable law;
-  c) Remove or alter any copyright, trademark, or other proprietary notices;
-  d) Distribute modified versions of the Software under the "ProduTime" name;
-  e) Claim ownership or authorship of the Software.
+a) sell, sublicense, rent, lease, or otherwise commercialize ProduTime;
+b) modify, decompile, disassemble, or create derivative works from ProduTime,
+   except to the extent permitted by applicable law;
+c) remove, hide, or alter copyright, trademark, license, or proprietary notices;
+d) distribute modified versions of ProduTime under the ProduTime name;
+e) claim ownership or authorship of ProduTime; or
+f) use ProduTime in a way that violates applicable law or the rights of others.
 
---------------------------------------------------------------------------------
-5. DATA & PRIVACY
---------------------------------------------------------------------------------
+5. SOURCE CODE NOTICE
+---------------------
 
-ProduTime operates entirely locally on your device. No personal data, activity
-records, or usage information is transmitted to the Developer or any third
-party. All data is stored locally in your AppData folder and never leaves your
-machine.
+If ProduTime source code is visible in a public repository, that visibility is
+provided for transparency, review, and collaboration only. It does not grant an
+open-source license, and it does not permit copying, modification,
+redistribution, sublicensing, or creation of derivative works except as
+expressly allowed by this license or by applicable law.
 
---------------------------------------------------------------------------------
-6. UPDATES
---------------------------------------------------------------------------------
+6. DATA AND PRIVACY
+-------------------
 
-The Software may notify you when a newer version is available. Updates are
-optional and initiated solely by you. The Developer reserves the right to
-discontinue updates at any time without notice.
+ProduTime stores activity records, settings, reports, and local app data on the
+user's device by default. ProduTime does not send telemetry, activity records,
+or usage analytics to George Karagioules.
 
---------------------------------------------------------------------------------
-7. INTELLECTUAL PROPERTY
---------------------------------------------------------------------------------
+Network activity may occur only when a user or administrator enables or uses a
+networked feature, such as checking for updates, downloading updates, opening
+external links, pairing with an admin console, or configuring email/reporting
+delivery. See PRIVACY.md for the practical privacy summary.
 
-ProduTime and all associated intellectual property rights remain the exclusive
-property of George Karagioules. This Agreement does not transfer any ownership
-rights to you.
+7. THIRD-PARTY COMPONENTS
+-------------------------
 
---------------------------------------------------------------------------------
-8. DISCLAIMER OF WARRANTIES
---------------------------------------------------------------------------------
+ProduTime includes third-party open-source components. Those components remain
+under their own licenses. Required notices are provided in
+THIRD_PARTY_NOTICES.md. Nothing in this ProduTime license limits rights granted
+to you by third-party component licenses.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. THE DEVELOPER DOES NOT
-WARRANT THAT THE SOFTWARE WILL BE ERROR-FREE OR UNINTERRUPTED.
+8. UPDATES
+----------
 
---------------------------------------------------------------------------------
-9. LIMITATION OF LIABILITY
---------------------------------------------------------------------------------
+ProduTime may offer optional updates. Updates are provided at the developer's
+discretion and may be changed, paused, or discontinued at any time.
 
-IN NO EVENT SHALL THE DEVELOPER BE LIABLE FOR ANY INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING BUT NOT LIMITED TO
-LOSS OF DATA, LOSS OF PROFITS, OR BUSINESS INTERRUPTION) ARISING OUT OF OR IN
-CONNECTION WITH THE USE OR INABILITY TO USE THE SOFTWARE, EVEN IF THE
-DEVELOPER HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+9. NO WARRANTY
+--------------
 
---------------------------------------------------------------------------------
-10. GOVERNING LAW
---------------------------------------------------------------------------------
+PRODUTIME IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, ACCURACY, RELIABILITY, OR
+UNINTERRUPTED OPERATION.
 
-This Agreement shall be governed by and construed in accordance with the laws
-of the jurisdiction in which the Developer operates, without regard to its
-conflict of law provisions.
+10. LIMITATION OF LIABILITY
+---------------------------
 
---------------------------------------------------------------------------------
-11. CONTACT
---------------------------------------------------------------------------------
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, GEORGE KARAGIOULES SHALL
+NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, CONSEQUENTIAL,
+OR PUNITIVE DAMAGES, OR FOR LOSS OF DATA, PROFITS, REVENUE, BUSINESS,
+GOODWILL, OR COMPUTER FUNCTION, ARISING OUT OF OR RELATING TO PRODUTIME OR
+THIS LICENSE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
 
-For questions regarding this Agreement, please contact the Developer:
+11. TERMINATION
+---------------
 
-  George Karagioules
-  Web:     www.georgekaragioules.com
-  Email:   worldoftravelbyalice@gmail.com
+This license terminates automatically if you violate its terms. Upon
+termination, you must stop using ProduTime and delete any copies in your
+possession, except where retention is required by law.
 
---------------------------------------------------------------------------------
+12. GOVERNING LAW
+-----------------
 
-By installing ProduTime, you acknowledge that you have read, understood, and
-agree to be bound by the terms of this End User License Agreement.
+This license is governed by the laws of Greece, without regard to conflict of
+law rules, unless applicable consumer or local law requires otherwise.
 
-ProduTime v0.5.5 — Developed by George Karagioules — (c) 2026
+13. CONTACT
+-----------
+
+George Karagioules
+Web: https://www.georgekaragioules.com
+GitHub: https://github.com/gkaragioul
+
+ProduTime Freeware License
+Version 1.0 - 2026-05-30

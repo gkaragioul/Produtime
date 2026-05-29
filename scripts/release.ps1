@@ -39,7 +39,7 @@ Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # -- Preflight --------------------------------------------------------------------
-$RepoRelease = "wotbyalice/WOT-Produtime-Releases"
+$RepoRelease = "gkaragioul/Produtime"
 $Tag = "v$Version"
 
 Write-Host "[0/5] Preflight checks..." -ForegroundColor Yellow
@@ -162,9 +162,9 @@ Pop-Location
 $OutDir = Join-Path $RootDir "build-output"
 
 # Find the installer EXE --name is fixed so permanent GitHub latest link works
-$InstallerFile = Get-Item -Path (Join-Path $OutDir "WOT-Produtime-Setup.exe") -ErrorAction SilentlyContinue
+$InstallerFile = Get-Item -Path (Join-Path $OutDir "ProduTime-Setup.exe") -ErrorAction SilentlyContinue
 if (-not $InstallerFile) {
-    Write-Error "WOT-Produtime-Setup.exe not found in $OutDir"
+    Write-Error "ProduTime-Setup.exe not found in $OutDir"
     exit 1
 }
 

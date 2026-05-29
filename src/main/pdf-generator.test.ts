@@ -15,7 +15,7 @@ describe('PDFGenerator - Story 3 core generation', () => {
   const mockDb: any = {
     getSetting: jest.fn((key: string) => {
       if (key === 'export_folder') return testDir;
-      if (key === 'employee_name') return 'Alice Example';
+      if (key === 'employee_name') return 'Example User';
       return null;
     }),
     getActivityLogsByDateRange: jest.fn((start: string, end: string) => {
@@ -84,7 +84,7 @@ describe('PDFGenerator - Story 3 core generation', () => {
     // Metadata: title, employee name, date
     expect(html).toContain('<!DOCTYPE html>');
     expect(html).toContain('Daily Activity Report');
-    expect(html).toContain('Employee: Alice Example');
+    expect(html).toContain('Employee: Example User');
     expect(html).toContain('Generated on');
 
     // Activity table headers

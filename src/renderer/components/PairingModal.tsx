@@ -1,12 +1,12 @@
 /**
  * PairingModal Component
- * Allows users to pair their device with the WOT cloud Admin Console.
+ * Allows users to pair their device with the ProduTime Admin Console.
  */
 
 import React, { useState, useEffect } from 'react';
 
-const CLOUD_API_URL = 'https://wot-produtime-production.up.railway.app';
-const CLOUD_DISPLAY_HOST = 'wot-produtime-production.up.railway.app';
+const CLOUD_API_URL = 'https://produtime-admin.georgekaragioules.com';
+const CLOUD_DISPLAY_HOST = 'produtime-admin.georgekaragioules.com';
 
 interface PairingModalProps {
   isOpen: boolean;

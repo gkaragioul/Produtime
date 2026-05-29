@@ -1,7 +1,7 @@
 {
   "name": "produtime-admin-web",
   "version": "1.0.0",
-  "description": "ProduTime Admin Console - Web Edition (deployable to Railway)",
+  "description": "ProduTime Admin Console - optional web management edition",
   "main": "dist/server/server/index.js",
   "scripts": {
     "build:server": "tsc -p tsconfig.server.json",
@@ -14,7 +14,7 @@
   },
   "keywords": ["produtime", "admin-console", "web", "time-tracking"],
   "author": "George Karagioules",
-  "license": "Freeware",
+  "license": "SEE LICENSE IN ../LICENSE.txt",
   "dependencies": {
     "better-sqlite3": "^12.2.0",
     "cors": "^2.8.5",

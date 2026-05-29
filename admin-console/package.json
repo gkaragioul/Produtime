@@ -20,7 +20,7 @@
     "management"
   ],
   "author": "George Karagioules",
-  "license": "Freeware",
+  "license": "SEE LICENSE IN LICENSE.txt",
   "dependencies": {
     "better-sqlite3": "^12.2.0",
     "react": "^19.1.1",
@@ -61,6 +61,18 @@
       {
         "from": "../assets/PTAdminIcon.png",
         "to": "assets/PTAdminIcon.png"
+      },
+      {
+        "from": "../LICENSE.txt",
+        "to": "LICENSE.txt"
+      },
+      {
+        "from": "../PRIVACY.md",
+        "to": "PRIVACY.md"
+      },
+      {
+        "from": "../THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
       }
     ],
     "win": {

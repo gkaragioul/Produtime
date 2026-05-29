@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { SettingsTab } from "./components/SettingsTab";
 import { DailyPerformanceConsole } from "./components/DailyPerformanceConsole";
 import { AdminAuthService } from "./services/admin-auth-service";
 import { AdminTimeoutService } from "./services/admin-timeout-service";
 import { AdminActivityDetector } from "./services/admin-activity-detector";
-import { LicensingGate } from "./components/licensing/LicensingGate";
 import { ManagedBadge } from "./components/ManagedBadge";
 import { PolicyView } from "./components/PolicyView";
 import { AdminLockScreen } from "./components/AdminLockScreen";
@@ -14,28 +12,13 @@ import { AutoUpdaterService } from "./services/auto-updater-service";
 import logoHeader from "../../assets/logo-header.png";
 import { UpdateState } from "../shared/types";
 
-type TabType = "dashboard" | "settings" | "policy";
+type TabType = "dashboard" | "settings";
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>("dashboard");
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [appVersion, setAppVersion] = useState<string>("");
-  const [isActivated, setIsActivated] = useState<boolean>(false); // Start as NOT activated
-  const [licenseCheckComplete, setLicenseCheckComplete] =
-    useState<boolean>(false); // Track if we've checked license
-
-  // Enhanced Licensing (v1.8) state
-  const [enhancedLicenseStatus, setEnhancedLicenseStatus] = useState<any>(null);
-  const [showLicensingGate, setShowLicensingGate] = useState<boolean>(false);
-  const manualActivationRequestedRef = useRef<boolean>(false); // Track manual activation request from menu
-
-  const [showTimeoutWarning, setShowTimeoutWarning] = useState<boolean>(false);
-  const [timeoutRemaining, setTimeoutRemaining] = useState<number>(0);
-
-  // Tracks if a logout occurred via timeout modal so we can gate Settings view in tests
-  const [wasLoggedOut, setWasLoggedOut] = useState<boolean>(false);
-
   // Auto-updater state
   const [updateState, setUpdateState] = useState<UpdateState | null>(null);
   const [updateDismissed, setUpdateDismissed] = useState(false);
@@ -142,97 +125,6 @@ const App: React.FC = () => {
       unsubscribeState?.();
       unsubscribeLock?.();
       unsubscribeUnlock?.();
-    };
-  }, []);
-
-  // Check license activation on startup - MUST complete before showing app
-  useEffect(() => {
-    console.log("[LICENSE] useEffect triggered - starting activation check");
-
-    // Enhanced Licensing (v1.8) check
-    const checkEnhancedLicense = async () => {
-      try {
-        console.log("[LICENSE] Checking enhanced license status...");
-        const response = await window.api.getLicenseStatus();
-        console.log("[LICENSE] Enhanced status:", response);
-
-        if (response.success && response.data) {
-          const status = response.data;
-          setEnhancedLicenseStatus(status);
-
-          if (status.isEntitled) {
-            // User has valid license or trial
-            setIsActivated(true);
-            // Only hide licensing gate if not manually requested by user (from Help menu)
-            if (!manualActivationRequestedRef.current) {
-              setShowLicensingGate(false);
-            }
-          } else if (status.mode === 'locked') {
-            // Locked mode - always show LicensingGate (the clean welcome screen)
-            // This handles both first-run and expired cases with the same UI
-            setIsActivated(false);
-            setShowLicensingGate(true);
-          } else {
-            // Fallback: any other state - show licensing gate
-            setIsActivated(false);
-            setShowLicensingGate(true);
-          }
-        } else {
-          // API not available - show licensing gate
-          console.log("[LICENSE] Enhanced licensing API not available");
-          setIsActivated(false);
-          setShowLicensingGate(true);
-        }
-      } catch (error) {
-        console.error("[LICENSE] Error checking enhanced license:", error);
-        // On error - show licensing gate
-        setIsActivated(false);
-        setShowLicensingGate(true);
-      } finally {
-        // Mark license check as complete
-        setLicenseCheckComplete(true);
-      }
-    };
-
-    // Start with enhanced license check
-    checkEnhancedLicense();
-
-    // Periodic validation every 30 seconds to catch trial expiry
-    const validationInterval = setInterval(() => {
-      checkEnhancedLicense();
-    }, 30000); // Check every 30 seconds
-
-    return () => clearInterval(validationInterval);
-  }, []);
-
-  // Subscribe to main-process lockout push (belt-and-suspenders)
-  useEffect(() => {
-    if (!window.electronAPI?.onLicenseLockout) return;
-    const unsubscribe = window.electronAPI.onLicenseLockout((status: any) => {
-      console.log("[LICENSE] Lockout push received from main:", status);
-      setIsActivated(false);
-      // Show licensing gate for revoked/expired licenses
-      setShowLicensingGate(true);
-    });
-    return () => {
-      try {
-        unsubscribe && unsubscribe();
-      } catch {}
-    };
-  }, []);
-
-  // Open License activation screen on demand from Help menu
-  useEffect(() => {
-    if (!window.electronAPI?.onOpenActivation) return;
-    const unsubscribe = window.electronAPI.onOpenActivation(() => {
-      // Show the licensing gate for manual activation
-      manualActivationRequestedRef.current = true;
-      setShowLicensingGate(true);
-    });
-    return () => {
-      try {
-        unsubscribe && unsubscribe();
-      } catch {}
     };
   }, []);
 
@@ -363,48 +255,7 @@ const App: React.FC = () => {
         }}
       />
 
-      {!licenseCheckComplete ? (
-        <div className="loading">
-          <div className="loading-spinner"></div>
-          <p>Initializing ProduTime...</p>
-        </div>
-      ) : (
-        <>
-          {/* Enhanced Licensing Gate (v1.8) - For activation */}
-          {showLicensingGate && (
-            <LicensingGate
-              onActivated={() => {
-                setShowLicensingGate(false);
-                manualActivationRequestedRef.current = false; // Clear manual flag when activated
-                setIsActivated(true);
-              }}
-              onCancel={() => {
-                // User clicked Back - close the gate and return to app
-                setShowLicensingGate(false);
-                manualActivationRequestedRef.current = false;
-              }}
-              forceShowActivation={manualActivationRequestedRef.current}
-            />
-          )}
-
-          {/* Show main app when activated (or no licensing screens showing) */}
-          {!showLicensingGate && (
-            <div className="app-shell">
-              {/* Trial Banner - shown when in trial mode */}
-              {enhancedLicenseStatus?.mode === 'trial' && enhancedLicenseStatus?.trialDaysRemaining !== undefined && (
-                <div className="trial-banner">
-                  <span>🎁 Trial Mode - {enhancedLicenseStatus.trialDaysRemaining} days remaining</span>
-                  <button
-                    className="trial-activate-btn"
-                    onClick={() => {
-                      manualActivationRequestedRef.current = true;
-                      setShowLicensingGate(true);
-                    }}
-                  >
-                    Activate License
-                  </button>
-                </div>
-              )}
+      <div className="app-shell">
               <div className="header">
                 <div className="header-content">
                   <img
@@ -467,10 +318,7 @@ const App: React.FC = () => {
                   </>
                 )}
               </div>
-            </div>
-          )}
-        </>
-      )}
+      </div>
 
       {/* Update progress bar — fixed bottom-left, always on top.
           Callbacks route through AutoUpdaterService so failures surface

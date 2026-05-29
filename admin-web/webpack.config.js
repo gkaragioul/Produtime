@@ -44,7 +44,6 @@ module.exports = {
     new CopyPlugin({
       patterns: [
         { from: './assets/PTAdminIcon.png', to: 'assets/' },
-        { from: './assets/WOTLockerIcon.png', to: 'assets/' },
         { from: './src/client/manifest.webmanifest', to: 'manifest.webmanifest' },
       ],
     }),

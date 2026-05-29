@@ -1,12 +1,12 @@
 {
   "name": "produtime",
-  "version": "1.1.18",
-  "description": "ProduTime - Free local-only time tracking application",
+  "version": "1.1.27",
+  "description": "ProduTime - free proprietary local-first time tracking and productivity reporting app",
   "main": "dist/main/main.js",
-  "homepage": "https://github.com/wotbyalice/WOT-Produtime",
+  "homepage": "https://github.com/gkaragioul/Produtime",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wotbyalice/WOT-Produtime.git"
+    "url": "https://github.com/gkaragioul/Produtime.git"
   },
   "scripts": {
     "prepare": "husky install",
@@ -40,20 +40,13 @@
     "build:safe": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/safe-build.ps1",
     "verify:current": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-validator.ps1",
     "panic:restore": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/panic-restore.ps1",
-    "panic:restore:license-manager": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/panic-restore-license-manager.ps1",
     "status": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"if (Test-Path CURRENT_VERSION.lock) { Get-Content CURRENT_VERSION.lock | ConvertFrom-Json | Format-List } else { Write-Host 'No version lock found' }\"",
     "workspace:startup": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/workspace-startup.ps1",
     "test:launch": "powershell -NoProfile -ExecutionPolicy Bypass -Command \"$p = Start-Process -FilePath 'build-output\\win-unpacked\\ProduTime.exe' -PassThru; Start-Sleep 5; if ($p.HasExited) { Write-Host 'FAILED: App crashed'; exit 1 } else { Write-Host 'PASSED: App running'; Stop-Process $p; exit 0 }\"",
-    "license:keypair": "ts-node --project tools/tsconfig.json tools/license-generator.ts keypair",
-    "license:generate": "ts-node --project tools/tsconfig.json tools/license-generator.ts generate",
-    "license:activate": "ts-node --project tools/tsconfig.json tools/license-generator.ts activate",
     "deploy:local": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/deploy-to-local.ps1",
     "test:produtime": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/launch-local-produtime.ps1",
     "test:produtime:silent": "wscript.exe //nologo .\\scripts\\start-produtime-silent.vbs",
-    "test:license-manager": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/launch-local-license-manager.ps1",
-    "test:license-manager:silent": "wscript.exe //nologo .\\scripts\\start-license-manager-silent.vbs",
     "package:produtime": "npm run dist:x64 && powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-for-distribution.ps1",
-    "package:license-manager": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/safe-build-license-manager.ps1",
     "package:all": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-for-distribution.ps1",
     "package:existing": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/package-existing-installs.ps1",
     "save:working": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/tag-working-version.ps1",
@@ -62,8 +55,8 @@
     "deps:check": "npm outdated",
     "deps:update": "npm update",
     "deps:audit": "npm audit fix",
-    "typecheck": "tsc -p src/main/tsconfig.json --noEmit && tsc -p licensing-server/api/tsconfig.json --noEmit",
-    "test:all": "npm test && node scripts/simulate-license-scenarios.js"
+    "typecheck": "tsc -p src/main/tsconfig.json --noEmit",
+    "test:all": "npm test"
   },
   "keywords": [
     "produtime",
@@ -73,7 +66,7 @@
     "typescript"
   ],
   "author": "George Karagioules",
-  "license": "Freeware",
+  "license": "SEE LICENSE IN LICENSE.txt",
   "devDependencies": {
     "@eslint/js": "^9.34.0",
     "@swc/core": "^1.13.5",
@@ -134,7 +127,7 @@
     ]
   },
   "build": {
-    "appId": "com.worldoftravel.produtime",
+    "appId": "com.georgekaragioules.produtime",
     "productName": "ProduTime",
     "icon": "assets/icon.ico",
     "asar": true,
@@ -161,6 +154,18 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "LICENSE.txt",
+        "to": "LICENSE.txt"
+      },
+      {
+        "from": "PRIVACY.md",
+        "to": "PRIVACY.md"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
       }
     ],
     "win": {
@@ -188,12 +193,12 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "wotbyalice",
-      "repo": "WOT-Produtime-Releases"
+      "owner": "gkaragioul",
+      "repo": "Produtime"
     },
     "nsis": {
       "oneClick": false,
-      "artifactName": "WOT-Produtime-Setup.${ext}",
+      "artifactName": "ProduTime-Setup.${ext}",
       "allowToChangeInstallationDirectory": true,
       "license": "LICENSE_EULA.txt",
       "createDesktopShortcut": true,
