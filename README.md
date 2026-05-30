@@ -8,6 +8,10 @@ and released as freeware. It is free to use, requires no activation key, and
 does not require a subscription. The source may be visible for transparency, but
 ProduTime is not open-source software.
 
+<p align="center">
+  <img src="assets/readme/produtime-main.png" alt="ProduTime desktop dashboard showing current activity, active time, idle time and productivity metrics" width="920">
+</p>
+
 ## What It Does
 
 ProduTime runs locally on a Windows desktop and helps users understand how time
@@ -19,6 +23,14 @@ is spent during the work day.
 - Privacy mode for sensitive app/window titles
 - Optional local/admin management features for controlled environments
 - Optional update checks through GitHub Releases
+
+## Screenshots
+
+<p align="center">
+  <img src="assets/readme/produtime-top-apps.png" alt="ProduTime top apps and detailed activity report" width="30%">
+  <img src="assets/readme/produtime-dashboard.png" alt="ProduTime focus summary dashboard on Windows" width="30%">
+  <img src="assets/readme/produtime-admin-console.png" alt="ProduTime admin console dashboard" width="30%">
+</p>
 
 ## Download
 
