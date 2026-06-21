@@ -1,6 +1,10 @@
-# TimePort Assets
+# ProduTime Assets
 
-This directory contains static assets used by the TimePort application.
+This directory contains static assets used by the ProduTime application.
+
+Unless a file clearly states otherwise, ProduTime-specific icons, screenshots,
+logos, and product artwork are part of the proprietary freeware distribution and
+are not licensed separately as open-source assets.
 
 ## Current Assets
 
@@ -64,5 +68,5 @@ assets/
 
 ---
 
-_Last Updated: August 29, 2025_
+_Last Updated: June 22, 2026_
 _Assets Version: 1.0_

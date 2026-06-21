@@ -1,12 +1,13 @@
 # ProduTime
 
-Free proprietary desktop time tracking and productivity reporting software for
-Windows.
+Source-available proprietary freeware for local-first desktop time tracking and
+productivity reporting on Windows.
 
 ProduTime is developed by [George Karagioules](https://www.georgekaragioules.com)
 and released as freeware. It is free to use, requires no activation key, and
 does not require a subscription. The source may be visible for transparency, but
-ProduTime is not open-source software.
+ProduTime is not open-source software and is not released under an open-source
+license.
 
 <p align="center">
   <a href="https://github.com/gkaragioul/Produtime/releases/latest"><strong>Download</strong></a>
@@ -41,8 +42,10 @@ is spent during the work day.
 Get the latest installer from the
 [Releases page](https://github.com/gkaragioul/Produtime/releases/latest).
 
-> ProduTime is freeware: free to use, not for resale, and not for modified
-> redistribution under the ProduTime name.
+> ProduTime is proprietary freeware: free to install and use, but not open
+> source. You may not modify, sublicense, sell, commercialize, or redistribute
+> modified versions except where expressly permitted by the license or
+> applicable law.
 
 ## Privacy Summary
 
@@ -124,5 +127,8 @@ ProduTime is proprietary freeware. See [LICENSE.txt](LICENSE.txt).
 
 Third-party notices are listed in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Third-party dependencies, Electron/Chromium/Node components, and any files that
+clearly state a separate license remain under their own license terms.
 
 Copyright (c) 2026 George Karagioules. All rights reserved.

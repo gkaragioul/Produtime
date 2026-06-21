@@ -1,11 +1,11 @@
 # ProduTime Developer Notes
 
-ProduTime is the free proprietary Windows desktop app for local time tracking
-and productivity reporting.
+ProduTime is the source-available proprietary freeware Windows desktop app for
+local time tracking and productivity reporting.
 
 The current public positioning is:
 
-- Freeware, not open source
+- Source-available freeware, not open source
 - No subscription, trial, activation key, or paid license required
 - Local-first by default
 - No telemetry or activity-data transmission to George Karagioules

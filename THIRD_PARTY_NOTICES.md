@@ -4,9 +4,10 @@ ProduTime includes third-party open-source components. Those components are
 owned by their respective authors and remain under their own licenses.
 
 This notice summarizes the direct runtime dependencies declared by ProduTime.
-Transitive dependency details are recorded in `package-lock.json`.
+Transitive dependency licenses should be reviewed from the installed package
+metadata and each dependency's `LICENSE*` files after `npm install`.
 
-| Component | Version in lockfile | License |
+| Component | Reviewed version | License |
 |---|---:|---|
 | @journeyapps/sqlcipher | 5.3.1 | BSD-3-Clause |
 | active-win | 8.2.1 | MIT |
@@ -34,5 +35,6 @@ Electron and electron-builder with binary distributions.
 The canonical license text for each npm dependency can be found in the
 dependency package under `node_modules/<package>/LICENSE*` after `npm install`.
 
-For redistribution, keep this file, `LICENSE.txt`, and any Electron/Chromium
-notices together with ProduTime binaries.
+For redistribution of original, unmodified ProduTime installers as permitted by
+`LICENSE.txt`, keep this file, `LICENSE.txt`, and any Electron/Chromium notices
+together with ProduTime binaries.
