@@ -9,6 +9,10 @@ does not require a subscription. The source may be visible for transparency, but
 ProduTime is not open-source software.
 
 <p align="center">
+  <a href="https://github.com/gkaragioul/Produtime/releases/latest"><strong>Download</strong></a>
+</p>
+
+<p align="center">
   <img src="assets/readme/produtime-main.png" alt="ProduTime desktop dashboard showing current activity, active time, idle time and productivity metrics" width="920">
 </p>
 
