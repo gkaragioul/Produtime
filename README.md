@@ -10,7 +10,7 @@ ProduTime is not open-source software and is not released under an open-source
 license.
 
 <p align="center">
-  <a href="https://github.com/gkaragioul/Produtime/releases/latest"><strong>Download</strong></a>
+  <a href="https://github.com/gkaragioul/Produtime/releases"><strong>Download</strong></a>
 </p>
 
 <p align="center">
@@ -39,8 +39,9 @@ is spent during the work day.
 
 ## Download
 
-Get the latest installer from the
-[Releases page](https://github.com/gkaragioul/Produtime/releases/latest).
+Installers are published on the
+[Releases page](https://github.com/gkaragioul/Produtime/releases) when builds
+are available.
 
 > ProduTime is proprietary freeware: free to install and use, but not open
 > source. You may not modify, sublicense, sell, commercialize, or redistribute
