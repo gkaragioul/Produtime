@@ -79,3 +79,10 @@ DerivedData/
 .netrc
 Packages/
 .build/
+
+# Local AI-agent / tool config (per machine, never commit)
+.mcp.json
+mempalace.yaml
+entities.json
+CLAUDE.md
+.claude/
