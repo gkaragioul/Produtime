@@ -1,5 +1,10 @@
-import { app, ipcMain, IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, ipcMain, IpcMainInvokeEvent } from 'electron';
 import { DatabaseManager } from './database';
+import {
+  generateAdminPassword,
+  hashAdminPassword,
+  isLegacyDefaultAdminPassword,
+} from './admin-password';
 // Auto-updater IPC is registered directly in auto-updater.ts via AutoUpdaterManager
 import { PDFGenerator } from './pdf-generator';
 import { SystemTrayManager } from './system-tray';
@@ -1296,6 +1301,47 @@ export class IPCHandlers {
     }
   }
 
+  // Shows a newly generated admin password once, in a native dialog owned by
+  // the window that asked to log in. The password is never logged or stored
+  // in plain text. Returns false if the dialog could not be shown, so the
+  // caller does not store a password nobody has seen.
+  private async showGeneratedAdminPassword(
+    event: IpcMainInvokeEvent,
+    password: string,
+    reason: 'first-run' | 'replaced-default'
+  ): Promise<boolean> {
+    const message =
+      reason === 'first-run'
+        ? 'A ProduTime admin password has been created for this computer.'
+        : 'The old default admin password has been replaced with a new random password.';
+    const options: Electron.MessageBoxOptions = {
+      type: 'warning',
+      title: 'ProduTime admin password',
+      message,
+      detail:
+        `Admin password: ${password}\n\n` +
+        'Write it down or store it in a password manager now. ' +
+        'It is shown only once and cannot be recovered from ProduTime.',
+      buttons: ['Copy password', 'Close'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    };
+    try {
+      const owner = event?.sender ? BrowserWindow.fromWebContents(event.sender) : null;
+      const result = owner
+        ? await dialog.showMessageBox(owner, options)
+        : await dialog.showMessageBox(options);
+      if (result.response === 0) {
+        clipboard.writeText(password);
+      }
+      return true;
+    } catch (err) {
+      this.logger.error('ADMIN', 'Could not show the generated admin password', err);
+      return false;
+    }
+  }
+
   // Admin authentication handlers
   private async handleAdminLogin(
     event: IpcMainInvokeEvent,
@@ -1318,18 +1364,31 @@ export class IPCHandlers {
       }
       const lockoutState = this.database.getLockoutState();
 
-      // Get the admin password hash from settings, or generate and store a secure one on first run
+      // Get the admin password hash from settings. There is no built-in
+      // default password: on first use a random one is generated and shown
+      // once to the person at this machine.
       const crypto = require('crypto');
       let adminPasswordHash = await this.database.getSetting('admin_password_hash');
 
       if (!adminPasswordHash) {
-        // Default password on first run: admin123
-        const defaultPassword = 'admin123';
-        const salt = crypto.randomBytes(16);
-        const derivedKey = crypto.scryptSync(defaultPassword, salt, 32);
-        adminPasswordHash = salt.toString('hex') + ':' + derivedKey.toString('hex');
-        this.database.setSetting('admin_password_hash', adminPasswordHash);
-        this.logger.info('ADMIN', 'Set default admin password on first run');
+        const generated = generateAdminPassword();
+        if (!(await this.showGeneratedAdminPassword(event, generated, 'first-run'))) {
+          return { success: false, error: 'Could not show the new admin password. Please try again.' };
+        }
+        this.database.setSetting('admin_password_hash', hashAdminPassword(generated));
+        this.logger.info('ADMIN', 'Generated a random admin password on first run');
+        // This attempt was made before the password existed, so it is not
+        // counted as a failed login.
+        return {
+          success: true,
+          data: {
+            success: false,
+            isLockedOut: false,
+            failedAttempts: lockoutState.failed_attempts_count,
+            maxAttempts: this.LOCKOUT_THRESHOLD,
+            passwordGenerated: true,
+          },
+        };
       }
 
       // Hash the incoming password for comparison
@@ -1383,6 +1442,16 @@ export class IPCHandlers {
           is_locked: false,
           locked_until: null,
         });
+
+        // Installs set up by older versions still use the fixed first-run
+        // password. Replace it with a random one and show that once.
+        if (isLegacyDefaultAdminPassword(request.password)) {
+          const generated = generateAdminPassword();
+          if (await this.showGeneratedAdminPassword(event, generated, 'replaced-default')) {
+            this.database.setSetting('admin_password_hash', hashAdminPassword(generated));
+            this.logger.warn('ADMIN', 'Replaced the old default admin password with a random one');
+          }
+        }
 
         return {
           success: true,

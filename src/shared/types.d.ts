@@ -164,6 +164,8 @@ export interface AdminLoginResponse {
     lockoutExpiresAt?: string;
     failedAttempts: number;
     maxAttempts: number;
+    // True when this attempt created the admin password and showed it once.
+    passwordGenerated?: boolean;
 }
 export interface UpdateInfo {
     version: string;

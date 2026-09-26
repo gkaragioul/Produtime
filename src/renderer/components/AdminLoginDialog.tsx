@@ -128,6 +128,14 @@ export const AdminLoginDialog: React.FC<AdminLoginDialogProps> = ({
       const result: AdminLoginResponse = await adminAuthService.login(password);
       console.log('🔧 [DEBUG] AdminLoginDialog: Login result:', result);
 
+      if (!result.success && result.passwordGenerated) {
+        // First use: the main process created the admin password and showed
+        // it once in a separate window. This attempt does not count as failed.
+        setPassword('');
+        setError('An admin password was created and shown in a separate window. Enter it to log in.');
+        return;
+      }
+
       if (result.success) {
         console.log('🔧 [DEBUG] AdminLoginDialog: Login successful');
         setPassword('');
