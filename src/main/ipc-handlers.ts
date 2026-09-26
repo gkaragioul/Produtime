@@ -1914,7 +1914,8 @@ export class IPCHandlers {
       if (pairCode.length === 0 || pairCode.length > 128) {
         return { success: false, error: 'Invalid pair code' };
       }
-      const result = await this.agentService.startCloudPairing(parsed.toString(), pairCode);
+      const serverUrl = parsed.toString().replace(/\/+$/, '');
+      const result = await this.agentService.startCloudPairing(serverUrl, pairCode);
       return { success: true, data: result };
     } catch (error: any) {
       return { success: false, error: error.message };

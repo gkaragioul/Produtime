@@ -336,6 +336,25 @@ export class DatabaseManager {
             WHERE key IN ('admin_password_hash', 'failed_attempts_alert_last_sent_at');
         `,
       },
+      {
+        version: 12,
+        description: 'Forget connections to the discontinued hosted admin service',
+        up: `
+          -- Older versions connected every install to a built-in admin server
+          -- hosted on Railway. That service no longer exists and its address
+          -- could be claimed by someone else, so forget any pairing that
+          -- points at a Railway-hosted endpoint, together with the policy it
+          -- pushed. The device then stays unpaired until the user pairs it
+          -- with a server address they enter themselves.
+          DELETE FROM effective_policy
+            WHERE EXISTS (
+              SELECT 1 FROM agent_pairing
+              WHERE id = 1 AND cloud_ws_endpoint LIKE '%.railway.app%'
+            );
+          DELETE FROM agent_pairing
+            WHERE cloud_ws_endpoint LIKE '%.railway.app%';
+        `,
+      },
     ];
 
     // Get current migration version

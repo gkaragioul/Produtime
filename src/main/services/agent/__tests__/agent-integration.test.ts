@@ -76,7 +76,7 @@ describe('Agent Integration Tests', () => {
         adminName: 'Cloud Admin Console',
         adminPubKey: 'base64publickey==',
         sessionToken: 'session-token-123',
-        wsEndpoint: 'wss://api.produtime.cloud/ws',
+        wsEndpoint: 'wss://admin.example.com/ws',
         tenantId: 'tenant-abc123',
         tenantName: 'Acme Corporation',
         initialPolicy: {

@@ -26,8 +26,8 @@ is spent during the work day.
 - Daily productivity summaries and schedule progress
 - PDF reports for daily, weekly, monthly, and custom ranges
 - Privacy mode for sensitive app/window titles
-- Optional local/admin management features for controlled environments
-- Optional update checks through GitHub Releases
+- Optional admin management, only after you pair the device with a server you choose
+- Automatic update checks against this repository's GitHub Releases
 
 ## Screenshots
 
@@ -51,12 +51,28 @@ ProduTime, build it from source as described in
 ## Privacy Summary
 
 ProduTime stores activity records, settings, reports, and local app data on the
-user's device by default. It does not send telemetry, activity records, or usage
-analytics to George Karagioules.
+user's device. It has no built-in server and sends no telemetry, activity
+records, or usage analytics to George Karagioules or anyone else.
 
-Network activity only happens when a user or administrator uses a networked
-feature, such as update checks, admin-console pairing, external links, or
-configured email/report delivery. See [PRIVACY.md](PRIVACY.md).
+What leaves the device, and when:
+
+- **Update checks (automatic):** about 10 seconds after start and then every
+  4 hours, ProduTime asks GitHub whether a newer release of
+  `gkaragioul/Produtime` exists. GitHub sees the request (your IP address and
+  the app version); no activity data is sent.
+- **Admin server (only if you pair):** ProduTime connects to an admin server
+  only after someone enters that server's address and a pair code under
+  Help > Register Device. From then on it sends the device name (employee name
+  or computer name), local IP address, OS, app version, and activity summaries
+  (active/idle time and time per app, with website names for browsers) to that
+  server. Unpaired installs make no such connection.
+- **Email (only if configured):** reports, report-failure notices and test
+  emails go through the SMTP server you set up.
+- **Links:** opening an external link opens it in your browser.
+
+Versions before this change connected every install to a built-in hosted
+admin server. That server no longer exists; upgraded installs forget any
+pairing with it automatically. See [PRIVACY.md](PRIVACY.md).
 
 ## Monitoring Other People
 
@@ -77,10 +93,9 @@ controlled only by who can use the computer:
   under, or who can otherwise use that PC and read its files, can open the
   dashboard, settings and reports and change settings.
 - **Admin Console:** anyone who can use the PC it runs on can see the data of
-  every paired device and change policies. ProduTime devices on the local
-  network can still connect to it to send their data, but a device is only
-  accepted after it pairs with a short-lived pairing code that you approve, and
-  its messages are signed.
+  every paired device and change policies. It listens on the local network so
+  devices can send it their data, but a device is only accepted after it pairs
+  with a short-lived pairing code that you approve, and its messages are signed.
 - **Web admin console (`admin-web/`):** it listens on `127.0.0.1` only and
   refuses requests from other computers and from other websites, so it can only
   be opened in a browser on the same PC. It cannot be deployed as a network or

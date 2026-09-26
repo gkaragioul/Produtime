@@ -459,16 +459,12 @@ export class AdminServer {
             });
 
             // Send PAIR_APPROVED so the agent transitions to paired state
-            const publicUrl = process.env.RAILWAY_PUBLIC_DOMAIN
-              ? `wss://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-              : null;
-
             const approvalMessage = this.signMessage('PAIR_APPROVED', deviceId!, {
               adminName: 'ProduTime Admin Console',
               adminPubKey: this.adminKeyPair?.publicKey,
               sessionToken: crypto.randomUUID(),
               initialPolicy: null,
-              wsEndpoint: publicUrl,
+              wsEndpoint: null, // local-only server: no public endpoint to hand out
             });
 
             try {
@@ -500,15 +496,12 @@ export class AdminServer {
 
           // Always send PAIR_APPROVED with current admin public key so the
           // agent has the latest key (handles server keypair regeneration)
-          const publicUrl = process.env.RAILWAY_PUBLIC_DOMAIN
-            ? `wss://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-            : null;
           const welcomeMsg = this.signMessage('PAIR_APPROVED', deviceId!, {
             adminName: 'ProduTime Admin Console',
             adminPubKey: this.adminKeyPair?.publicKey,
             sessionToken: crypto.randomUUID(),
             initialPolicy: null,
-            wsEndpoint: publicUrl,
+            wsEndpoint: null, // local-only server: no public endpoint to hand out
           });
           try {
             ws.send(JSON.stringify(welcomeMsg));
@@ -788,17 +781,12 @@ export class AdminServer {
       this.log(`[SERVER] Found pending WebSocket connection!`);
       this.log(`[SERVER] WebSocket readyState: ${pendingConn.ws.readyState} (1=OPEN)`);
       
-      // Include wsEndpoint so devices can reconnect via the cloud/public URL
-      const publicUrl = process.env.PUBLIC_URL || process.env.RAILWAY_PUBLIC_DOMAIN
-        ? `wss://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-        : null;
-
       const approvalMessage = this.signMessage('PAIR_APPROVED', pending.device_id, {
         adminName: 'ProduTime Admin Console',
         adminPubKey: this.adminKeyPair?.publicKey,
         sessionToken: crypto.randomUUID(),
         initialPolicy: null,
-        wsEndpoint: publicUrl,
+        wsEndpoint: null, // local-only server: no public endpoint to hand out
       });
       
       try {

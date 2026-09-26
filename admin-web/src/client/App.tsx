@@ -13,7 +13,6 @@ import { LogViewer } from './components/LogViewer';
 import { DeviceDetailPage } from './components/DeviceDetailPage';
 import { AppCategorization } from './components/AppCategorization';
 import { Analytics } from './components/Analytics';
-import { LockerView } from './components/LockerView';
 import {
   DashboardSummaryResponse,
   DashboardSummaryEnhanced,
@@ -29,7 +28,7 @@ import {
 // Logo — use the copied asset path
 const adminLogo = 'assets/PTAdminIcon.png';
 
-type PageType = 'dashboard' | 'devices' | 'policies' | 'pairing' | 'logs' | 'device-detail' | 'app-categories' | 'analytics' | 'locker';
+type PageType = 'dashboard' | 'devices' | 'policies' | 'pairing' | 'logs' | 'device-detail' | 'app-categories' | 'analytics';
 
 declare global {
   interface Window {
@@ -172,7 +171,6 @@ const App: React.FC = () => {
     { id: 'policies', label: 'Policies', icon: '📋' },
     { id: 'pairing', label: 'Pairing', icon: '🔗', badge: pendingCount > 0 ? pendingCount : undefined },
     { id: 'logs', label: 'Server Logs', icon: '📝' },
-    { id: 'locker', label: 'Secure Locker', icon: 'assets/PTAdminIcon.png' },
   ];
 
   return (
@@ -226,9 +224,6 @@ const App: React.FC = () => {
         <nav style={{ flex: 1, padding: '20px 0', overflow: 'auto' }}>
           {navItems.map((item) => (
             <React.Fragment key={item.id}>
-            {item.id === 'locker' && (
-              <div style={{ borderTop: '1px solid #333', margin: '12px 20px' }} />
-            )}
             <button
               onClick={() => { setCurrentPage(item.id as PageType); setSidebarOpen(false); }}
               style={{
@@ -292,7 +287,6 @@ const App: React.FC = () => {
           {currentPage === 'policies' && <PolicyManager />}
           {currentPage === 'pairing' && <PairingInbox onCountChange={setPendingCount} />}
           {currentPage === 'logs' && <LogViewer />}
-          {currentPage === 'locker' && <LockerView />}
           {currentPage === 'device-detail' && selectedDeviceId && (
             <DeviceDetailPage deviceId={selectedDeviceId} onBack={navigateBack} />
           )}

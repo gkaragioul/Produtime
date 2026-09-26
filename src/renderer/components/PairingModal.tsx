@@ -1,12 +1,24 @@
 /**
  * PairingModal Component
- * Allows users to pair their device with the ProduTime Admin Console.
+ * Allows users to pair their device with an admin server whose address they
+ * enter. There is no built-in server: nothing is contacted until the user
+ * enters an address and a pair code and presses Pair.
  */
 
 import React, { useState, useEffect } from 'react';
 
-const CLOUD_API_URL = 'https://produtime-admin.georgekaragioules.com';
-const CLOUD_DISPLAY_HOST = 'produtime-admin.georgekaragioules.com';
+// Returns an error message, or null when the address is a usable https:// URL.
+function validateServerUrl(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return 'Enter the address of your admin server';
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== 'https:') return 'The server address must start with https://';
+    return null;
+  } catch {
+    return 'Enter a full address, for example https://admin.example.com';
+  }
+}
 
 interface PairingModalProps {
   isOpen: boolean;
@@ -15,6 +27,7 @@ interface PairingModalProps {
 }
 
 export const PairingModal: React.FC<PairingModalProps> = ({ isOpen, onClose, onPaired }) => {
+  const [serverUrl, setServerUrl] = useState('');
   const [pairCode, setPairCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,6 +40,11 @@ export const PairingModal: React.FC<PairingModalProps> = ({ isOpen, onClose, onP
   }, [isOpen]);
 
   const handlePair = async () => {
+    const urlError = validateServerUrl(serverUrl);
+    if (urlError) {
+      setError(urlError);
+      return;
+    }
     if (pairCode.length !== 6) {
       setError('Please enter a valid 6-digit pair code');
       return;
@@ -34,21 +52,21 @@ export const PairingModal: React.FC<PairingModalProps> = ({ isOpen, onClose, onP
     setIsLoading(true);
     setError(null);
     try {
-      const response = await window.electronAPI.agentStartCloudPairing(CLOUD_API_URL, pairCode);
+      const response = await window.electronAPI.agentStartCloudPairing(serverUrl.trim(), pairCode);
       if (response.success && response.data?.success) {
         onPaired?.();
         onClose();
       } else {
-        setError(response.data?.error || response.error || 'Cloud pairing failed');
+        setError(response.data?.error || response.error || 'Pairing failed');
       }
     } catch {
-      setError('Failed to connect to cloud admin');
+      setError('Failed to connect to the admin server');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const isPairDisabled = isLoading || pairCode.length !== 6;
+  const isPairDisabled = isLoading || pairCode.length !== 6 || !serverUrl.trim();
 
   if (!isOpen) return null;
 
@@ -57,14 +75,22 @@ export const PairingModal: React.FC<PairingModalProps> = ({ isOpen, onClose, onP
       <div style={s.modal} onClick={(e) => e.stopPropagation()}>
         <h2 style={s.title}>Register Device</h2>
         <p style={s.subtitle}>
-          Connect this device to the ProduTime Admin Console.
-          Your administrator will provide a 6-digit pair code.
+          Connect this device to an admin server. Your administrator will give
+          you the server address and a 6-digit pair code. Once paired, this
+          device sends its name, IP address, app version and activity summaries
+          to that server.
         </p>
 
-        {/* Cloud endpoint display */}
-        <div style={s.endpointBox}>
-          <span style={s.endpointLabel}>Connecting to</span>
-          <span style={s.endpointValue}>{CLOUD_DISPLAY_HOST}</span>
+        {/* Server address */}
+        <div style={{ marginBottom: 16 }}>
+          <label style={s.fieldLabel}>Admin server address</label>
+          <input
+            type="url"
+            value={serverUrl}
+            onChange={(e) => setServerUrl(e.target.value)}
+            placeholder="https://admin.example.com"
+            style={s.urlInput}
+          />
         </div>
 
         {/* Pair code */}
@@ -115,14 +141,10 @@ const s: Record<string, React.CSSProperties> = {
   },
   title: { fontSize: 18, fontWeight: 600, marginBottom: 12 },
   subtitle: { fontSize: 14, color: '#666', marginBottom: 20 },
-  endpointBox: {
-    display: 'flex', alignItems: 'center', gap: 8,
-    padding: '10px 14px', backgroundColor: '#f0f7ff',
-    borderRadius: 8, marginBottom: 16,
-    border: '1px solid #b3d4f5',
+  urlInput: {
+    width: '100%', padding: 10, borderRadius: 8,
+    border: '1px solid #ddd', fontSize: 14, boxSizing: 'border-box',
   },
-  endpointLabel: { fontSize: 12, color: '#555', flexShrink: 0 },
-  endpointValue: { fontSize: 13, color: '#1565c0', fontFamily: 'monospace', wordBreak: 'break-all' },
   fieldLabel: { fontSize: 13, fontWeight: 500, color: '#444', display: 'block', marginBottom: 8 },
   codeInput: {
     width: '100%', padding: 12, borderRadius: 8,

@@ -25,7 +25,6 @@ import {
   STATS_SUMMARY_INTERVAL_MS,
   CLOUD_RECONNECT_BASE_DELAY_MS,
   CLOUD_RECONNECT_MAX_DELAY_MS,
-  CLOUD_ADMIN_WSS_URL,
 } from '../../../shared/admin-protocol';
 import {
   EnhancedHeartbeatPayload,
@@ -140,39 +139,20 @@ export class AgentService extends EventEmitter {
     // Load effective policy
     await this.loadEffectivePolicy();
     
-    // MANAGED DEPLOYMENT: Always connect to the hardcoded cloud admin URL.
-    // Generate keys if this is a fresh install, then connect.
-    if (!this.pairingState?.devicePubKey) {
-      console.log('[AGENT] Fresh install — generating keys for cloud auto-connect');
-      const keyPair = this.crypto.generateKeyPair();
-      this.pairingState = {
-        paired: false,
-        adminHost: null,
-        adminName: null,
-        adminPubKey: null,
-        devicePubKey: keyPair.publicKey,
-        devicePrivKeyEncrypted: this.crypto.encryptWithPassword(keyPair.privateKey, this.deviceId),
-        pairedAt: null,
-        lastConnectedAt: null,
-        sessionToken: null,
-        cloudWsEndpoint: CLOUD_ADMIN_WSS_URL,
-        tenantId: null,
-        tenantName: null,
-      };
-      await this.savePairingState();
+    // No built-in server: the agent connects only after the user has paired
+    // this device with a server address they entered. Unpaired installs make
+    // no outbound connection at all.
+    const endpoint = this.pairingState?.paired ? this.pairingState.cloudWsEndpoint : null;
+    if (endpoint) {
+      console.log('[AGENT] Connecting to the paired admin server:', endpoint);
+      this.isCloudMode = true;
+      this.state.isCloudConnection = true;
+      this.state.tenantName = this.pairingState?.tenantName || null;
+      this.connectToCloud(endpoint);
+    } else {
+      console.log('[AGENT] Not paired with an admin server; no connection will be made');
     }
 
-    // Always override to cloud endpoint (even if old local pairing exists)
-    if (this.pairingState) {
-      this.pairingState.cloudWsEndpoint = CLOUD_ADMIN_WSS_URL;
-    }
-
-    console.log('[AGENT] Connecting to cloud admin:', CLOUD_ADMIN_WSS_URL);
-    this.isCloudMode = true;
-    this.state.isCloudConnection = true;
-    this.state.tenantName = this.pairingState?.tenantName || null;
-    this.connectToCloud(CLOUD_ADMIN_WSS_URL);
-    
     console.log('Agent service initialized');
   }
 
@@ -518,6 +498,15 @@ export class AgentService extends EventEmitter {
    * Requirement 11.4: Fall back to local-only mode if unavailable
    */
   private connectToCloud(cloudWsEndpoint: string): void {
+    // Only encrypted WebSocket endpoints: device data must not travel in clear text.
+    if (!AgentService.isSecureWsEndpoint(cloudWsEndpoint)) {
+      console.warn('[AGENT] Refusing to connect to a non-wss:// admin endpoint:', cloudWsEndpoint);
+      this.state.status = 'disconnected';
+      this.state.cloudConnectionFailed = true;
+      this.emitStateChanged();
+      return;
+    }
+
     // Cancel any pending reconnect — we're starting one now.
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
@@ -620,9 +609,9 @@ export class AgentService extends EventEmitter {
     this.state.status = 'disconnected';
     this.emitStateChanged();
 
-    // Always reconnect to cloud — never give up
-    const cloudEndpoint = this.pairingState?.cloudWsEndpoint || CLOUD_ADMIN_WSS_URL;
-    if (cloudEndpoint) {
+    // Reconnect only to the endpoint of a server this device is paired with.
+    const cloudEndpoint = this.pairingState?.paired ? this.pairingState.cloudWsEndpoint : null;
+    if (cloudEndpoint && AgentService.isSecureWsEndpoint(cloudEndpoint)) {
       // Drop any pending reconnect so we don't stack two timers.
       if (this.reconnectTimeout) {
         clearTimeout(this.reconnectTimeout);
@@ -1332,6 +1321,15 @@ export class AgentService extends EventEmitter {
       this.getPrivateKey()
     );
     this.send(message);
+  }
+
+  private static isSecureWsEndpoint(endpoint: string | null | undefined): boolean {
+    if (!endpoint) return false;
+    try {
+      return new URL(endpoint).protocol === 'wss:';
+    } catch {
+      return false;
+    }
   }
 
   /**

@@ -395,5 +395,3 @@ export const SESSION_TOKEN_EXPIRY_MS = 86400000;  // 24 hours
 export const CLOUD_RECONNECT_BASE_DELAY_MS = 1000;  // 1 second base delay
 export const CLOUD_RECONNECT_MAX_DELAY_MS = 60000;  // 60 seconds max delay
 
-// Hardcoded cloud admin endpoint for managed deployments
-export const CLOUD_ADMIN_WSS_URL = 'wss://wot-produtime-production.up.railway.app';
