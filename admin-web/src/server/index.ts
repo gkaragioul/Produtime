@@ -14,6 +14,7 @@ import { WebSocket } from 'ws';
 import { AdminDatabase } from './db';
 import { AdminServer } from './device-server';
 import { DeviceDetailService } from './device-detail-service';
+import { requireAdminPassword } from './admin-password';
 
 // ============================================================================
 // Configuration
@@ -21,7 +22,15 @@ import { DeviceDetailService } from './device-detail-service';
 
 const PORT = parseInt(process.env.PORT || '17888', 10);
 const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+// No built-in default: refuse to start unless ADMIN_PASSWORD is configured.
+const ADMIN_PASSWORD: string = (() => {
+  try {
+    return requireAdminPassword(process.env);
+  } catch (error) {
+    console.error(`[AUTH] ${(error as Error).message}`);
+    return process.exit(1);
+  }
+})();
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'admin-console.db');
 
 // ============================================================================
@@ -31,13 +40,13 @@ const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'dat
 const db = new AdminDatabase(DATABASE_PATH);
 const deviceServer = new AdminServer(db, PORT);
 
-// Ensure default admin password is set
+// Store the configured admin password hash on first start
 if (!db.getSetting('admin_password_hash')) {
   const salt = crypto.randomBytes(16);
   crypto.scrypt(ADMIN_PASSWORD, salt, 64, (err, derivedKey) => {
     if (!err) {
       db.setSetting('admin_password_hash', salt.toString('hex') + ':' + derivedKey.toString('hex'));
-      console.log('[AUTH] Default admin password hash stored');
+      console.log('[AUTH] Admin password hash stored');
     }
   });
 }
@@ -123,7 +132,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     let storedHash = db.getSetting('admin_password_hash');
     if (!storedHash) {
-      // First run - store default
+      // First run - store the configured ADMIN_PASSWORD
       const salt = crypto.randomBytes(16);
       const hash = await new Promise<Buffer>((resolve, reject) => {
         crypto.scrypt(ADMIN_PASSWORD, salt, 64, (err, key) => err ? reject(err) : resolve(key));

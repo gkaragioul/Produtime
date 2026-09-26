@@ -45,6 +45,8 @@ RUN mkdir -p /data
 # Environment variables (overridable — Railway sets PORT automatically)
 ENV DATABASE_PATH=/data/admin-console.db
 ENV NODE_ENV=production
+# ADMIN_PASSWORD has no default: set it (at least 12 characters) at deploy time,
+# otherwise the server refuses to start.
 
 # No HEALTHCHECK here — Railway manages its own healthcheck via /health
 # No EXPOSE — Railway assigns the port dynamically
