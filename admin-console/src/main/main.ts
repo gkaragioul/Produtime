@@ -3,10 +3,11 @@
  * No licensing, no update checks, all features available.
  */
 
-import { app, BrowserWindow, ipcMain, Menu, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, dialog, clipboard } from 'electron';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { AdminDatabase } from './db';
+import { generateAdminPassword, isLegacyDefaultAdminPassword } from './admin-password';
 import { AdminServer } from './server';
 
 let mainWindow: BrowserWindow | null = null;
@@ -148,6 +149,50 @@ function hashPassword(password: string, salt: Buffer): Promise<Buffer> {
   });
 }
 
+async function storeAdminPassword(password: string): Promise<void> {
+  const salt = crypto.randomBytes(16);
+  const hash = await hashPassword(password, salt);
+  db?.setSetting('admin_password_hash', salt.toString('hex') + ':' + hash.toString('hex'));
+}
+
+/**
+ * Shows a newly generated admin password once. Returns false if it could not
+ * be shown, so the caller does not store a password nobody has seen.
+ */
+async function showGeneratedAdminPassword(
+  password: string,
+  reason: 'first-run' | 'replaced-default'
+): Promise<boolean> {
+  const options: Electron.MessageBoxOptions = {
+    type: 'warning',
+    title: 'ProduTime Admin Console password',
+    message:
+      reason === 'first-run'
+        ? 'An Admin Console password has been created.'
+        : 'The old default Admin Console password has been replaced with a new random password.',
+    detail:
+      `Admin password: ${password}\n\n` +
+      'Write it down or store it in a password manager now. ' +
+      'It is shown only once and cannot be recovered from the Admin Console.',
+    buttons: ['Copy password', 'Close'],
+    defaultId: 0,
+    cancelId: 1,
+    noLink: true,
+  };
+  try {
+    const result = mainWindow
+      ? await dialog.showMessageBox(mainWindow, options)
+      : await dialog.showMessageBox(options);
+    if (result.response === 0) {
+      clipboard.writeText(password);
+    }
+    return true;
+  } catch (err) {
+    console.error('Could not show the generated admin password:', err);
+    return false;
+  }
+}
+
 /**
  * Re-push policy (with updated app categories) to all connected devices that have an assigned policy.
  */
@@ -178,14 +223,20 @@ function registerIpcHandlers(): void {
   // Authentication handlers
   ipcMain.handle('auth:login', async (_, password: string) => {
     try {
-      let storedHash = db?.getSetting('admin_password_hash') ?? null;
+      const storedHash = db?.getSetting('admin_password_hash') ?? null;
 
-      // First run: hash default password and store it
+      // First run: there is no default password. Generate a random one and
+      // show it once; this attempt does not log in.
       if (!storedHash) {
-        const salt = crypto.randomBytes(16);
-        const hash = await hashPassword('admin123', salt);
-        storedHash = salt.toString('hex') + ':' + hash.toString('hex');
-        db?.setSetting('admin_password_hash', storedHash);
+        const generated = generateAdminPassword();
+        if (!(await showGeneratedAdminPassword(generated, 'first-run'))) {
+          return { success: false, error: 'Could not show the new admin password. Please try again.' };
+        }
+        await storeAdminPassword(generated);
+        return {
+          success: false,
+          error: 'An admin password was created and shown in a separate window. Enter it to log in.',
+        };
       }
 
       // Verify the incoming password
@@ -196,6 +247,14 @@ function registerIpcHandlers(): void {
 
       // Constant-time comparison
       if (crypto.timingSafeEqual(expectedHash, incomingHash)) {
+        // Consoles set up by older versions still use the fixed first-run
+        // password. Replace it with a random one and show that once.
+        if (isLegacyDefaultAdminPassword(password)) {
+          const generated = generateAdminPassword();
+          if (await showGeneratedAdminPassword(generated, 'replaced-default')) {
+            await storeAdminPassword(generated);
+          }
+        }
         isAdminAuthenticated = true;
         authExpiry = Date.now() + 8 * 60 * 60 * 1000; // 8 hours
         return { success: true };
