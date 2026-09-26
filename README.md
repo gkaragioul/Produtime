@@ -10,7 +10,7 @@ ProduTime is not open-source software and is not released under an open-source
 license.
 
 <p align="center">
-  <a href="https://github.com/gkaragioul/Produtime/releases"><strong>Download</strong></a>
+  <a href="#build-from-source"><strong>Build from source</strong></a>
 </p>
 
 <p align="center">
@@ -39,9 +39,9 @@ is spent during the work day.
 
 ## Download
 
-Installers are published on the
-[Releases page](https://github.com/gkaragioul/Produtime/releases) when builds
-are available.
+No prebuilt installers are published for this repository at the moment. To use
+ProduTime, build it from source as described in
+[Build From Source](#build-from-source).
 
 > ProduTime is proprietary freeware: free to install and use, but not open
 > source. You may not modify, sublicense, sell, commercialize, or redistribute
@@ -57,6 +57,31 @@ analytics to George Karagioules.
 Network activity only happens when a user or administrator uses a networked
 feature, such as update checks, admin-console pairing, external links, or
 configured email/report delivery. See [PRIVACY.md](PRIVACY.md).
+
+## Monitoring Other People
+
+ProduTime records which applications and window titles are active, keyboard and
+mouse activity, and idle time. If you use it to monitor employees or anyone
+other than yourself, you must inform them and obtain their informed consent,
+and you are responsible for complying with the privacy, employment and
+data-protection laws that apply where you and they are (for example the GDPR in
+the EU). Do not use ProduTime for covert monitoring.
+
+## Admin Password
+
+ProduTime and the Admin Console have no built-in default admin password. The
+first time someone opens the admin login, a random password is generated and
+shown once in a separate window; store it in a password manager. Installs that
+still use the old default password of earlier versions are switched to a new
+random password (shown once) at their next admin login. The optional web admin
+console (`admin-web/`) refuses to start unless the `ADMIN_PASSWORD` environment
+variable is set to a password of at least 12 characters.
+
+## Known Limitations
+
+- Security alerts and failure notifications are sent with the sender address
+  `noreply@timeport.app` (from the project's former name), whatever SMTP account
+  you configure. Some mail servers may reject or flag these messages.
 
 ## Tech Stack
 
@@ -121,6 +146,13 @@ admin-console/    Optional ProduTime Admin Console
 admin-web/        Optional web admin console
 scripts/          Build and maintenance scripts
 ```
+
+## Disclaimer
+
+ProduTime is provided "as is", without warranty of any kind, express or
+implied. Use it at your own risk; the author is not liable for any damages,
+data loss or legal consequences arising from its use. See the "No Warranty"
+section of [LICENSE.txt](LICENSE.txt) for the full terms.
 
 ## License
 
