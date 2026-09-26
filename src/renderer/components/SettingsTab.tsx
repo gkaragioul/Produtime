@@ -1,8 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AdminAuthService } from '../services/admin-auth-service';
-import { AdminTimeoutService } from '../services/admin-timeout-service';
-import { AdminActivityDetector } from '../services/admin-activity-detector';
-import { AdminLoginDialog } from './AdminLoginDialog';
 
 import { IPCService } from '../services/ipc-service';
 import { PDFReportService } from '../services/pdf-report-service';
@@ -127,8 +123,6 @@ export function validateCustomDateRange(
 }
 
 export const SettingsTab: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [showLoginDialog, setShowLoginDialog] = useState(false);
   const [settings, setSettings] = useState<SettingsData>({
     work_schedule_start: '09:00',
     work_schedule_end: '17:00',
@@ -289,74 +283,19 @@ export const SettingsTab: React.FC = () => {
   const [privacyModeEnabled, setPrivacyModeEnabled] = useState(false);
   const [privacyApps, setPrivacyApps] = useState<string[]>([]);
 
-  // Initialize timeout and admin services safely (non-throwing in tests)
-  let timeoutService: AdminTimeoutService | null = null;
-  let activityDetector: AdminActivityDetector | null = null;
-  let adminAuthService: AdminAuthService | null = null;
-  try {
-    timeoutService = AdminTimeoutService.getInstance();
-    activityDetector = AdminActivityDetector.getInstance();
-    adminAuthService = AdminAuthService.getInstance(
-      timeoutService,
-      activityDetector
-    );
-  } catch (err) {
-    console.warn(
-      'SettingsTab: failed to initialize admin services; continuing in degraded mode.',
-      err
-    );
-  }
-
-  // Debug logging
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🔧 [DEBUG] SettingsTab: Timeout services initialized:', {
-      timeoutService: !!timeoutService,
-      activityDetector: !!activityDetector,
-      adminAuthService: !!adminAuthService,
-    });
-  }
   const ipcService = IPCService.getInstance();
   const validationService = SettingsValidationService.getInstance();
 
   useEffect(() => {
-    // Check if admin is already authenticated
-    if (adminAuthService?.isAdminAuthenticated?.()) {
-      setIsAuthenticated(true);
-      loadSettings();
-
-      loadLastAutoExportStatus();
-      loadAutoStartState();
-      loadPrivacySettings();
-    }
+    loadSettings();
+    loadLastAutoExportStatus();
+    loadAutoStartState();
+    loadPrivacySettings();
 
     // Cleanup on unmount
     return () => {
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
     };
-  }, []);
-
-  // React to admin auth changes (e.g., auto-logout from timeout)
-  useEffect(() => {
-    const handleAuthChange = (authed: boolean) => {
-      if (!authed) {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(
-            '[DEBUG] SettingsTab: Received auto-logout event, locking settings'
-          );
-        }
-        setIsAuthenticated(false);
-        setShowLoginDialog(false);
-      }
-    };
-    try {
-      adminAuthService?.onAuthChange?.(handleAuthChange);
-      return () => {
-        adminAuthService?.removeAuthChangeListener?.(handleAuthChange);
-      };
-    } catch (err) {
-      console.warn('SettingsTab: auth change listener unavailable', err);
-      return () => {};
-    }
   }, []);
 
   const loadAutoStartState = async () => {
@@ -462,29 +401,6 @@ export const SettingsTab: React.FC = () => {
       console.error('Error loading settings:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleSettingsAccess = () => {
-    if (adminAuthService?.isAdminAuthenticated?.()) {
-      setIsAuthenticated(true);
-      loadSettings();
-      loadLastAutoExportStatus();
-      loadAutoStartState();
-      loadPrivacySettings();
-    } else {
-      setShowLoginDialog(true);
-    }
-  };
-
-  const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
-    loadSettings();
-    loadLastAutoExportStatus();
-    loadAutoStartState();
-    loadPrivacySettings();
-    if (process.env.NODE_ENV === 'development') {
-      console.log('🔧 [DEBUG] SettingsTab: Admin login successful - silent timeout active');
     }
   };
 
@@ -727,31 +643,6 @@ export const SettingsTab: React.FC = () => {
     setTimeout(() => setSuccessMessage(''), 2000);
   };
 
-  const handleLogout = () => {
-    try {
-      adminAuthService?.logout?.();
-    } catch (err) {
-      console.warn('SettingsTab: logout failed (non-fatal in tests)', err);
-    }
-    setIsAuthenticated(false);
-
-    setSettings({
-      work_schedule_start: '09:00',
-      work_schedule_end: '17:00',
-      work_schedule_weekly: defaultWeekly(),
-      export_folder: '',
-      auto_export_enabled: 'true',
-
-      auto_export_time: '18:00',
-      idle_threshold: '300',
-      employee_name: '',
-      admin_alert_email: '',
-    });
-    setValidationResults({});
-    setErrors({});
-    setWarnings({});
-  };
-
   const renderFieldValidation = (fieldKey: keyof SettingsData) => (
     <>
       {(validationResults[fieldKey]?.error || errors[fieldKey]) && (
@@ -767,38 +658,11 @@ export const SettingsTab: React.FC = () => {
     </>
   );
 
-  if (!isAuthenticated) {
-    return (
-      <div className="settings-tab">
-        <div className="settings-locked">
-          <div className="lock-icon">🔒</div>
-          <h2>Settings Access Restricted</h2>
-          <p>Administrator authentication is required to access settings.</p>
-          <button
-            className="access-settings-button"
-            onClick={handleSettingsAccess}
-          >
-            Access Settings
-          </button>
-        </div>
-
-        <AdminLoginDialog
-          isOpen={showLoginDialog}
-          onClose={() => setShowLoginDialog(false)}
-          onSuccess={handleLoginSuccess}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="settings-tab">
       <div className="settings-header">
         <h2>Application Settings</h2>
         <div className="header-buttons">
-          <button className="logout-button" onClick={handleLogout}>
-            Logout
-          </button>
           <button
             className="exit-button"
             onClick={async () => {

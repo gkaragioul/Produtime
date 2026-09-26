@@ -5,7 +5,6 @@
 
 import React, { useState, useEffect } from 'react';
 import './mobile.css';
-import { AdminLogin } from './components/AdminLogin';
 import { DeviceList } from './components/DeviceList';
 import { PairingInbox } from './components/PairingInbox';
 import { PolicyManager } from './components/PolicyManager';
@@ -34,11 +33,6 @@ type PageType = 'dashboard' | 'devices' | 'policies' | 'pairing' | 'logs' | 'dev
 
 declare global {
   interface Window {
-    adminAuth: {
-      login: (password: string) => Promise<{ success: boolean; error?: string }>;
-      isAuthenticated: () => Promise<{ authenticated: boolean }>;
-      logout: () => Promise<{ success: boolean }>;
-    };
     adminAPI: {
       // Device operations
       getAllDevices: () => Promise<any[]>;
@@ -105,7 +99,6 @@ declare global {
 }
 
 const App: React.FC = () => {
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [currentPage, setCurrentPage] = useState<PageType>('dashboard');
   const [serverInfo, setServerInfo] = useState<{ port: number; publicKey: string } | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
@@ -113,19 +106,8 @@ const App: React.FC = () => {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Check auth state on mount
+  // Load server data and subscribe to events
   useEffect(() => {
-    window.adminAuth.isAuthenticated().then((result) => {
-      setAuthenticated(result.authenticated);
-    }).catch(() => {
-      setAuthenticated(false);
-    });
-  }, []);
-
-  // Load server data and subscribe to events (only when authenticated)
-  useEffect(() => {
-    if (!authenticated) return;
-
     const loadData = async () => {
       try {
         const info = await window.adminAPI.getServerInfo();
@@ -170,22 +152,7 @@ const App: React.FC = () => {
       unsubPairRequest();
       unsubServerStarted();
     };
-  }, [authenticated]);
-
-  const handleLogout = async () => {
-    await window.adminAuth.logout();
-    setAuthenticated(false);
-  };
-
-  // Show nothing while checking auth
-  if (authenticated === null) {
-    return null;
-  }
-
-  // Show login screen if not authenticated
-  if (!authenticated) {
-    return <AdminLogin onLoginSuccess={() => setAuthenticated(true)} />;
-  }
+  }, []);
 
   const navigateToDeviceDetail = (deviceId: string) => {
     setSelectedDeviceId(deviceId);
@@ -300,26 +267,6 @@ const App: React.FC = () => {
             </React.Fragment>
           ))}
         </nav>
-
-        {/* Logout Button */}
-        <div style={{ padding: '0 20px 10px' }}>
-          <button
-            onClick={handleLogout}
-            style={{
-              width: '100%',
-              padding: '8px',
-              fontSize: '13px',
-              backgroundColor: 'transparent',
-              border: '1px solid #555',
-              borderRadius: '4px',
-              color: '#aaa',
-              cursor: 'pointer',
-              textAlign: 'center',
-            }}
-          >
-            Logout
-          </button>
-        </div>
 
         {/* Server Status */}
         <div style={{ padding: '20px', borderTop: '1px solid #333', fontSize: '12px' }}>

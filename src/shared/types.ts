@@ -81,15 +81,6 @@ export interface ElectronAPI {
   ) => () => void;
   onTrayActionTriggered: (callback: (actionId: string) => void) => () => void;
 
-  // Admin Authentication API
-  adminLogin: (
-    request: AdminLoginRequest
-  ) => Promise<IPCResponse<AdminLoginResponse>>;
-  getAdminLockoutState: () => Promise<IPCResponse<AdminLockoutState>>;
-  resetAdminLockout: (request?: {
-    password?: string;
-  }) => Promise<IPCResponse<void>>;
-
   // Email Configuration API
   getEmailConfig: () => Promise<IPCResponse<any>>;
   saveEmailConfig: (config: any) => Promise<IPCResponse<any>>;
@@ -236,11 +227,6 @@ export enum IPCChannels {
   TRAY_NOTIFICATION_CLICKED = 'tray:notificationClicked',
   TRAY_ACTION_TRIGGERED = 'tray:actionTriggered',
 
-  // Admin Authentication
-  ADMIN_LOGIN = 'admin:login',
-  ADMIN_GET_LOCKOUT_STATE = 'admin:getLockoutState',
-  ADMIN_RESET_LOCKOUT = 'admin:resetLockout',
-
   // Enhanced Settings Management
   BULK_UPDATE_SETTINGS = 'settings:bulkUpdate',
 
@@ -297,21 +283,6 @@ export interface GetAnalyticsRequest {
 export interface InsertAnalyticsRequest {
   metric_name: string;
   metric_value: number;
-}
-
-export interface AdminLoginRequest {
-  password: string;
-  ipAddress?: string;
-}
-
-export interface AdminLoginResponse {
-  success: boolean;
-  isLockedOut: boolean;
-  lockoutExpiresAt?: string;
-  failedAttempts: number;
-  maxAttempts: number;
-  // True when this attempt created the admin password and showed it once.
-  passwordGenerated?: boolean;
 }
 
 // Auto-updater types
@@ -570,23 +541,6 @@ export interface Analytics {
   metric_name: string;
   metric_value: number;
   recorded_at: string;
-}
-
-export interface AdminLoginAttempt {
-  id?: number;
-  ip_address: string | null;
-  attempted_at: string;
-  success: boolean;
-}
-
-export interface AdminLockoutState {
-  id: number;
-  is_locked: boolean;
-  locked_until: string | null;
-  failed_attempts_count: number;
-  last_attempt_at: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 // Database Migration Types

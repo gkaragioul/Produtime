@@ -32,9 +32,6 @@ export interface ElectronAPI {
     quitApplication: () => Promise<IPCResponse<void>>;
     onTrayNotificationClicked: (callback: (notificationId: string) => void) => () => void;
     onTrayActionTriggered: (callback: (actionId: string) => void) => () => void;
-    adminLogin: (request: AdminLoginRequest) => Promise<IPCResponse<AdminLoginResponse>>;
-    getAdminLockoutState: () => Promise<IPCResponse<AdminLockoutState>>;
-    resetAdminLockout: (request?: { password?: string }) => Promise<IPCResponse<void>>;
     getEmailConfig: () => Promise<IPCResponse<any>>;
     saveEmailConfig: (config: any) => Promise<IPCResponse<any>>;
     testEmail: () => Promise<IPCResponse<any>>;
@@ -107,9 +104,6 @@ export declare enum IPCChannels {
     TEST_AUTO_EXPORT = "autoexport:test",
     TRAY_NOTIFICATION_CLICKED = "tray:notificationClicked",
     TRAY_ACTION_TRIGGERED = "tray:actionTriggered",
-    ADMIN_LOGIN = "admin:login",
-    ADMIN_GET_LOCKOUT_STATE = "admin:getLockoutState",
-    ADMIN_RESET_LOCKOUT = "admin:resetLockout",
     BULK_UPDATE_SETTINGS = "settings:bulkUpdate",
     GET_DEVICE_ID = "license:getDeviceId",
     ACTIVATE_LICENSE = "license:activate",
@@ -153,19 +147,6 @@ export interface GetAnalyticsRequest {
 export interface InsertAnalyticsRequest {
     metric_name: string;
     metric_value: number;
-}
-export interface AdminLoginRequest {
-    password: string;
-    ipAddress?: string;
-}
-export interface AdminLoginResponse {
-    success: boolean;
-    isLockedOut: boolean;
-    lockoutExpiresAt?: string;
-    failedAttempts: number;
-    maxAttempts: number;
-    // True when this attempt created the admin password and showed it once.
-    passwordGenerated?: boolean;
 }
 export interface UpdateInfo {
     version: string;
@@ -309,21 +290,6 @@ export interface Analytics {
     metric_name: string;
     metric_value: number;
     recorded_at: string;
-}
-export interface AdminLoginAttempt {
-    id?: number;
-    ip_address: string | null;
-    attempted_at: string;
-    success: boolean;
-}
-export interface AdminLockoutState {
-    id: number;
-    is_locked: boolean;
-    locked_until: string | null;
-    failed_attempts_count: number;
-    last_attempt_at: string | null;
-    created_at: string;
-    updated_at: string;
 }
 export interface Migration {
     version: number;

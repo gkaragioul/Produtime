@@ -7,7 +7,6 @@ import {
   Setting,
   Analytics,
   Migration,
-  AdminLockoutState,
 } from '../shared/types';
 import { EncryptionKeyService } from './services/encryption-key-service';
 import { DEFAULT_PRIVACY_APPS } from './services/privacy-constants';
@@ -323,6 +322,20 @@ export class DatabaseManager {
           CREATE INDEX IF NOT EXISTS idx_admin_login_attempts_date_success ON admin_login_attempts(attempted_at, success);
         `,
       },
+      {
+        version: 11,
+        description: 'Remove admin login: drop login tables and stored password hash',
+        up: `
+          -- ProduTime no longer has an admin login. Migrations 3 and 10 still
+          -- create these objects on older databases; drop them here together
+          -- with the stored admin password hash and the failed-login alert
+          -- timestamp. IF EXISTS keeps this safe on any database state.
+          DROP TABLE IF EXISTS admin_login_attempts;
+          DROP TABLE IF EXISTS admin_lockout_state;
+          DELETE FROM settings
+            WHERE key IN ('admin_password_hash', 'failed_attempts_alert_last_sent_at');
+        `,
+      },
     ];
 
     // Get current migration version
@@ -565,119 +578,6 @@ export class DatabaseManager {
       .all() as Analytics[];
   }
 
-  // Admin Authentication operations
-  public recordLoginAttempt(
-    ipAddress: string | null,
-    success: boolean
-  ): number {
-    const stmt = this.db.prepare(`
-      INSERT INTO admin_login_attempts (ip_address, success, attempted_at)
-      VALUES (?, ?, CURRENT_TIMESTAMP)
-    `);
-    const result = stmt.run(ipAddress, success ? 1 : 0);
-    return result.lastInsertRowid as number;
-  }
-
-  public getRecentFailedAttempts(minutesBack: number = 60): number {
-    const stmt = this.db.prepare(`
-      SELECT COUNT(*) as count
-      FROM admin_login_attempts
-      WHERE success = 0
-      AND attempted_at > datetime('now', '-' || ? || ' minutes')
-    `);
-    const result = stmt.get(minutesBack) as { count: number };
-    return result.count;
-  }
-
-  public getLockoutState(): AdminLockoutState {
-    // Use INSERT OR IGNORE to atomically create the record if it doesn't exist
-    // This prevents TOCTOU (Time-of-Check-Time-of-Use) race conditions
-    const now = new Date().toISOString();
-    const insertOrIgnore = this.db.prepare(`
-      INSERT OR IGNORE INTO admin_lockout_state (id, is_locked, failed_attempts_count, created_at, updated_at)
-      VALUES (1, 0, 0, ?, ?)
-    `);
-    insertOrIgnore.run(now, now);
-
-    // Now retrieve the record (guaranteed to exist)
-    const stmt = this.db.prepare(`
-      SELECT * FROM admin_lockout_state WHERE id = 1
-    `);
-    const result = stmt.get() as AdminLockoutState | undefined;
-
-    if (!result) {
-      // This should never happen after INSERT OR IGNORE, but handle gracefully
-      throw new Error('Failed to initialize admin lockout state');
-    }
-
-    return {
-      ...result,
-      is_locked: Boolean(result.is_locked),
-    };
-  }
-
-  public updateLockoutState(state: Partial<AdminLockoutState>): void {
-    const updates: string[] = [];
-    const values: any[] = [];
-
-    if (state.is_locked !== undefined) {
-      updates.push('is_locked = ?');
-      values.push(state.is_locked ? 1 : 0);
-    }
-
-    if (state.locked_until !== undefined) {
-      updates.push('locked_until = ?');
-      values.push(state.locked_until);
-    }
-
-    if (state.failed_attempts_count !== undefined) {
-      updates.push('failed_attempts_count = ?');
-      values.push(state.failed_attempts_count);
-    }
-
-    if (state.last_attempt_at !== undefined) {
-      updates.push('last_attempt_at = ?');
-      values.push(state.last_attempt_at);
-    }
-
-    updates.push('updated_at = CURRENT_TIMESTAMP');
-    values.push(1); // for WHERE clause
-
-    const stmt = this.db.prepare(`
-      UPDATE admin_lockout_state
-      SET ${updates.join(', ')}
-      WHERE id = ?
-    `);
-    stmt.run(...values);
-  }
-
-  public isAdminLockedOut(): boolean {
-    const lockoutState = this.getLockoutState();
-
-    if (!lockoutState.is_locked) {
-      return false;
-    }
-
-    if (!lockoutState.locked_until) {
-      return false;
-    }
-
-    const now = new Date();
-    const lockedUntil = new Date(lockoutState.locked_until);
-
-    if (now >= lockedUntil) {
-      // Lockout period has expired, unlock
-      this.updateLockoutState({
-        is_locked: false,
-        locked_until: null,
-        failed_attempts_count: 0,
-      });
-      return false;
-    }
-
-    return true;
-  }
-
   // Utility methods
   public clearAllData(): void {
     try {
@@ -685,7 +585,6 @@ export class DatabaseManager {
         this.db.exec('DELETE FROM activity_logs');
         this.db.exec('DELETE FROM analytics');
         // Don't delete settings as they contain configuration
-        // Don't delete admin_login_attempts and admin_lockout_state for security audit trail
       });
       transaction();
     } catch (error) {
@@ -745,22 +644,6 @@ export class DatabaseManager {
         if (isNaN(idleTime) || idleTime < 30 || idleTime > 3600) {
           throw new Error(
             `Invalid idle threshold: ${value}. Must be between 30 and 3600 seconds.`
-          );
-        }
-        break;
-      case 'admin_lockout_threshold':
-        const threshold = parseInt(value);
-        if (isNaN(threshold) || threshold < 3 || threshold > 20) {
-          throw new Error(
-            `Invalid lockout threshold: ${value}. Must be between 3 and 20 attempts.`
-          );
-        }
-        break;
-      case 'admin_lockout_duration_minutes':
-        const duration = parseInt(value);
-        if (isNaN(duration) || duration < 5 || duration > 1440) {
-          throw new Error(
-            `Invalid lockout duration: ${value}. Must be between 5 and 1440 minutes.`
           );
         }
         break;

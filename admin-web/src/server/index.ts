@@ -2,35 +2,30 @@
  * ProduTime Admin Console - Web Server
  * Standalone Express server replacing the Electron main process.
  * Serves REST API + static frontend + WebSocket for device communication + admin events.
+ *
+ * There is no login. The server therefore listens on the loopback interface
+ * only (127.0.0.1) and rejects requests whose Host or Origin is not this
+ * computer, so it cannot be reached from the network or driven by other
+ * websites open in a browser on this computer.
  */
 
 import express from 'express';
-import cors from 'cors';
 import * as http from 'http';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import jwt from 'jsonwebtoken';
 import { WebSocket } from 'ws';
 import { AdminDatabase } from './db';
 import { AdminServer } from './device-server';
 import { DeviceDetailService } from './device-detail-service';
-import { requireAdminPassword } from './admin-password';
 
 // ============================================================================
 // Configuration
 // ============================================================================
 
 const PORT = parseInt(process.env.PORT || '17888', 10);
-const JWT_SECRET = process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex');
-// No built-in default: refuse to start unless ADMIN_PASSWORD is configured.
-const ADMIN_PASSWORD: string = (() => {
-  try {
-    return requireAdminPassword(process.env);
-  } catch (error) {
-    console.error(`[AUTH] ${(error as Error).message}`);
-    return process.exit(1);
-  }
-})();
+// Loopback only, on purpose not configurable: without a login the admin API
+// must never be reachable from another machine.
+const HOST = '127.0.0.1';
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'admin-console.db');
 
 // ============================================================================
@@ -40,15 +35,43 @@ const DATABASE_PATH = process.env.DATABASE_PATH || path.join(process.cwd(), 'dat
 const db = new AdminDatabase(DATABASE_PATH);
 const deviceServer = new AdminServer(db, PORT);
 
-// Store the configured admin password hash on first start
-if (!db.getSetting('admin_password_hash')) {
-  const salt = crypto.randomBytes(16);
-  crypto.scrypt(ADMIN_PASSWORD, salt, 64, (err, derivedKey) => {
-    if (!err) {
-      db.setSetting('admin_password_hash', salt.toString('hex') + ':' + derivedKey.toString('hex'));
-      console.log('[AUTH] Admin password hash stored');
-    }
-  });
+// ============================================================================
+// Local-only request checks
+// ============================================================================
+
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+// The Host header must name this computer. This blocks DNS-rebinding attacks,
+// where another website points its own domain at 127.0.0.1.
+function isLocalHost(hostHeader: string | undefined): boolean {
+  if (!hostHeader) return false;
+  try {
+    return LOCAL_HOSTNAMES.has(new URL(`http://${hostHeader}`).hostname);
+  } catch {
+    return false;
+  }
+}
+
+// Browsers send an Origin header on cross-site requests and on every
+// WebSocket. Only pages served by this server may use the API. Device agents
+// are not browsers and send no Origin.
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  try {
+    const url = new URL(origin);
+    const port = url.port || (url.protocol === 'https:' ? '443' : '80');
+    return (
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      LOCAL_HOSTNAMES.has(url.hostname) &&
+      port === String(PORT)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isLocalRequest(req: http.IncomingMessage): boolean {
+  return isLocalHost(req.headers.host) && isAllowedOrigin(req.headers.origin);
 }
 
 // ============================================================================
@@ -56,10 +79,13 @@ if (!db.getSetting('admin_password_hash')) {
 // ============================================================================
 
 const app = express();
-app.use(cors({
-  origin: true,
-  credentials: true,
-}));
+app.use((req, res, next) => {
+  if (!isLocalRequest(req)) {
+    res.status(403).json({ error: 'Forbidden: the ProduTime web admin only accepts requests from this computer' });
+    return;
+  }
+  next();
+});
 app.use(express.json());
 
 // Health check — must be before static middleware
@@ -76,7 +102,7 @@ app.get('/info', (_req, res) => {
   });
 });
 
-// Public update manifest — fetched by ProduTime assisted updater (no auth required)
+// Update manifest — fetched by the ProduTime assisted updater
 app.get('/updates/latest.json', (_req, res) => {
   const raw = db.getSetting('update_manifest');
   if (!raw) {
@@ -96,84 +122,6 @@ app.get('/updates/latest.json', (_req, res) => {
 // __dirname = dist/server/server/, client is at dist/client/
 const staticDir = path.join(__dirname, '../../client');
 app.use(express.static(staticDir));
-
-// ============================================================================
-// Auth middleware
-// ============================================================================
-
-function authMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Unauthorized' });
-    return;
-  }
-
-  try {
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET) as { role: string };
-    (req as any).user = decoded;
-    next();
-  } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
-  }
-}
-
-// ============================================================================
-// Auth routes (no middleware)
-// ============================================================================
-
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { password } = req.body;
-    if (!password) {
-      res.status(400).json({ success: false, error: 'Password required' });
-      return;
-    }
-
-    let storedHash = db.getSetting('admin_password_hash');
-    if (!storedHash) {
-      // First run - store the configured ADMIN_PASSWORD
-      const salt = crypto.randomBytes(16);
-      const hash = await new Promise<Buffer>((resolve, reject) => {
-        crypto.scrypt(ADMIN_PASSWORD, salt, 64, (err, key) => err ? reject(err) : resolve(key));
-      });
-      storedHash = salt.toString('hex') + ':' + hash.toString('hex');
-      db.setSetting('admin_password_hash', storedHash);
-    }
-
-    const [saltHex, hashHex] = storedHash.split(':');
-    const salt = Buffer.from(saltHex, 'hex');
-    const expectedHash = Buffer.from(hashHex, 'hex');
-    const incomingHash = await new Promise<Buffer>((resolve, reject) => {
-      crypto.scrypt(password, salt, 64, (err, key) => err ? reject(err) : resolve(key));
-    });
-
-    if (crypto.timingSafeEqual(expectedHash, incomingHash)) {
-      const token = jwt.sign({ role: 'admin' }, JWT_SECRET, { expiresIn: '8h' });
-      res.json({ success: true, token });
-    } else {
-      res.json({ success: false, error: 'Invalid password' });
-    }
-  } catch (error) {
-    console.error('Auth login error:', error);
-    res.status(500).json({ success: false, error: 'Authentication error' });
-  }
-});
-
-app.get('/api/auth/check', authMiddleware, (_req, res) => {
-  res.json({ authenticated: true });
-});
-
-app.post('/api/auth/logout', (_req, res) => {
-  // JWT is stateless - client just deletes token
-  res.json({ success: true });
-});
-
-// ============================================================================
-// All API routes below require auth
-// ============================================================================
-
-app.use('/api', authMiddleware);
 
 // --- Device routes ---
 app.get('/api/devices', (_req, res) => {
@@ -519,7 +467,7 @@ app.get('/api/version', (_req, res) => {
   res.json({ version: '1.0.0-web' });
 });
 
-// --- Update manifest management (auth required) ---
+// --- Update manifest management ---
 app.get('/api/updates/manifest', (_req, res) => {
   const raw = db.getSetting('update_manifest');
   res.json(raw ? JSON.parse(raw) : null);
@@ -780,21 +728,7 @@ import { WebSocketServer } from 'ws';
 
 // Admin events WebSocket server (for frontend)
 const adminWss = new WebSocketServer({ noServer: true });
-adminWss.on('connection', (ws, req) => {
-  // Verify JWT from query string
-  const url = new URL(req.url || '', `http://${req.headers.host}`);
-  const token = url.searchParams.get('token');
-  if (!token) {
-    ws.close(4001, 'Missing token');
-    return;
-  }
-  try {
-    jwt.verify(token, JWT_SECRET);
-  } catch {
-    ws.close(4001, 'Invalid token');
-    return;
-  }
-
+adminWss.on('connection', (ws) => {
   adminEventClients.add(ws);
 
   // Send initial server info
@@ -813,6 +747,12 @@ adminWss.on('connection', (ws, req) => {
 
 // Handle upgrade requests - route to admin WS or device WS
 httpServer.on('upgrade', (request, socket, head) => {
+  if (!isLocalRequest(request)) {
+    socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+
   const url = new URL(request.url || '', `http://${request.headers.host}`);
 
   if (url.pathname === '/ws/admin') {
@@ -830,31 +770,19 @@ httpServer.on('upgrade', (request, socket, head) => {
 });
 
 // Override the AdminServer's start to NOT listen on its own, since we control the httpServer
-// We still need to initialize it (keypair, mDNS for LAN, dashboard service, etc.)
+// We still need to initialize it (keypair, dashboard service, etc.)
 
 async function startServer(): Promise<void> {
   console.log(`[SERVER] Starting ProduTime Admin Web on port ${PORT}`);
   console.log(`[SERVER] Database: ${DATABASE_PATH}`);
   console.log(`[SERVER] Static files: ${staticDir}`);
 
-  // Start the device server's internal logic (exceptions engine).
-  // Skip mDNS in cloud/Railway — it uses UDP multicast which doesn't work in containers.
-  if (!process.env.RAILWAY_PUBLIC_DOMAIN) {
-    try {
-      (deviceServer as any).startMdnsAdvertising();
-    } catch (err) {
-      console.log('[SERVER] mDNS advertising skipped:', err);
-    }
-  } else {
-    console.log('[SERVER] Cloud mode detected — skipping mDNS advertising');
-  }
-
   // Start exceptions engine
   deviceServer.getDashboardService().startExceptionsEngine();
 
   // Start our unified HTTP server
-  httpServer.listen(PORT, '0.0.0.0', () => {
-    console.log(`[SERVER] ProduTime Admin Web listening on http://0.0.0.0:${PORT}`);
+  httpServer.listen(PORT, HOST, () => {
+    console.log(`[SERVER] ProduTime Admin Web listening on http://${HOST}:${PORT} (this computer only)`);
     console.log(`[SERVER] Admin UI:    http://localhost:${PORT}`);
     console.log(`[SERVER] Admin WS:    ws://localhost:${PORT}/ws/admin`);
     console.log(`[SERVER] Device WS:   ws://localhost:${PORT}`);

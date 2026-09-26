@@ -52,10 +52,6 @@ var IPCChannels;
     // System Tray events (main -> renderer)
     IPCChannels["TRAY_NOTIFICATION_CLICKED"] = "tray:notificationClicked";
     IPCChannels["TRAY_ACTION_TRIGGERED"] = "tray:actionTriggered";
-    // Admin Authentication
-    IPCChannels["ADMIN_LOGIN"] = "admin:login";
-    IPCChannels["ADMIN_GET_LOCKOUT_STATE"] = "admin:getLockoutState";
-    IPCChannels["ADMIN_RESET_LOCKOUT"] = "admin:resetLockout";
     // Enhanced Settings Management
     IPCChannels["BULK_UPDATE_SETTINGS"] = "settings:bulkUpdate";
     // License Activation

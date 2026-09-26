@@ -1,8 +1,5 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { DailyPerformanceConsole } from "./components/DailyPerformanceConsole";
-import { AdminAuthService } from "./services/admin-auth-service";
-import { AdminTimeoutService } from "./services/admin-timeout-service";
-import { AdminActivityDetector } from "./services/admin-activity-detector";
 import { ManagedBadge } from "./components/ManagedBadge";
 import { PolicyView } from "./components/PolicyView";
 import { AdminLockScreen } from "./components/AdminLockScreen";
@@ -30,11 +27,6 @@ const App: React.FC = () => {
   const [isLocked, setIsLocked] = useState<boolean>(false);
   const [lockMessage, setLockMessage] = useState<string>("");
   const [showPairingModal, setShowPairingModal] = useState<boolean>(false);
-
-  // Service singletons (kept in refs to avoid repeated getInstance calls)
-  const timeoutServiceRef = useRef<AdminTimeoutService | null>(null);
-  const activityDetectorRef = useRef<AdminActivityDetector | null>(null);
-  const adminAuthServiceRef = useRef<AdminAuthService | null>(null);
 
   // Get app version on startup
   useEffect(() => {
@@ -141,98 +133,6 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // Initialize admin services once on mount (store in refs)
-  useEffect(() => {
-    try {
-      const timeoutService = AdminTimeoutService.getInstance();
-      const activityDetector = AdminActivityDetector.getInstance();
-      const adminAuthService = AdminAuthService.getInstance(
-        timeoutService,
-        activityDetector
-      );
-      timeoutServiceRef.current = timeoutService;
-      activityDetectorRef.current = activityDetector;
-      adminAuthServiceRef.current = adminAuthService;
-    } catch (err) {
-      console.error("App: failed to initialize admin services", err);
-    }
-  }, []);
-
-  // Global activity detection for admin timeout (always active; callback is no-op when not authenticated)
-  useEffect(() => {
-    try {
-      const activityDetector = activityDetectorRef.current;
-      const adminAuthService = adminAuthServiceRef.current;
-      if (!activityDetector || !adminAuthService) return;
-
-      const handleGlobalActivity = () => {
-        try {
-          // Reset/ensure timers on any activity
-          adminAuthService.startTimeoutAndActivityDetection();
-        } catch (error) {
-          console.error("Error handling global activity:", error);
-        }
-      };
-
-      activityDetector.onActivity(handleGlobalActivity);
-      activityDetector.startDetection();
-
-      return () => {
-        try {
-          activityDetector.removeCallback(handleGlobalActivity);
-        } catch {}
-        try {
-          activityDetector.stopDetection();
-        } catch {}
-      };
-    } catch (err) {
-      console.error("App: failed to set up global activity detection", err);
-    }
-  }, []);
-
-  // Re-register activity callback whenever the active tab changes (to satisfy tests)
-  useEffect(() => {
-    try {
-      const activityDetector = activityDetectorRef.current;
-      const adminAuthService = adminAuthServiceRef.current;
-      if (!activityDetector || !adminAuthService) return;
-      const handleGlobalActivity = () => {
-        try {
-          adminAuthService.startTimeoutAndActivityDetection();
-        } catch {}
-      };
-      activityDetector.onActivity(handleGlobalActivity);
-      return () => {
-        try {
-          activityDetector.removeCallback(handleGlobalActivity);
-        } catch {}
-      };
-    } catch {}
-  }, [activeTab]);
-
-  // Bridge DOM activity to activityDetector with throttle (for tests)
-  useEffect(() => {
-    try {
-      const adminAuthService = adminAuthServiceRef.current;
-      if (!adminAuthService) return;
-      let last = 0;
-      const evtHandler = () => {
-        const now = Date.now();
-        if (now - last < 50) return;
-        last = now;
-        try {
-          adminAuthService.startTimeoutAndActivityDetection();
-        } catch {}
-      };
-      document.addEventListener("mousemove", evtHandler);
-      document.addEventListener("keydown", evtHandler);
-      return () => {
-        document.removeEventListener("mousemove", evtHandler);
-        document.removeEventListener("keydown", evtHandler);
-      };
-    } catch {}
-  }, []);
-
   return (
     <div className="app">
       {/* Admin Lock Screen - shown when admin has locked the app */}
@@ -271,16 +171,7 @@ const App: React.FC = () => {
                   <div className="tab-navigation">
                     <button
                       className={`tab-button ${activeTab === "dashboard" ? "active" : ""}`}
-                      onClick={() => {
-                        try {
-                          const admin = adminAuthServiceRef.current;
-                          if (admin?.isAdminAuthenticated()) {
-                            // Immediately lock Settings when navigating to Dashboard
-                            admin.logout();
-                          }
-                        } catch {}
-                        setActiveTab("dashboard");
-                      }}
+                      onClick={() => setActiveTab("dashboard")}
                     >
                       Dashboard
                     </button>

@@ -185,6 +185,10 @@ export class AdminDatabase {
       );
     `);
 
+    // The Admin Console no longer has a login. Remove the password hash that
+    // older versions stored here.
+    this.db.prepare("DELETE FROM admin_settings WHERE key = 'admin_password_hash'").run();
+
     // Admin keypair (single row)
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS admin_keypair (

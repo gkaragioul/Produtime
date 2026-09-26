@@ -480,25 +480,6 @@ export class AdminServer {
       return;
     }
 
-    if (url === '/debug' && req.method === 'GET') {
-      const connectedDevices = Array.from(this.connectedDevices.entries()).map(([id, d]) => ({
-        deviceId: id,
-        ip: d.ip,
-        lastHeartbeat: d.lastHeartbeat,
-        timeSinceHeartbeat: Date.now() - d.lastHeartbeat,
-      }));
-      const pendingConnections = Array.from(this.pendingConnections.keys());
-      
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        connectedDevices,
-        pendingConnections,
-        currentPairCode: this.currentPairCode,
-        pairCodeExpiry: this.pairCodeExpiry,
-      }, null, 2));
-      return;
-    }
-
     res.writeHead(404);
     res.end('Not Found');
   }

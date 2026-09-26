@@ -199,54 +199,6 @@ body {
   overflow-x: hidden;
 }
 
-.settings-locked {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-.lock-icon {
-  font-size: 4rem;
-  margin-bottom: 20px;
-  opacity: 0.7;
-}
-
-.settings-locked h2 {
-  color: #495057;
-  margin-bottom: 10px;
-  font-size: 1.5rem;
-}
-
-.settings-locked p {
-  color: #6c757d;
-  margin-bottom: 30px;
-  font-size: 1rem;
-}
-
-.access-settings-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  padding: 12px 30px;
-  border-radius: 25px;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-}
-
-.access-settings-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-}
-
 .settings-header {
   display: flex;
   justify-content: space-between;
@@ -265,21 +217,6 @@ body {
 .header-buttons {
   display: flex;
   gap: 10px;
-}
-
-.logout-button {
-  background: #dc3545;
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
-}
-
-.logout-button:hover {
-  background-color: #c82333;
 }
 
 .exit-button {
@@ -619,121 +556,6 @@ select::-webkit-scrollbar-thumb:hover {
   border-radius: 4px;
   margin-bottom: 16px;
   border: 1px solid #c3e6cb;
-}
-
-/* Admin Login Dialog Styles */
-.admin-login-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.admin-login-dialog {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  width: 90%;
-  max-width: 400px;
-  max-height: 90vh;
-  overflow: hidden;
-}
-
-.admin-login-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-  border-bottom: 1px solid #dee2e6;
-  background-color: #f8f9fa;
-}
-
-.admin-login-header h2 {
-  margin: 0;
-  color: #495057;
-  font-size: 1.25rem;
-}
-
-.close-button {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #6c757d;
-  padding: 0;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.close-button:hover {
-  background-color: #e9ecef;
-}
-
-.close-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.admin-login-content {
-  padding: 20px;
-}
-
-.lockout-message {
-  text-align: center;
-  color: #dc3545;
-  margin-bottom: 20px;
-  padding: 15px;
-  background-color: #f8d7da;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
-}
-
-.login-button {
-  background: #667eea;
-  color: white;
-  border: none;
-  padding: 12px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 500;
-  transition: background-color 0.2s;
-}
-
-.login-button:hover {
-  background: #5a6fd8;
-}
-
-.login-button:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-}
-
-.attempts-warning {
-  background-color: #fff3cd;
-  color: #856404;
-  padding: 8px 12px;
-  border-radius: 4px;
-  margin-bottom: 16px;
-  border: 1px solid #ffeaa7;
-  font-size: 14px;
 }
 
 /* Activity Dashboard Styles */

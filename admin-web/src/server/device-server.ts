@@ -5,7 +5,6 @@
 
 import * as http from 'http';
 import * as crypto from 'crypto';
-import * as dgram from 'dgram';
 import * as os from 'os';
 import { WebSocketServer, WebSocket } from 'ws';
 import * as nacl from 'tweetnacl';
@@ -18,8 +17,6 @@ import {
   StatsSummaryPayload,
   PolicyData,
   ADMIN_CONSOLE_DEFAULT_PORT,
-  MDNS_SERVICE_TYPE,
-  MDNS_SERVICE_NAME,
 } from '../shared/admin-protocol';
 import { EnhancedHeartbeatPayload } from '../shared/dashboard-types';
 
@@ -49,12 +46,6 @@ export class AdminServer {
   private currentPairCode: string | null = null;
   private pairCodeExpiry: number = 0;
   private port: number;
-  
-  // mDNS advertising
-  private mdnsSocket: dgram.Socket | null = null;
-  private mdnsInterval: NodeJS.Timeout | null = null;
-  private readonly MDNS_ADDRESS = '224.0.0.251';
-  private readonly MDNS_PORT = 5353;
 
   // Log buffer for UI display
   private logBuffer: string[] = [];
@@ -207,13 +198,12 @@ export class AdminServer {
   public start(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.log(`[SERVER] Starting server on port ${this.port}`);
-      this.httpServer.listen(this.port, '0.0.0.0', () => {
+      // Local only: the web admin has no login, so it must never listen on
+      // a network interface.
+      this.httpServer.listen(this.port, '127.0.0.1', () => {
         this.log(`[SERVER] Server started successfully on port ${this.port}`);
         this.log(`[SERVER] Waiting for client connections...`);
         console.log(`Admin Console server listening on port ${this.port}`);
-        
-        // Start mDNS advertising so clients can discover us
-        this.startMdnsAdvertising();
         
         // Start exceptions engine
         this.dashboardService.startExceptionsEngine();
@@ -232,9 +222,6 @@ export class AdminServer {
    */
   public stop(): Promise<void> {
     return new Promise((resolve) => {
-      // Stop mDNS advertising
-      this.stopMdnsAdvertising();
-      
       // Stop exceptions engine
       this.dashboardService.stopExceptionsEngine();
       
@@ -250,212 +237,6 @@ export class AdminServer {
         });
       });
     });
-  }
-
-  /**
-   * Start mDNS advertising to allow clients to discover this Admin Console
-   */
-  private startMdnsAdvertising(): void {
-    try {
-      this.mdnsSocket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-      
-      this.mdnsSocket.on('error', (err) => {
-        console.error('[SERVER] mDNS socket error:', err);
-      });
-
-      this.mdnsSocket.bind(this.MDNS_PORT, () => {
-        try {
-          this.mdnsSocket?.addMembership(this.MDNS_ADDRESS);
-          this.log('[SERVER] mDNS advertising started');
-          
-          // Listen for queries and respond
-          this.mdnsSocket?.on('message', (msg, rinfo) => {
-            this.handleMdnsQuery(msg, rinfo);
-          });
-          
-          // Also send periodic announcements
-          this.sendMdnsAnnouncement();
-          this.mdnsInterval = setInterval(() => {
-            this.sendMdnsAnnouncement();
-          }, 10000); // Announce every 10 seconds
-          
-        } catch (err) {
-          console.error('[SERVER] Failed to join mDNS multicast group:', err);
-        }
-      });
-    } catch (err) {
-      console.error('[SERVER] Failed to start mDNS advertising:', err);
-    }
-  }
-
-  /**
-   * Stop mDNS advertising
-   */
-  private stopMdnsAdvertising(): void {
-    if (this.mdnsInterval) {
-      clearInterval(this.mdnsInterval);
-      this.mdnsInterval = null;
-    }
-    
-    if (this.mdnsSocket) {
-      try {
-        this.mdnsSocket.dropMembership(this.MDNS_ADDRESS);
-      } catch (err) {
-        // Ignore
-      }
-      this.mdnsSocket.close();
-      this.mdnsSocket = null;
-    }
-    
-    this.log('[SERVER] mDNS advertising stopped');
-  }
-
-  /**
-   * Handle incoming mDNS query
-   */
-  private handleMdnsQuery(msg: Buffer, rinfo: dgram.RemoteInfo): void {
-    try {
-      // Check if this is a query for our service
-      const msgStr = msg.toString('utf8', 12);
-      if (msgStr.includes('produtime-admin') || msgStr.includes('_tcp')) {
-        // Respond with our presence
-        this.sendMdnsResponse(rinfo.address, rinfo.port);
-      }
-    } catch (err) {
-      // Ignore parsing errors
-    }
-  }
-
-  /**
-   * Send mDNS announcement (unsolicited response)
-   */
-  private sendMdnsAnnouncement(): void {
-    if (!this.mdnsSocket) return;
-    
-    const response = this.buildMdnsResponse();
-    this.mdnsSocket.send(response, 0, response.length, this.MDNS_PORT, this.MDNS_ADDRESS, (err) => {
-      if (err) {
-        console.error('[SERVER] Failed to send mDNS announcement:', err);
-      }
-    });
-  }
-
-  /**
-   * Send mDNS response to a specific address
-   */
-  private sendMdnsResponse(address: string, port: number): void {
-    if (!this.mdnsSocket) return;
-    
-    const response = this.buildMdnsResponse();
-    this.mdnsSocket.send(response, 0, response.length, port, address, (err) => {
-      if (err) {
-        console.error('[SERVER] Failed to send mDNS response:', err);
-      }
-    });
-  }
-
-  /**
-   * Build mDNS response packet advertising our service
-   */
-  private buildMdnsResponse(): Buffer {
-    // Get local IP addresses
-    const localIPs = this.getLocalIPs();
-    const hostname = os.hostname();
-    
-    // Build a simple mDNS response
-    // DNS header - response with authoritative answer
-    const header = Buffer.alloc(12);
-    header.writeUInt16BE(0, 0);        // Transaction ID
-    header.writeUInt16BE(0x8400, 2);   // Flags: response, authoritative
-    header.writeUInt16BE(0, 4);        // Questions: 0
-    header.writeUInt16BE(1, 6);        // Answer RRs: 1
-    header.writeUInt16BE(0, 8);        // Authority RRs: 0
-    header.writeUInt16BE(localIPs.length, 10);  // Additional RRs: IP addresses
-
-    // Answer section - PTR record for service
-    const serviceName = MDNS_SERVICE_TYPE + '.local';
-    const instanceName = MDNS_SERVICE_NAME + '.' + serviceName;
-    
-    // Encode service name
-    const nameBuffer = this.encodeDnsName(serviceName);
-    
-    // PTR record pointing to our instance
-    const ptrRecord = Buffer.alloc(10);
-    ptrRecord.writeUInt16BE(12, 0);    // Type: PTR
-    ptrRecord.writeUInt16BE(1, 2);     // Class: IN
-    ptrRecord.writeUInt32BE(120, 4);   // TTL: 120 seconds
-    
-    const instanceBuffer = this.encodeDnsName(instanceName);
-    ptrRecord.writeUInt16BE(instanceBuffer.length, 8);  // Data length
-    
-    // Additional records - A records for IP addresses
-    const additionalRecords: Buffer[] = [];
-    for (const ip of localIPs) {
-      const hostBuffer = this.encodeDnsName(hostname + '.local');
-      const aRecord = Buffer.alloc(10);
-      aRecord.writeUInt16BE(1, 0);     // Type: A
-      aRecord.writeUInt16BE(1, 2);     // Class: IN
-      aRecord.writeUInt32BE(120, 4);   // TTL: 120 seconds
-      aRecord.writeUInt16BE(4, 8);     // Data length: 4 bytes for IPv4
-      
-      const ipParts = ip.split('.').map(p => parseInt(p));
-      const ipBuffer = Buffer.from(ipParts);
-      
-      additionalRecords.push(Buffer.concat([hostBuffer, aRecord, ipBuffer]));
-    }
-
-    // Also include TXT record with port info
-    const txtData = `port=${this.port}`;
-    const txtBuffer = Buffer.alloc(1 + txtData.length);
-    txtBuffer.writeUInt8(txtData.length, 0);
-    txtBuffer.write(txtData, 1);
-
-    return Buffer.concat([
-      header,
-      nameBuffer,
-      ptrRecord,
-      instanceBuffer,
-      ...additionalRecords,
-    ]);
-  }
-
-  /**
-   * Encode a DNS name (e.g., "_produtime-admin._tcp.local")
-   */
-  private encodeDnsName(name: string): Buffer {
-    const parts = name.split('.');
-    const buffers: Buffer[] = [];
-    
-    for (const part of parts) {
-      const len = Buffer.alloc(1);
-      len.writeUInt8(part.length, 0);
-      buffers.push(len);
-      buffers.push(Buffer.from(part));
-    }
-    buffers.push(Buffer.from([0])); // Null terminator
-    
-    return Buffer.concat(buffers);
-  }
-
-  /**
-   * Get local IPv4 addresses
-   */
-  private getLocalIPs(): string[] {
-    const interfaces = os.networkInterfaces();
-    const ips: string[] = [];
-
-    for (const name of Object.keys(interfaces)) {
-      const iface = interfaces[name];
-      if (!iface) continue;
-
-      for (const info of iface) {
-        if (info.family === 'IPv4' && !info.internal) {
-          ips.push(info.address);
-        }
-      }
-    }
-
-    return ips;
   }
 
   /**
@@ -493,25 +274,6 @@ export class AdminServer {
         publicKey: this.adminKeyPair?.publicKey,
         port: this.port,
       }));
-      return;
-    }
-
-    if (url === '/debug' && req.method === 'GET') {
-      const connectedDevices = Array.from(this.connectedDevices.entries()).map(([id, d]) => ({
-        deviceId: id,
-        ip: d.ip,
-        lastHeartbeat: d.lastHeartbeat,
-        timeSinceHeartbeat: Date.now() - d.lastHeartbeat,
-      }));
-      const pendingConnections = Array.from(this.pendingConnections.keys());
-      
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        connectedDevices,
-        pendingConnections,
-        currentPairCode: this.currentPairCode,
-        pairCodeExpiry: this.pairCodeExpiry,
-      }, null, 2));
       return;
     }
 

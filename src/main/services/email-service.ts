@@ -1,5 +1,4 @@
 import * as nodemailer from 'nodemailer';
-import { AdminLockoutState } from '../../shared/types';
 
 export interface EmailConfig {
   host: string;
@@ -8,18 +7,6 @@ export interface EmailConfig {
   auth: {
     user: string;
     pass: string;
-  };
-}
-
-export interface SecurityAlert {
-  type: 'lockout' | 'failed_attempts' | 'unlock';
-  timestamp: string;
-  employeeName?: string;
-  details: {
-    failedAttempts: number;
-    maxAttempts: number;
-    lockoutDuration?: string;
-    ipAddress?: string;
   };
 }
 
@@ -130,185 +117,32 @@ export class EmailService {
   }
 
   /**
-   * Send security alert email
+   * Send a short test email so the SMTP settings can be checked.
    */
-  public async sendSecurityAlert(
-    recipientEmail: string,
-    alert: SecurityAlert
-  ): Promise<boolean> {
+  public async sendTestEmail(recipientEmail: string): Promise<boolean> {
     if (!this.isConfigured || !this.transporter) {
-      console.warn('Email service not configured. Security alert not sent.');
+      console.warn('Email service not configured. Test email not sent.');
       return false;
     }
 
     if (!recipientEmail || !this.isValidEmail(recipientEmail)) {
-      console.warn('Invalid recipient email address. Security alert not sent.');
+      console.warn('Invalid recipient email address. Test email not sent.');
       return false;
     }
 
     try {
-      const { subject, htmlBody, textBody } = this.generateAlertContent(alert);
-
-      const mailOptions = {
-        from: '"TimePort Security" <noreply@timeport.app>',
+      const info = await this.transporter.sendMail({
+        from: 'TimePort <noreply@timeport.app>',
         to: recipientEmail,
-        subject: subject,
-        text: textBody,
-        html: htmlBody,
-      };
-
-      const info = await this.transporter.sendMail(mailOptions);
-      console.log('Security alert email sent:', info.messageId);
-
-      // Log preview URL for development
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
-      }
-
+        subject: 'ProduTime test email',
+        text: 'This is a test email from ProduTime. Your email settings work.',
+        html: '<p>This is a test email from ProduTime. Your email settings work.</p>',
+      });
+      console.log('Test email sent:', info.messageId);
       return true;
     } catch (error) {
-      console.error('Failed to send security alert email:', error);
+      console.error('Failed to send test email:', error);
       return false;
-    }
-  }
-
-  /**
-   * Generate email content based on alert type
-   */
-  private generateAlertContent(alert: SecurityAlert): {
-    subject: string;
-    htmlBody: string;
-    textBody: string;
-  } {
-    const timestamp = new Date(alert.timestamp).toLocaleString();
-
-    switch (alert.type) {
-      case 'lockout':
-        return {
-          subject: `🔒 TimePort Security Alert: Admin Account Locked${alert.employeeName ? ` - ${alert.employeeName}` : ''}`,
-          htmlBody: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <div style="background-color: #dc3545; color: white; padding: 20px; text-align: center;">
-                <h1 style="margin: 0;">🔒 Security Alert</h1>
-              </div>
-              <div style="padding: 20px; background-color: #f8f9fa;">
-                <h2 style="color: #dc3545;">Admin Account Locked</h2>
-                ${alert.employeeName ? `<p><strong>Employee:</strong> ${alert.employeeName}</p>` : ''}
-                <p><strong>Time:</strong> ${timestamp}</p>
-                <p><strong>Reason:</strong> Too many failed login attempts</p>
-                <p><strong>Failed Attempts:</strong> ${alert.details.failedAttempts}/${alert.details.maxAttempts}</p>
-                ${alert.details.lockoutDuration ? `<p><strong>Lockout Duration:</strong> ${alert.details.lockoutDuration}</p>` : ''}
-                ${alert.details.ipAddress ? `<p><strong>IP Address:</strong> ${alert.details.ipAddress}</p>` : '<p><strong>IP Address:</strong> Not available</p>'}
-
-                <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; margin: 20px 0; border-radius: 5px;">
-                  <h3 style="color: #856404; margin-top: 0;">What to do:</h3>
-                  <ul style="color: #856404;">
-                    <li>If this was you, wait for the lockout period to expire</li>
-                    <li>If this was not you, investigate potential security breach</li>
-                    <li>Consider changing the admin password</li>
-                    <li>Review system access logs</li>
-                  </ul>
-                </div>
-
-                <p style="font-size: 12px; color: #6c757d; margin-top: 30px;">
-                  This is an automated security alert from TimePort. Do not reply to this email.
-                </p>
-              </div>
-            </div>
-          `,
-          textBody: `
-TIMEPORT SECURITY ALERT: Admin Account Locked${alert.employeeName ? ` - ${alert.employeeName}` : ''}
-
-${alert.employeeName ? `Employee: ${alert.employeeName}\n` : ''}Time: ${timestamp}
-Reason: Too many failed login attempts
-Failed Attempts: ${alert.details.failedAttempts}/${alert.details.maxAttempts}
-${alert.details.lockoutDuration ? `Lockout Duration: ${alert.details.lockoutDuration}\n` : ''}${alert.details.ipAddress ? `IP Address: ${alert.details.ipAddress}` : 'IP Address: Not available'}
-
-What to do:
-- If this was you, wait for the lockout period to expire
-- If this was not you, investigate potential security breach
-- Consider changing the admin password
-- Review system access logs
-
-This is an automated security alert from TimePort.
-          `,
-        };
-
-      case 'failed_attempts':
-        return {
-          subject: `⚠️ TimePort Security Alert: Failed Login Attempts${alert.employeeName ? ` - ${alert.employeeName}` : ''}`,
-          htmlBody: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <div style="background-color: #ffc107; color: #212529; padding: 20px; text-align: center;">
-                <h1 style="margin: 0;">⚠️ Security Alert</h1>
-              </div>
-              <div style="padding: 20px; background-color: #f8f9fa;">
-                <h2 style="color: #ffc107;">Failed Login Attempts Detected</h2>
-                ${alert.employeeName ? `<p><strong>Employee:</strong> ${alert.employeeName}</p>` : ''}
-                <p><strong>Time:</strong> ${timestamp}</p>
-                <p><strong>Failed Attempts:</strong> ${alert.details.failedAttempts}/${alert.details.maxAttempts}</p>
-                ${alert.details.ipAddress ? `<p><strong>IP Address:</strong> ${alert.details.ipAddress}</p>` : '<p><strong>IP Address:</strong> Not available</p>'}
-
-                <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; margin: 20px 0; border-radius: 5px;">
-                  <p style="color: #856404; margin: 0;">
-                    <strong>Notice:</strong> Failed admin login attempts were detected${alert.employeeName ? ` for employee ${alert.employeeName}` : ''}. Review access logs and consider changing the admin password if this was not authorized.
-                  </p>
-                </div>
-
-                <p style="font-size: 12px; color: #6c757d; margin-top: 30px;">
-                  This is an automated security alert from TimePort. Do not reply to this email.
-                </p>
-              </div>
-            </div>
-          `,
-          textBody: `
-TIMEPORT SECURITY ALERT: Failed Login Attempts${alert.employeeName ? ` - ${alert.employeeName}` : ''}
-
-${alert.employeeName ? `Employee: ${alert.employeeName}\n` : ''}Time: ${timestamp}
-Failed Attempts: ${alert.details.failedAttempts}/${alert.details.maxAttempts}
-${alert.details.ipAddress ? `IP Address: ${alert.details.ipAddress}` : 'IP Address: Not available'}
-
-Notice: Failed admin login attempts were detected${alert.employeeName ? ` for employee ${alert.employeeName}` : ''}. Review access logs and consider changing the admin password if this was not authorized.
-
-This is an automated security alert from TimePort.
-          `,
-        };
-
-      case 'unlock':
-        return {
-          subject: '✅ TimePort Security Alert: Admin Account Unlocked',
-          htmlBody: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <div style="background-color: #28a745; color: white; padding: 20px; text-align: center;">
-                <h1 style="margin: 0;">✅ Security Alert</h1>
-              </div>
-              <div style="padding: 20px; background-color: #f8f9fa;">
-                <h2 style="color: #28a745;">Admin Account Unlocked</h2>
-                <p><strong>Time:</strong> ${timestamp}</p>
-                <p>The admin account lockout has expired and the account is now accessible again.</p>
-
-                <p style="font-size: 12px; color: #6c757d; margin-top: 30px;">
-                  This is an automated security alert from TimePort. Do not reply to this email.
-                </p>
-              </div>
-            </div>
-          `,
-          textBody: `
-TIMEPORT SECURITY ALERT: Admin Account Unlocked
-
-Time: ${timestamp}
-The admin account lockout has expired and the account is now accessible again.
-
-This is an automated security alert from TimePort.
-          `,
-        };
-
-      default:
-        return {
-          subject: 'TimePort Security Alert',
-          htmlBody: '<p>Unknown security alert type.</p>',
-          textBody: 'Unknown security alert type.',
-        };
     }
   }
 

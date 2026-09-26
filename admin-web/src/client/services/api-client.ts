@@ -1,47 +1,16 @@
 /**
  * Web API Client
- * Drop-in replacement for Electron IPC (window.adminAuth + window.adminAPI)
+ * Drop-in replacement for Electron IPC (window.adminAPI)
  * Uses HTTP fetch + WebSocket for real-time events.
  */
 
 const API_BASE = '';  // Same origin
 
-// ============================================================================
-// Token management
-// ============================================================================
-
-let authToken: string | null = localStorage.getItem('adminToken');
-
-function setToken(token: string | null): void {
-  authToken = token;
-  if (token) {
-    localStorage.setItem('adminToken', token);
-  } else {
-    localStorage.removeItem('adminToken');
-  }
-}
-
-function getHeaders(): Record<string, string> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (authToken) {
-    headers['Authorization'] = `Bearer ${authToken}`;
-  }
-  return headers;
-}
-
 async function apiFetch(path: string, options?: RequestInit): Promise<any> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: { ...getHeaders(), ...(options?.headers || {}) },
+    headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
   });
-  if (res.status === 401) {
-    setToken(null);
-    // Redirect to login — token expired or invalid
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
-    throw new Error('Session expired — please log in again');
-  }
   return res.json();
 }
 
@@ -76,14 +45,12 @@ type UnsubscribeFn = () => void;
 
 const eventListeners = new Map<string, Set<EventCallback>>();
 let adminWs: WebSocket | null = null;
-let wsReconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 function connectAdminWs(): void {
-  if (!authToken) return;
   if (adminWs && (adminWs.readyState === WebSocket.OPEN || adminWs.readyState === WebSocket.CONNECTING)) return;
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}/ws/admin?token=${encodeURIComponent(authToken)}`;
+  const wsUrl = `${protocol}//${window.location.host}/ws/admin`;
 
   adminWs = new WebSocket(wsUrl);
 
@@ -101,26 +68,15 @@ function connectAdminWs(): void {
 
   adminWs.onclose = () => {
     adminWs = null;
-    // Reconnect after 3 seconds if we still have a token
-    if (authToken) {
-      wsReconnectTimer = setTimeout(() => connectAdminWs(), 3000);
+    // Reconnect after 3 seconds while something is listening
+    if (eventListeners.size > 0) {
+      setTimeout(() => connectAdminWs(), 3000);
     }
   };
 
   adminWs.onerror = () => {
     adminWs?.close();
   };
-}
-
-function disconnectAdminWs(): void {
-  if (wsReconnectTimer) {
-    clearTimeout(wsReconnectTimer);
-    wsReconnectTimer = null;
-  }
-  if (adminWs) {
-    adminWs.close();
-    adminWs = null;
-  }
 }
 
 function onEvent(event: string, callback: EventCallback): UnsubscribeFn {
@@ -142,43 +98,6 @@ function onEvent(event: string, callback: EventCallback): UnsubscribeFn {
     }
   };
 }
-
-// ============================================================================
-// adminAuth — matches window.adminAuth interface
-// ============================================================================
-
-export const adminAuth = {
-  login: async (password: string): Promise<{ success: boolean; error?: string }> => {
-    try {
-      const result = await apiFetch('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ password }),
-      });
-      if (result.success && result.token) {
-        setToken(result.token);
-        connectAdminWs();
-      }
-      return { success: result.success, error: result.error };
-    } catch (err: any) {
-      return { success: false, error: err.message };
-    }
-  },
-
-  isAuthenticated: async (): Promise<{ authenticated: boolean }> => {
-    if (!authToken) return { authenticated: false };
-    try {
-      return await apiGet('/api/auth/check');
-    } catch {
-      return { authenticated: false };
-    }
-  },
-
-  logout: async (): Promise<{ success: boolean }> => {
-    setToken(null);
-    disconnectAdminWs();
-    return { success: true };
-  },
-};
 
 // ============================================================================
 // adminAPI — matches window.adminAPI interface exactly
@@ -290,8 +209,3 @@ export const adminAPI = {
   // Version
   getAppVersion: () => apiGet('/api/version').then(r => r.version),
 };
-
-// Auto-connect WebSocket if we have a token on load
-if (authToken) {
-  connectAdminWs();
-}

@@ -41,10 +41,6 @@ function setupIPC(overrides: Partial<any> = {}) {
     (window as any).electronAPI = {} as any;
   }
   Object.assign((window as any).electronAPI, api, overrides);
-  // Make AdminAuthService think we are already authenticated for these tests
-  sessionStorage.setItem('admin_authenticated', 'true');
-  sessionStorage.setItem('admin_auth_token', 'token');
-  sessionStorage.setItem('admin_auth_time', new Date().toISOString());
   return (window as any).electronAPI;
 }
 
@@ -54,14 +50,13 @@ beforeEach(() => {
 afterEach(() => {
   jest.runOnlyPendingTimers();
   jest.useRealTimers();
-  sessionStorage.clear();
 });
 
 describe('SettingsTab (RED)', () => {
   test('loads settings from IPC and renders core fields', async () => {
     setupIPC();
     render(<SettingsTab />);
-    // Should auto-load on mount due to stored admin auth
+    // Settings load on mount; there is no login
     expect(await screen.findByDisplayValue('08:30')).toBeInTheDocument();
     expect(screen.getByDisplayValue('17:15')).toBeInTheDocument();
     expect(screen.getByDisplayValue('C:/Reports')).toBeInTheDocument();

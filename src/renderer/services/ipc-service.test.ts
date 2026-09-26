@@ -38,9 +38,6 @@ const mockElectronAPI: jest.Mocked<ElectronAPI> = {
   onTrayActionTriggered: jest.fn(),
 
   // Admin Authentication API
-  adminLogin: jest.fn(),
-  getAdminLockoutState: jest.fn(),
-  resetAdminLockout: jest.fn(),
 
   // Enhanced Settings Management API
   bulkUpdateSettings: jest.fn(),

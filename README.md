@@ -67,21 +67,35 @@ and you are responsible for complying with the privacy, employment and
 data-protection laws that apply where you and they are (for example the GDPR in
 the EU). Do not use ProduTime for covert monitoring.
 
-## Admin Password
+## No Logins: Who Can See What
 
-ProduTime and the Admin Console have no built-in default admin password. The
-first time someone opens the admin login, a random password is generated and
-shown once in a separate window; store it in a password manager. Installs that
-still use the old default password of earlier versions are switched to a new
-random password (shown once) at their next admin login. The optional web admin
-console (`admin-web/`) refuses to start unless the `ADMIN_PASSWORD` environment
-variable is set to a password of at least 12 characters.
+ProduTime, the Admin Console and the web admin console (`admin-web/`) have no
+logins, passwords or sessions. Each one opens straight to its screens. Access is
+controlled only by who can use the computer:
+
+- **ProduTime (desktop app):** anyone who can use the Windows account it runs
+  under, or who can otherwise use that PC and read its files, can open the
+  dashboard, settings and reports and change settings.
+- **Admin Console:** anyone who can use the PC it runs on can see the data of
+  every paired device and change policies. ProduTime devices on the local
+  network can still connect to it to send their data, but a device is only
+  accepted after it pairs with a short-lived pairing code that you approve, and
+  its messages are signed.
+- **Web admin console (`admin-web/`):** it listens on `127.0.0.1` only and
+  refuses requests from other computers and from other websites, so it can only
+  be opened in a browser on the same PC. It cannot be deployed as a network or
+  internet service.
+
+Protect these PCs with their own Windows sign-in, and do not share the Windows
+account ProduTime or the admin tools run under. Admin password data stored by
+earlier versions is deleted automatically when you upgrade.
 
 ## Known Limitations
 
-- Security alerts and failure notifications are sent with the sender address
-  `noreply@timeport.app` (from the project's former name), whatever SMTP account
-  you configure. Some mail servers may reject or flag these messages.
+- Report-failure notifications and test emails are sent with the sender
+  address `noreply@timeport.app` (from the project's former name), whatever
+  SMTP account you configure. Some mail servers may reject or flag these
+  messages.
 
 ## Tech Stack
 
@@ -143,7 +157,7 @@ src/
   shared/         Shared TypeScript types
 assets/           Icons and images
 admin-console/    Optional ProduTime Admin Console
-admin-web/        Optional web admin console
+admin-web/        Optional web admin console (this PC only)
 scripts/          Build and maintenance scripts
 ```
 

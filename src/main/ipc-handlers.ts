@@ -1,10 +1,5 @@
-import { app, BrowserWindow, clipboard, dialog, ipcMain, IpcMainInvokeEvent } from 'electron';
+import { app, ipcMain, IpcMainInvokeEvent } from 'electron';
 import { DatabaseManager } from './database';
-import {
-  generateAdminPassword,
-  hashAdminPassword,
-  isLegacyDefaultAdminPassword,
-} from './admin-password';
 // Auto-updater IPC is registered directly in auto-updater.ts via AutoUpdaterManager
 import { PDFGenerator } from './pdf-generator';
 import { SystemTrayManager } from './system-tray';
@@ -37,9 +32,6 @@ import {
   ReportFormat,
   TrayNotification,
   TrayState,
-  AdminLoginRequest,
-  AdminLoginResponse,
-  AdminLockoutState,
   ActivateLicenseRequest,
   ActivationResponse,
   ActivationStatus,
@@ -60,21 +52,11 @@ export class IPCHandlers {
   private deviceIdService: DeviceIdService;
   private logger: Logger;
   private enhancedLicenseService: EnhancedLicenseService | null = null;
-  private readonly FAILED_ALERT_LAST_SENT_KEY =
-    'failed_attempts_alert_last_sent_at';
-  private readonly FAILED_ALERT_RATE_LIMIT_MIN = 10; // minutes
 
-  private readonly FAILED_ALERT_THRESHOLD = 3; // Minimum failed attempts before sending alert
-  private readonly LOCKOUT_THRESHOLD = 5; // Lock account after this many failed attempts
-  private readonly LOCKOUT_DURATION_MINUTES = 15; // Lockout duration in minutes
-
-  // Settings keys the renderer MUST NOT be able to write via the generic IPC.
-  // Includes the admin password hash (auth bypass), lockout state (bypass lockout),
+  // Settings keys the renderer MUST NOT be able to write via the generic IPC:
   // license/entitlement state, agent private keys, and SMTP credentials.
   // Exact keys OR prefixes (ends with '_') are matched.
   private readonly RENDERER_DENIED_SETTING_KEYS: ReadonlyArray<string> = [
-    'admin_password_hash',
-    'admin_lockout_',
     'license_',
     'entitlement_',
     'agent_',
@@ -82,7 +64,6 @@ export class IPCHandlers {
     'device_private_key',
     'email_smtp_pass',
     'email_smtp_password',
-    'failed_attempts_',
   ];
 
   private isRendererDeniedSettingKey(key: string): boolean {
@@ -101,13 +82,10 @@ export class IPCHandlers {
   // Settings keys the renderer MUST NOT be able to read via the generic IPC.
   // The write deny-list covers mutation, but the read paths are separate —
   // without this, a renderer XSS (or any compromised renderer code) can read
-  // the scrypt admin password hash (enabling offline brute force), the SMTP
-  // password, the encrypted-agent-private-key blob, and license/lockout
-  // state. None of these have a legitimate renderer use case; auth-bearing
-  // handlers read them directly from the DB in the main process.
+  // the SMTP password, the encrypted-agent-private-key blob, and license
+  // state. None of these have a legitimate renderer use case; handlers that
+  // need them read them directly from the DB in the main process.
   private readonly RENDERER_DENIED_READ_KEYS: ReadonlyArray<string> = [
-    'admin_password_hash',
-    'admin_lockout_',
     'license_',
     'entitlement_',
     'agent_',
@@ -115,7 +93,6 @@ export class IPCHandlers {
     'device_private_key',
     'email_smtp_pass',
     'email_smtp_password',
-    'failed_attempts_',
   ];
 
   private isRendererDeniedReadKey(key: string): boolean {
@@ -333,10 +310,6 @@ export class IPCHandlers {
       IPCChannels.GET_TRAY_STATE,
       IPCChannels.TOGGLE_WINDOW_VISIBILITY,
       IPCChannels.QUIT_APPLICATION,
-      // Admin
-      IPCChannels.ADMIN_LOGIN,
-      IPCChannels.ADMIN_GET_LOCKOUT_STATE,
-      IPCChannels.ADMIN_RESET_LOCKOUT,
       // Enhanced settings
       IPCChannels.BULK_UPDATE_SETTINGS,
 
@@ -472,17 +445,6 @@ export class IPCHandlers {
       );
     }
 
-    // Admin authentication handlers
-    ipcMain.handle(IPCChannels.ADMIN_LOGIN, this.handleAdminLogin.bind(this));
-    ipcMain.handle(
-      IPCChannels.ADMIN_GET_LOCKOUT_STATE,
-      this.handleGetAdminLockoutState.bind(this)
-    );
-    ipcMain.handle(
-      IPCChannels.ADMIN_RESET_LOCKOUT,
-      this.handleResetAdminLockout.bind(this)
-    );
-
     // Email configuration handlers
     try { ipcMain.removeHandler('email:getConfig'); } catch {}
     try { ipcMain.removeHandler('email:saveConfig'); } catch {}
@@ -537,11 +499,10 @@ export class IPCHandlers {
         if (!this.emailService.isConfigured) {
           return { success: false, error: 'Email service not configured' };
         }
-        await this.emailService.sendSecurityAlert(alertEmail, {
-          type: 'failed_attempts',
-          timestamp: new Date().toISOString(),
-          details: { failedAttempts: 0, maxAttempts: 0 },
-        });
+        const sent = await this.emailService.sendTestEmail(alertEmail);
+        if (!sent) {
+          return { success: false, error: 'Test email could not be sent' };
+        }
         return { success: true };
       } catch (error: any) {
         return { success: false, error: error.message };
@@ -825,9 +786,8 @@ export class IPCHandlers {
       }
 
       // Reject writes to security-sensitive settings from the renderer.
-      // These keys hold the admin password hash, lockout state, license,
-      // agent private key material, and SMTP credentials — the renderer has
-      // no legitimate reason to write them and doing so bypasses admin auth.
+      // These keys hold license state, agent private key material, and SMTP
+      // credentials — the renderer has no legitimate reason to write them.
       if (this.isRendererDeniedSettingKey(request.key)) {
         this.logger.warn(
           'IPC',
@@ -907,8 +867,8 @@ export class IPCHandlers {
     try {
       const settings = this.database.getAllSettings();
       // Filter out security-sensitive rows before returning to renderer.
-      // Protects the admin password hash, SMTP creds, license state, and
-      // agent private-key blob from leaking via a bulk dump.
+      // Protects SMTP creds, license state, and the agent private-key blob
+      // from leaking via a bulk dump.
       const filtered = (settings || []).filter(
         (s) => !this.isRendererDeniedReadKey(s.key)
       );
@@ -1301,312 +1261,6 @@ export class IPCHandlers {
     }
   }
 
-  // Shows a newly generated admin password once, in a native dialog owned by
-  // the window that asked to log in. The password is never logged or stored
-  // in plain text. Returns false if the dialog could not be shown, so the
-  // caller does not store a password nobody has seen.
-  private async showGeneratedAdminPassword(
-    event: IpcMainInvokeEvent,
-    password: string,
-    reason: 'first-run' | 'replaced-default'
-  ): Promise<boolean> {
-    const message =
-      reason === 'first-run'
-        ? 'A ProduTime admin password has been created for this computer.'
-        : 'The old default admin password has been replaced with a new random password.';
-    const options: Electron.MessageBoxOptions = {
-      type: 'warning',
-      title: 'ProduTime admin password',
-      message,
-      detail:
-        `Admin password: ${password}\n\n` +
-        'Write it down or store it in a password manager now. ' +
-        'It is shown only once and cannot be recovered from ProduTime.',
-      buttons: ['Copy password', 'Close'],
-      defaultId: 0,
-      cancelId: 1,
-      noLink: true,
-    };
-    try {
-      const owner = event?.sender ? BrowserWindow.fromWebContents(event.sender) : null;
-      const result = owner
-        ? await dialog.showMessageBox(owner, options)
-        : await dialog.showMessageBox(options);
-      if (result.response === 0) {
-        clipboard.writeText(password);
-      }
-      return true;
-    } catch (err) {
-      this.logger.error('ADMIN', 'Could not show the generated admin password', err);
-      return false;
-    }
-  }
-
-  // Admin authentication handlers
-  private async handleAdminLogin(
-    event: IpcMainInvokeEvent,
-    request: AdminLoginRequest
-  ): Promise<IPCResponse<AdminLoginResponse>> {
-    try {
-      // Check if account is locked out
-      if (this.database.isAdminLockedOut()) {
-        const lockoutState = this.database.getLockoutState();
-        return {
-          success: true,
-          data: {
-            success: false,
-            isLockedOut: true,
-            failedAttempts: lockoutState.failed_attempts_count,
-            maxAttempts: this.LOCKOUT_THRESHOLD,
-            lockoutExpiresAt: lockoutState.locked_until || undefined,
-          },
-        };
-      }
-      const lockoutState = this.database.getLockoutState();
-
-      // Get the admin password hash from settings. There is no built-in
-      // default password: on first use a random one is generated and shown
-      // once to the person at this machine.
-      const crypto = require('crypto');
-      let adminPasswordHash = await this.database.getSetting('admin_password_hash');
-
-      if (!adminPasswordHash) {
-        const generated = generateAdminPassword();
-        if (!(await this.showGeneratedAdminPassword(event, generated, 'first-run'))) {
-          return { success: false, error: 'Could not show the new admin password. Please try again.' };
-        }
-        this.database.setSetting('admin_password_hash', hashAdminPassword(generated));
-        this.logger.info('ADMIN', 'Generated a random admin password on first run');
-        // This attempt was made before the password existed, so it is not
-        // counted as a failed login.
-        return {
-          success: true,
-          data: {
-            success: false,
-            isLockedOut: false,
-            failedAttempts: lockoutState.failed_attempts_count,
-            maxAttempts: this.LOCKOUT_THRESHOLD,
-            passwordGenerated: true,
-          },
-        };
-      }
-
-      // Hash the incoming password for comparison
-      let isValidPassword = false;
-      try {
-        const parts = adminPasswordHash.split(':');
-        if (parts.length !== 2) {
-          this.logger.warn('ADMIN', 'Invalid password hash format in database');
-          // Still run scrypt against a dummy salt/hash so a malformed stored
-          // hash doesn't leak via response-time (the "no hash vs wrong
-          // password" timing distinction).
-          const dummySalt = crypto.randomBytes(16);
-          const dummyHash = crypto.randomBytes(32);
-          const incomingDerivedKey = crypto.scryptSync(
-            request.password || '',
-            dummySalt,
-            32
-          );
-          try {
-            crypto.timingSafeEqual(incomingDerivedKey, dummyHash);
-          } catch {
-            // length mismatch — ignore
-          }
-          isValidPassword = false;
-        } else {
-          const salt = Buffer.from(parts[0], 'hex');
-          const storedHash = Buffer.from(parts[1], 'hex');
-          const incomingDerivedKey = crypto.scryptSync(request.password || '', salt, 32);
-
-          // Use constant-time comparison to prevent timing attacks
-          isValidPassword =
-            incomingDerivedKey.length === storedHash.length &&
-            crypto.timingSafeEqual(incomingDerivedKey, storedHash);
-        }
-      } catch (err) {
-        // Hashing or comparison failed
-        this.logger.error('ADMIN', 'Password verification error', err);
-        isValidPassword = false;
-      }
-
-      // Record the login attempt
-      this.database.recordLoginAttempt(
-        request.ipAddress || null,
-        isValidPassword
-      );
-
-      if (isValidPassword) {
-        // Reset failed attempts on successful login
-        this.database.updateLockoutState({
-          failed_attempts_count: 0,
-          is_locked: false,
-          locked_until: null,
-        });
-
-        // Installs set up by older versions still use the fixed first-run
-        // password. Replace it with a random one and show that once.
-        if (isLegacyDefaultAdminPassword(request.password)) {
-          const generated = generateAdminPassword();
-          if (await this.showGeneratedAdminPassword(event, generated, 'replaced-default')) {
-            this.database.setSetting('admin_password_hash', hashAdminPassword(generated));
-            this.logger.warn('ADMIN', 'Replaced the old default admin password with a random one');
-          }
-        }
-
-        return {
-          success: true,
-          data: {
-            success: true,
-            isLockedOut: false,
-            failedAttempts: 0,
-            maxAttempts: this.LOCKOUT_THRESHOLD,
-          },
-        };
-      } else {
-        // Handle failed login
-        const lockoutState = this.database.getLockoutState();
-        const newFailedCount = lockoutState.failed_attempts_count + 1;
-
-        // Lock out if threshold reached
-        const shouldLock = newFailedCount >= this.LOCKOUT_THRESHOLD;
-        const lockedUntil = shouldLock
-          ? new Date(Date.now() + this.LOCKOUT_DURATION_MINUTES * 60 * 1000).toISOString()
-          : null;
-
-        this.database.updateLockoutState({
-          failed_attempts_count: newFailedCount,
-          last_attempt_at: new Date().toISOString(),
-          is_locked: shouldLock,
-          locked_until: lockedUntil,
-        });
-
-        if (shouldLock) {
-          this.logger.warn('ADMIN', `Account locked after ${newFailedCount} failed attempts. Locked for ${this.LOCKOUT_DURATION_MINUTES} minutes.`);
-        }
-
-        // Send an admin alert only after threshold failures (rate-limited)
-        // Fire-and-forget to avoid blocking the authentication response
-        console.log(
-          `🔧 [DEBUG] Failed login count: ${newFailedCount}, threshold: ${this.FAILED_ALERT_THRESHOLD}`
-        );
-
-        if (newFailedCount >= this.FAILED_ALERT_THRESHOLD) {
-          console.log(
-            `🚨 [SECURITY] Threshold reached! Triggering email alert...`
-          );
-          this.sendFailedAttemptsAlert(
-            newFailedCount,
-            this.FAILED_ALERT_THRESHOLD,
-            request.ipAddress
-          ).catch((error) => {
-            console.error('Failed to send admin alert email:', error);
-          });
-        } else {
-          console.log(
-            `🔧 [DEBUG] Threshold not reached yet (${newFailedCount}/${this.FAILED_ALERT_THRESHOLD})`
-          );
-        }
-
-        return {
-          success: true,
-          data: {
-            success: false,
-            isLockedOut: shouldLock,
-            failedAttempts: newFailedCount,
-            maxAttempts: this.LOCKOUT_THRESHOLD,
-            lockoutExpiresAt: lockedUntil || undefined,
-          },
-        };
-      }
-    } catch (error) {
-      console.error('Error during admin login:', error);
-      return {
-        success: false,
-        error: `Failed to process admin login: ${error}`,
-      };
-    }
-  }
-
-  private async handleGetAdminLockoutState(
-    event: IpcMainInvokeEvent
-  ): Promise<IPCResponse<AdminLockoutState>> {
-    try {
-      const lockoutState = this.database.getLockoutState();
-      // Redact brute-force progress from the renderer. The renderer only needs
-      // is_locked / locked_until to drive the lockout UI; leaking the running
-      // failed-attempts count lets a compromised renderer enumerate remaining
-      // tries before the 5/15-min lockout triggers.
-      const safeState: AdminLockoutState = {
-        ...lockoutState,
-        failed_attempts_count: 0,
-        last_attempt_at: null,
-      };
-      return { success: true, data: safeState };
-    } catch (error) {
-      console.error('Error getting admin lockout state:', error);
-      return {
-        success: false,
-        error: `Failed to get admin lockout state: ${error}`,
-      };
-    }
-  }
-
-  private async handleResetAdminLockout(
-    event: IpcMainInvokeEvent,
-    request?: { password?: string }
-  ): Promise<IPCResponse<void>> {
-    try {
-      // Lockout reset must require the admin password — otherwise an
-      // attacker in the renderer can bypass the 5-attempts / 15-minute
-      // brute-force protection by calling this channel directly.
-      const supplied = request?.password || '';
-      if (!supplied) {
-        return {
-          success: false,
-          error: 'Admin password required to reset lockout.',
-        };
-      }
-
-      const crypto = require('crypto');
-      const stored = await this.database.getSetting('admin_password_hash');
-      let ok = false;
-      if (stored) {
-        try {
-          const parts = String(stored).split(':');
-          if (parts.length === 2) {
-            const salt = Buffer.from(parts[0], 'hex');
-            const storedHash = Buffer.from(parts[1], 'hex');
-            const incoming = crypto.scryptSync(supplied, salt, 32);
-            ok =
-              incoming.length === storedHash.length &&
-              crypto.timingSafeEqual(incoming, storedHash);
-          }
-        } catch (err) {
-          this.logger.error('ADMIN', 'Lockout-reset password check failed', err);
-          ok = false;
-        }
-      }
-
-      if (!ok) {
-        this.logger.warn('ADMIN', 'Rejected lockout reset with invalid password');
-        return { success: false, error: 'Invalid admin password.' };
-      }
-
-      this.database.updateLockoutState({
-        is_locked: false,
-        locked_until: null,
-        failed_attempts_count: 0,
-      });
-      return { success: true };
-    } catch (error) {
-      console.error('Error resetting admin lockout:', error);
-      return {
-        success: false,
-        error: `Failed to reset admin lockout: ${error}`,
-      };
-    }
-  }
-
   // Enhanced settings management handlers
   private async handleBulkUpdateSettings(
     event: IpcMainInvokeEvent,
@@ -1643,148 +1297,6 @@ export class IPCHandlers {
         success: false,
         error: `Failed to bulk update settings: ${error}`,
       };
-    }
-  }
-
-  // Email alert helper methods
-  private async sendLockoutAlert(
-    failedAttempts: number,
-    maxAttempts: number,
-    lockoutDurationMinutes: number,
-    ipAddress?: string
-  ): Promise<void> {
-    try {
-      const alertEmail = await this.database.getSetting('admin_alert_email');
-      if (!alertEmail) {
-        console.log('No admin alert email configured. Lockout alert not sent.');
-        return;
-      }
-
-      const lockoutDuration = `${lockoutDurationMinutes} minute${lockoutDurationMinutes !== 1 ? 's' : ''}`;
-
-      // Get employee name from settings
-      const employeeName = await this.database.getSetting('employee_name');
-
-      await this.emailService.sendSecurityAlert(alertEmail, {
-        type: 'lockout',
-        timestamp: new Date().toISOString(),
-        employeeName: employeeName || undefined,
-        details: {
-          failedAttempts,
-          maxAttempts,
-          lockoutDuration,
-          ipAddress,
-        },
-      });
-    } catch (error) {
-      console.error('Failed to send lockout alert email:', error);
-    }
-  }
-
-  private async sendFailedAttemptsAlert(
-    failedAttempts: number,
-    maxAttempts: number,
-    ipAddress?: string
-  ): Promise<void> {
-    try {
-      console.log(
-        `🔧 [DEBUG] sendFailedAttemptsAlert called with failedAttempts: ${failedAttempts}, maxAttempts: ${maxAttempts}`
-      );
-
-      const alertEmail = await this.database.getSetting('admin_alert_email');
-      console.log(`🔧 [DEBUG] admin_alert_email setting: ${alertEmail}`);
-
-      if (!alertEmail) {
-        console.log(
-          '❌ [EMAIL] No admin alert email configured. Failed attempts alert not sent.'
-        );
-        return;
-      }
-
-      // Rate limit: only send once per FAILED_ALERT_RATE_LIMIT_MIN minutes
-      const lastSent = this.database.getSetting(
-        this.FAILED_ALERT_LAST_SENT_KEY
-      );
-      console.log(`🔧 [DEBUG] lastSent: ${lastSent}`);
-
-      const now = new Date();
-      let canSend = true;
-      if (lastSent) {
-        const last = new Date(lastSent);
-        const diffMin = (now.getTime() - last.getTime()) / 60000;
-        canSend = diffMin >= this.FAILED_ALERT_RATE_LIMIT_MIN;
-        console.log(
-          `🔧 [DEBUG] Rate limit check: diffMin=${diffMin}, canSend=${canSend}, threshold=${this.FAILED_ALERT_RATE_LIMIT_MIN}`
-        );
-      } else {
-        console.log(`🔧 [DEBUG] No previous email sent, canSend=${canSend}`);
-      }
-
-      if (!canSend) {
-        console.log(
-          `⏰ [EMAIL] Skipping failed-attempts alert due to rate limiting. Next alert allowed after ${this.FAILED_ALERT_RATE_LIMIT_MIN} minutes.`
-        );
-        return;
-      }
-
-      console.log(
-        `📧 [EMAIL] Attempting to send security alert to: ${alertEmail}`
-      );
-
-      // Get employee name from settings
-      const employeeName = await this.database.getSetting('employee_name');
-      console.log(`🔧 [DEBUG] Employee name: ${employeeName}`);
-
-      const sent = await this.emailService.sendSecurityAlert(alertEmail, {
-        type: 'failed_attempts',
-        timestamp: now.toISOString(),
-        employeeName: employeeName || undefined,
-        details: {
-          failedAttempts,
-          maxAttempts,
-          ipAddress,
-        },
-      });
-
-      console.log(`📧 [EMAIL] Email send result: ${sent}`);
-
-      if (sent) {
-        this.database.setSetting(
-          this.FAILED_ALERT_LAST_SENT_KEY,
-          now.toISOString()
-        );
-        console.log(
-          `🔧 [DEBUG] Updated last sent timestamp: ${now.toISOString()}`
-        );
-      } else {
-        console.log(`❌ [EMAIL] Failed to send security alert email`);
-      }
-    } catch (error) {
-      console.error('Failed to send failed attempts alert email:', error);
-    }
-  }
-
-  private async sendUnlockAlert(): Promise<void> {
-    try {
-      const alertEmail = await this.database.getSetting('admin_alert_email');
-      if (!alertEmail) {
-        return;
-      }
-
-      // Get employee name from settings
-      const employeeName = await this.database.getSetting('employee_name');
-
-      await this.emailService.sendSecurityAlert(alertEmail, {
-        type: 'unlock',
-        timestamp: new Date().toISOString(),
-        employeeName: employeeName || undefined,
-        details: {
-          failedAttempts: 0,
-          maxAttempts: 0,
-        },
-      });
-    } catch (error) {
-      console.error('Failed to send unlock alert email:', error);
     }
   }
 

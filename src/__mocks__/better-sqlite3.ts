@@ -265,13 +265,12 @@ class MockDatabase {
   }
 
   exec(sql: string): this {
-    // Handle DELETE statements
-    const lowerSql = sql.toLowerCase();
-    if (lowerSql.includes("delete from")) {
-      const tableMatch = lowerSql.match(/delete from (\w+)/);
-      if (tableMatch) {
-        const tableName = tableMatch[1];
-        const table = mockTables.get(tableName);
+    // Handle DELETE statements. The mock cannot evaluate WHERE clauses, so
+    // only an unconditional DELETE clears a table; conditional ones are ignored.
+    for (const statement of sql.toLowerCase().split(";")) {
+      const tableMatch = statement.match(/delete from (\w+)/);
+      if (tableMatch && !/\bwhere\b/.test(statement)) {
+        const table = mockTables.get(tableMatch[1]);
         if (table) {
           table.clear();
         }

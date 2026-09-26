@@ -20,9 +20,6 @@ import type {
   ReportData,
   TrayNotification,
   TrayState,
-  AdminLoginRequest,
-  AdminLoginResponse,
-  AdminLockoutState,
   WorkScheduleForDayRequest,
   WorkScheduleForDay,
   ActivateLicenseRequest,
@@ -92,11 +89,6 @@ const IPCChannels = {
   // System Tray events (main -> renderer)
   TRAY_NOTIFICATION_CLICKED: 'tray:notificationClicked',
   TRAY_ACTION_TRIGGERED: 'tray:actionTriggered',
-
-  // Admin Authentication
-  ADMIN_LOGIN: 'admin:login',
-  ADMIN_GET_LOCKOUT_STATE: 'admin:getLockoutState',
-  ADMIN_RESET_LOCKOUT: 'admin:resetLockout',
 
   // Enhanced Settings Management
   BULK_UPDATE_SETTINGS: 'settings:bulkUpdate',
@@ -282,20 +274,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.removeListener(IPCChannels.TRAY_ACTION_TRIGGERED, listener);
     };
   },
-
-  // Admin Authentication API
-  adminLogin: (
-    request: AdminLoginRequest
-  ): Promise<IPCResponse<AdminLoginResponse>> =>
-    ipcRenderer.invoke(IPCChannels.ADMIN_LOGIN, request),
-
-  getAdminLockoutState: (): Promise<IPCResponse<AdminLockoutState>> =>
-    ipcRenderer.invoke(IPCChannels.ADMIN_GET_LOCKOUT_STATE),
-
-  resetAdminLockout: (
-    request?: { password?: string }
-  ): Promise<IPCResponse<void>> =>
-    ipcRenderer.invoke(IPCChannels.ADMIN_RESET_LOCKOUT, request),
 
   // Email Configuration API
   getEmailConfig: (): Promise<IPCResponse<any>> =>

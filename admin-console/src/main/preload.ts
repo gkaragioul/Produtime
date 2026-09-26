@@ -5,12 +5,6 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 
-contextBridge.exposeInMainWorld('adminAuth', {
-  login: (password: string) => ipcRenderer.invoke('auth:login', password),
-  isAuthenticated: () => ipcRenderer.invoke('auth:isAuthenticated'),
-  logout: () => ipcRenderer.invoke('auth:logout'),
-});
-
 contextBridge.exposeInMainWorld('adminAPI', {
   // Device operations
   getAllDevices: () => ipcRenderer.invoke('devices:getAll'),
