@@ -11,6 +11,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import * as nacl from 'tweetnacl';
 import { AdminDatabase } from './db';
 import { DashboardService } from './dashboard-service';
+import { PairingGuard } from './pairing-guard';
 import {
   AdminProtocolMessage,
   PairRequestPayload,
@@ -48,6 +49,7 @@ export class AdminServer {
   private adminKeyPair: { publicKey: string; privateKey: string } | null = null;
   private currentPairCode: string | null = null;
   private pairCodeExpiry: number = 0;
+  private pairingGuard = new PairingGuard();
   private port: number;
   
   // mDNS advertising
@@ -446,17 +448,8 @@ export class AdminServer {
    * Handle HTTP requests
    */
   private handleHttpRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
-    // CORS headers for local network
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (req.method === 'OPTIONS') {
-      res.writeHead(200);
-      res.end();
-      return;
-    }
-
+    // No CORS headers: only ProduTime devices (not browsers) call this server,
+    // so web pages must not be able to read its responses.
     const url = req.url || '/';
 
     if (url === '/health' && req.method === 'GET') {
@@ -488,59 +481,67 @@ export class AdminServer {
    * Handle pairing request
    */
   private handlePairRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
-    this.log('[SERVER] ========================================');
-    this.log('[SERVER] HTTP POST /pair/request received');
-    this.log(`[SERVER] Remote address: ${req.socket.remoteAddress}`);
-    
+    const ip = req.socket.remoteAddress || 'unknown';
+    const sendJson = (status: number, body: object) => {
+      res.writeHead(status, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(body));
+    };
+
+    if (!this.pairingGuard.allowRequest(ip)) {
+      this.log(`[SERVER] Pair request from ${ip} rejected: too many requests`);
+      sendJson(429, { success: false, error: 'Too many pairing requests. Try again in a minute.' });
+      req.resume();
+      return;
+    }
+
+    this.log(`[SERVER] Pair request received from ${ip}`);
+
+    const MAX_BODY_BYTES = 64 * 1024;
     let body = '';
-    req.on('data', (chunk) => (body += chunk));
+    let tooLarge = false;
+    req.on('data', (chunk) => {
+      if (tooLarge) return;
+      body += chunk;
+      if (body.length > MAX_BODY_BYTES) {
+        tooLarge = true;
+        sendJson(413, { success: false, error: 'Request too large' });
+        req.destroy();
+      }
+    });
     req.on('end', () => {
+      if (tooLarge) return;
       try {
-        this.log(`[SERVER] Request body length: ${body.length}`);
-        this.log(`[SERVER] Request body preview: ${body.substring(0, 300)}`);
-        
         const message = JSON.parse(body) as AdminProtocolMessage;
-        
+
         if (message.type !== 'PAIR_REQUEST') {
-          this.log(`[SERVER] ERROR: Invalid message type: ${message.type}`);
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: 'Invalid message type' }));
+          this.log('[SERVER] Pair request rejected: invalid message type');
+          sendJson(400, { success: false, error: 'Invalid message type' });
           return;
         }
 
         const payload = (message as any).payload as PairRequestPayload;
-        this.log('[SERVER] Pair request details:');
-        this.log(`[SERVER]   deviceId: ${message.deviceId}`);
-        this.log(`[SERVER]   deviceName: ${payload.deviceName}`);
-        this.log(`[SERVER]   pairCode: ${payload.pairCode}`);
-        this.log(`[SERVER]   appVersion: ${payload.appVersion}`);
 
-        // Verify pair code
-        this.log(`[SERVER] Current pair code: ${this.currentPairCode}`);
-        this.log(`[SERVER] Pair code expiry: ${this.pairCodeExpiry} now: ${Date.now()}`);
-        
+        // Verify pair code. The code itself is never logged.
         if (!this.currentPairCode || Date.now() > this.pairCodeExpiry) {
-          this.log('[SERVER] ERROR: No active pair code or expired');
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: 'No active pair code' }));
+          this.log('[SERVER] Pair request rejected: no active pair code');
+          sendJson(400, { success: false, error: 'No active pair code' });
           return;
         }
 
-        if (payload.pairCode !== this.currentPairCode) {
-          this.log('[SERVER] ERROR: Pair code mismatch');
-          this.log(`[SERVER]   received: ${payload.pairCode}`);
-          this.log(`[SERVER]   expected: ${this.currentPairCode}`);
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: 'Invalid pair code' }));
+        if (payload?.pairCode !== this.currentPairCode) {
+          if (this.pairingGuard.recordWrongCode()) {
+            this.clearPairCode();
+            this.log(`[SERVER] Wrong pair code from ${ip}; too many wrong codes, the pair code was cancelled. Generate a new one.`);
+          } else {
+            this.log(`[SERVER] Pair request rejected: wrong pair code from ${ip}`);
+          }
+          sendJson(400, { success: false, error: 'Invalid pair code' });
           return;
         }
 
         // Store pending pair request
         const requestId = crypto.randomUUID();
-        const ip = req.socket.remoteAddress || 'unknown';
-        this.log('[SERVER] Creating pending pair request:');
-        this.log(`[SERVER]   requestId: ${requestId}`);
-        this.log(`[SERVER]   ip: ${ip}`);
+        this.log(`[SERVER] Pair code accepted from ${ip}; waiting for approval (request ${requestId})`);
 
         this.db.insertPendingPair({
           request_id: requestId,
@@ -567,17 +568,20 @@ export class AdminServer {
         });
 
         // Clear pair code after use
-        this.currentPairCode = null;
+        this.clearPairCode();
 
-        this.log(`[SERVER] Pair request accepted, requestId: ${requestId}`);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, requestId }));
-      } catch (error) {
-        this.log(`[SERVER] Error handling pair request: ${error}`);
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: false, error: 'Invalid request' }));
+        sendJson(200, { success: true, requestId });
+      } catch {
+        this.log('[SERVER] Pair request rejected: malformed request');
+        sendJson(400, { success: false, error: 'Invalid request' });
       }
     });
+  }
+
+  private clearPairCode(): void {
+    this.currentPairCode = null;
+    this.pairCodeExpiry = 0;
+    this.pairingGuard.resetCodeAttempts();
   }
 
   /**
@@ -873,6 +877,7 @@ export class AdminServer {
     const num = bytes.readUIntBE(0, 3) % 1000000;
     this.currentPairCode = num.toString().padStart(6, '0');
     this.pairCodeExpiry = Date.now() + 300000; // 5 minutes
+    this.pairingGuard.resetCodeAttempts();
     return this.currentPairCode;
   }
 

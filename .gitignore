@@ -66,7 +66,10 @@ coverage/
 
 # Database files (dev/test)
 *.db
-!src/main/services/test-data/timeport.db
+# Test database folders (never commit test databases)
+test-data/
+test-data-privacy/
+src/main/services/test-data/
 cloud-admin-api/prisma/dev.db
 
 # Installer output
